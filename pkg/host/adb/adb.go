@@ -168,7 +168,8 @@ func Dropped(err error) bool {
 	return exit.ExitCode() == 1 &&
 		(strings.Contains(msg, "adb: device '") && strings.Contains(msg, "' not found") ||
 			strings.Contains(msg, "device offline") ||
-			strings.Contains(msg, "no devices/emulators found"))
+			strings.Contains(msg, "no devices/emulators found") ||
+			strings.Contains(msg, "error: closed"))
 }
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

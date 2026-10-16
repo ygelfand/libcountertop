@@ -15,7 +15,7 @@ import (
 // `adb shell` on older adb returns adb's status, not the command's.
 const rcMarker = "__adb_rc="
 
-const backTimeout = 5 * time.Second
+const backTimeout = 90 * time.Second
 
 type Device struct {
 	serial string
@@ -347,11 +347,17 @@ func (d *Device) withRetry(do func() (string, error)) (string, error) {
 }
 
 func (d *Device) back(ctx context.Context) error {
-	tick := time.NewTicker(time.Second)
+	_ = exec.Command(Binary, "kill-server").Run()
+	time.Sleep(time.Second)
+	_ = exec.Command(Binary, "start-server").Run()
+	time.Sleep(time.Second)
+
+	tick := time.NewTicker(3 * time.Second)
 	defer tick.Stop()
 
 	for {
 		if raw, err := d.rawShell("true"); err == nil && strings.Contains(raw, rcMarker) {
+			time.Sleep(2 * time.Second)
 			return nil
 		}
 		select {
