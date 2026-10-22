@@ -9,6 +9,7 @@ require (
 	github.com/Sendspin/sendspin-go v1.8.2
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/asticode/go-astits v1.16.0
+	github.com/beevik/ntp v1.5.0
 	github.com/bluenviron/gohlslib/v2 v2.4.5
 	github.com/bluenviron/mediacommon/v2 v2.9.5
 	github.com/charmbracelet/x/term v0.2.2

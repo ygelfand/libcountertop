@@ -174,7 +174,8 @@ func (m *motion) progress() (float32, bool) {
 		m.kind = ""
 		return 0, false
 	}
-	return m.at + (m.to-m.at)*float32(1-math.Pow(1-t, 3)), true
+	u := 1 - t
+	return m.at + (m.to-m.at)*float32(1-u*u*u), true
 }
 
 type layer struct {
