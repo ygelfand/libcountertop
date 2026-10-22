@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	headerSize = 48
+	headerSize = 64
 	magic      = 0x42465354
 )
 
@@ -51,16 +51,31 @@ func (f *Frame) Rotation() int { return int(atomic.LoadUint32(f.word(20))) }
 type Turn struct {
 	Count uint32
 	Step  int
+	From  int
 	Area  image.Rectangle
 }
 
 func (f *Frame) Turn() Turn {
 	t := Turn{Count: atomic.LoadUint32(f.word(24))}
 	t.Step = int(int32(atomic.LoadUint32(f.word(28))))
+	t.From = int(atomic.LoadUint32(f.word(44)))
 	xy, wh := atomic.LoadUint32(f.word(32)), atomic.LoadUint32(f.word(36))
 	x, y := int(xy&0xffff), int(xy>>16)
 	t.Area = image.Rect(x, y, x+int(wh&0xffff), y+int(wh>>16))
 	return t
+}
+
+func (f *Frame) Want(page int) {
+	seq := atomic.LoadUint32(f.word(48))>>16 + 1
+	atomic.StoreUint32(f.word(48), seq<<16|uint32(page)&0xffff)
+}
+
+func (f *Frame) Rest(on bool) {
+	var v uint32
+	if on {
+		v = 1
+	}
+	atomic.StoreUint32(f.word(40), v)
 }
 
 func (f *Frame) Ready() bool { return atomic.LoadUint32(f.word(0)) == magic }

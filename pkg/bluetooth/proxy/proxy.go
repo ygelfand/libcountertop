@@ -89,7 +89,6 @@ func NewTable() *setting.Table[schema.Bluetooth] {
 					Name:  "scan",
 					Group: Group,
 					Icon:  "mdi:radar",
-					Local: true,
 				},
 				schema.ScanShares(),
 				func(c *schema.Bluetooth) *schema.ScanShare { return &c.Scan },

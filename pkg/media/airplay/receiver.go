@@ -99,8 +99,8 @@ func (r *Receiver) Stop() {
 }
 
 func (r *Receiver) SetEnabled(on bool) {
-	if err := r.knobs.Change("on", setting.OnOff(on)); err != nil {
-		slog.Error("saving a setting failed", "setting", "airplay on", "err", err)
+	if err := r.knobs.Change("airplay", setting.OnOff(on)); err != nil {
+		slog.Error("saving a setting failed", "setting", "media.airplay", "err", err)
 	}
 }
 

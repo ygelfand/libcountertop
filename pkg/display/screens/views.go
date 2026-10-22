@@ -33,6 +33,8 @@ func (a *App) screenFor(v shell.View) *Screen {
 		return a.pageScreen(t)
 	case *homecontrol.Home:
 		return a.homeScreen(t)
+	case *homecontrol.Dashboard:
+		return a.dashboardScreen(t)
 	case *homecontrol.Picker:
 		return a.pickerScreen(t)
 	case *homecontrol.Full:
@@ -81,6 +83,10 @@ func (a *App) videoScreen(p *videopage.Page) *Screen {
 
 func (a *App) homeScreen(h *homecontrol.Home) *Screen {
 	return &Screen{Title: say.T("home.title"), View: h, Build: a.home.Body}
+}
+
+func (a *App) dashboardScreen(d *homecontrol.Dashboard) *Screen {
+	return &Screen{Title: say.T("dashboard.title"), View: d, Build: a.home.Dashboard}
 }
 
 func (a *App) pickerScreen(p *homecontrol.Picker) *Screen {

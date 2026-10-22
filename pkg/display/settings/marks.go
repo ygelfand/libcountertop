@@ -16,36 +16,40 @@ type ModeMarks struct {
 	Native  func() image.Image
 }
 
-func (m ModeMarks) For(modes []config.HomeMode) []menu.Mark {
-	out := make([]menu.Mark, len(modes))
-	for i, mode := range modes {
-		switch mode {
-		case config.HomeTessera, config.HomeFirmware:
-			out[i].SVG = m.Tessera
-		case config.HomeNative:
-			if m.Native != nil {
-				out[i].Image = m.Native()
-			}
-		}
-	}
-	return out
+type Mode interface {
+	~string
+	Label() string
 }
 
-func (m ModeMarks) Row(label string, modes []config.HomeMode, chosen config.HomeMode) menu.Row {
+func (m ModeMarks) mark(mode string) menu.Mark {
+	switch mode {
+	case string(config.HomeTessera), string(config.HomeFirmware):
+		return menu.Mark{SVG: m.Tessera}
+	case string(config.HomeNative):
+		if m.Native != nil {
+			return menu.Mark{Image: m.Native()}
+		}
+	}
+	return menu.Mark{}
+}
+
+func ModeRow[M Mode](m ModeMarks, label string, modes []M, chosen M) menu.Row {
 	labels := make([]string, len(modes))
+	marks := make([]menu.Mark, len(modes))
 	for i, mode := range modes {
 		labels[i] = mode.Label()
+		marks[i] = m.mark(string(mode))
 	}
 	return menu.Row{
 		Label:   label,
 		Kind:    menu.Segments,
 		Options: labels,
-		Marks:   m.For(modes),
+		Marks:   marks,
 		Level:   max(slices.Index(modes, chosen), 0),
 	}
 }
 
-func (m ModeMarks) Pick(modes []config.HomeMode, set func(config.HomeMode)) func(int) {
+func ModePick[M Mode](modes []M, set func(M)) func(int) {
 	return func(i int) { set(modes[i]) }
 }
 

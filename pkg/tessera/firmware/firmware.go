@@ -19,11 +19,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 )
 
-const APIPort = 6054
-
 type Options struct {
 	Helper   string
 	Dir      string
+	Port     int
 	Width    int
 	Height   int
 	DPI      int
@@ -115,6 +114,9 @@ func (h *Helper) session(ctx context.Context) error {
 		"TESSERA_PRODUCT="+h.opts.Product,
 		"TESSERA_BOARD="+h.opts.Board,
 	)
+	if h.opts.Port > 0 {
+		cmd.Env = append(cmd.Env, "TESSERA_PORT="+strconv.Itoa(h.opts.Port))
+	}
 	if h.opts.Columns > 0 && h.opts.Rows > 0 {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TESSERA_GRID=%dx%d,%dx%d",
 			h.opts.Columns, h.opts.Rows, h.opts.Rows, h.opts.Columns))

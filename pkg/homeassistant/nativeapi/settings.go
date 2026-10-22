@@ -9,9 +9,9 @@ import (
 const Group setting.Group = "API"
 
 func NewTable() *setting.Table[schema.API] {
-	return setting.NewTable("api", []setting.Group{Group}, []setting.Setting[schema.API]{
+	return setting.NewTable("access", []setting.Group{Group}, []setting.Setting[schema.API]{
 		setting.Flag(
-			setting.Setting[schema.API]{Name: "adopted", Group: Group},
+			setting.Setting[schema.API]{Name: "adopted", Group: Group, ID: "api_adopted"},
 			func(c *schema.API) *bool { return &c.Adopted },
 		),
 	}, setting.Messages{Text: say.T, Missing: say.Missing}).Local()

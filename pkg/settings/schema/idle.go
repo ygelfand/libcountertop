@@ -9,14 +9,14 @@ type Idle struct {
 	Placement
 	First  IdleVisual `json:"first"`
 	Second IdleVisual `json:"second"`
-	Saver  HomeMode   `json:"saver"`
+	Saver  SaverMode  `json:"saver"`
 
 	Night      Night `json:"night"`
 	NightLux   int   `json:"night_lux"`
 	NightAfter Delay `json:"night_after"`
 }
 
-func (c Idle) Tessera() bool { return c.Saver == HomeTessera }
+func (c Idle) Tessera() bool { return c.Saver == SaverTessera }
 
 type IdleVisual struct {
 	Kind   string `json:"kind"`
@@ -86,7 +86,7 @@ func DefaultIdle() Idle {
 		Placement:  Placement{Position: PositionRandom, Align: AlignRandom, Size: DefaultSize},
 		First:      IdleVisual{Source: SourceBoth},
 		Second:     IdleVisual{Source: SourceBoth},
-		Saver:      HomeNative,
+		Saver:      SaverNative,
 		Night:      NightClock,
 		NightLux:   DefaultNightLux,
 		NightAfter: DefaultNightAfter,

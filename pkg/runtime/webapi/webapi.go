@@ -91,14 +91,15 @@ func New(o Options) *API {
 func NewTable() *setting.Table[schema.Frontend] {
 	password := setting.Words(
 		setting.Setting[schema.Frontend]{
-			Name: "password", Group: Group, Icon: "mdi:form-textbox-password", Local: true,
+			Name: "password", Group: Group, ID: "frontend_password",
+			Icon: "mdi:form-textbox-password",
 		},
 		passwordMost,
 		func(c *schema.Frontend) *string { return &c.Password },
 	)
 	password.Kind = setting.Credential
 	return setting.NewTable(
-		"frontend",
+		"access",
 		[]setting.Group{Group},
 		[]setting.Setting[schema.Frontend]{password},
 		setting.Messages{Text: say.T, Missing: say.Missing},

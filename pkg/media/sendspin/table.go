@@ -16,15 +16,15 @@ const Group setting.Group = "Sendspin"
 
 func NewTable() *Table {
 	var t *Table
-	t = setting.NewTable("sendspin", []setting.Group{Group}, []Setting{
+	t = setting.NewTable("media", []setting.Group{Group}, []Setting{
 		{
-			Name: "on", Group: Group, ID: "sendspin", Icon: "mdi:speaker-multiple",
+			Name: "sendspin", Group: Group, ID: "sendspin", Icon: "mdi:speaker-multiple",
 			Kind: setting.Toggle,
 			Read: func(c *schema.Sendspin) string { return setting.OnOff(c.Enabled) },
 			Write: func(c *schema.Sendspin, v string) error {
 				on, ok := setting.Boolean(v)
 				if !ok {
-					return t.MustRow("on").Bad(v, "on or off")
+					return t.MustRow("sendspin").Bad(v, "on or off")
 				}
 				c.Enabled = on
 				return nil

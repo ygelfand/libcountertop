@@ -41,9 +41,9 @@ type Client struct {
 	mu sync.Mutex
 }
 
-func Dial(ctx context.Context, client string) (*Client, error) {
+func Dial(ctx context.Context, client string, port int) (*Client, error) {
 	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(APIPort)))
+	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		return nil, err
 	}

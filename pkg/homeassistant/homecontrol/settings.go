@@ -27,6 +27,7 @@ const (
 	tesseraThemed  = "tessera.themed"
 	tesseraTurn    = "tessera.turn"
 	tesseraBottom  = "tessera.bottom"
+	tesseraFollow  = "tessera.follow"
 )
 
 func (e *Engine) Controls() *setting.Controls[config.Home] { return e.knobs }
@@ -89,6 +90,10 @@ func (e *Engine) table() *setting.Table[config.Home] {
 			config.TesseraBottoms(),
 			func(h *config.Home) *config.TesseraBottom { return &h.Bottom },
 		),
+		setting.Flag(
+			Setting{Name: tesseraFollow, Group: Group, Icon: "mdi:gesture-swipe-horizontal"},
+			func(h *config.Home) *bool { return &h.Follow },
+		),
 	}
 	for _, s := range e.selections {
 		rows = append(rows, controlRow(s.Key), groupRow(s.Key))
@@ -101,7 +106,6 @@ func controlRow(key string) Setting {
 	name := "control." + key
 	return Setting{
 		Name:  name,
-		Local: true,
 		Group: Group,
 		Kind:  setting.Toggle,
 		Read:  func(h *config.Home) string { return setting.OnOff(h.Control[key]) },
@@ -129,7 +133,6 @@ func groupRow(key string) Setting {
 	name := "group." + key
 	return Setting{
 		Name:  name,
-		Local: true,
 		Group: Group,
 		Kind:  setting.Number,
 		Max:   config.HomeGroupMost,

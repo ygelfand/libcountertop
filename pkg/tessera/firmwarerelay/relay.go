@@ -22,6 +22,7 @@ const answerWait = 15 * time.Second
 
 var blocked = map[string]bool{
 	"rotation":            true,
+	"standby_after":       true,
 	"dark_mode":           true,
 	"display_backlight":   true,
 	"normal_brightness":   true,
@@ -44,12 +45,12 @@ type Home interface {
 type Options struct {
 	Word    string
 	Device  uint32
+	Port    int
 	Node    func() string
 	Zone    func() string
 	Home    Home
 	States  *states.States
 	Changed func()
-	Updated func()
 }
 
 type Relay struct {
@@ -59,11 +60,11 @@ type Relay struct {
 	client   *firmware.Client
 	entities []esphome.Entity
 	actions  []*esphome.Action
+	standby  *esphome.Switch
 	apply    map[uint32]func(proto.Message)
 	calls    map[uint32]chan *api.ExecuteServiceResponse
 	next     uint32
 	shape    string
-	byID     map[string]esphome.Entity
 }
 
 func New(o Options) *Relay { return &Relay{opts: o} }
@@ -80,27 +81,6 @@ func (r *Relay) Actions() []*esphome.Action {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.actions
-}
-
-func (r *Relay) Switch(id string) (*esphome.Switch, bool) {
-	s, ok := r.entity(id).(*esphome.Switch)
-	return s, ok
-}
-
-func (r *Relay) Number(id string) (*esphome.Number, bool) {
-	n, ok := r.entity(id).(*esphome.Number)
-	return n, ok
-}
-
-func (r *Relay) Clock(id string) (*esphome.Text, bool) {
-	t, ok := r.entity(id).(*esphome.Text)
-	return t, ok
-}
-
-func (r *Relay) entity(id string) esphome.Entity {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.byID[id]
 }
 
 func (r *Relay) Run(ctx context.Context) error {
@@ -121,10 +101,19 @@ func (r *Relay) Run(ctx context.Context) error {
 	return nil
 }
 
+func (r *Relay) Port() int { return r.opts.Port }
+
+func (r *Relay) Standby() bool {
+	r.mu.Lock()
+	s := r.standby
+	r.mu.Unlock()
+	return s != nil && s.Get()
+}
+
 func (r *Relay) forget() {
 	r.mu.Lock()
 	had := len(r.entities) > 0 || len(r.actions) > 0
-	r.client, r.entities, r.actions, r.shape, r.byID = nil, nil, nil, "", nil
+	r.client, r.entities, r.actions, r.standby, r.shape = nil, nil, nil, nil, ""
 	r.mu.Unlock()
 	if had {
 		r.opts.Changed()
@@ -132,7 +121,7 @@ func (r *Relay) forget() {
 }
 
 func (r *Relay) session(ctx context.Context) error {
-	c, err := firmware.Dial(ctx, r.opts.Node())
+	c, err := firmware.Dial(ctx, r.opts.Node(), r.opts.Port)
 	if err != nil {
 		return err
 	}
@@ -203,14 +192,13 @@ func (r *Relay) mirror(c *firmware.Client, listed []proto.Message) {
 	var (
 		entities []esphome.Entity
 		acts     []*esphome.Action
+		standby  *esphome.Switch
 		apply    = map[uint32]func(proto.Message){}
 		shape    []string
-		byID     = map[string]esphome.Entity{}
 	)
 	add := func(e esphome.Entity, kind, id string) {
 		entities = append(entities, e)
 		shape = append(shape, kind+":"+id)
-		byID[id] = e
 	}
 	for _, m := range listed {
 		if id, ok := listedID(m); ok && blocked[id] {
@@ -245,6 +233,9 @@ func (r *Relay) mirror(c *firmware.Client, listed []proto.Message) {
 			s := &esphome.Switch{Base: r.base(id, m.Name, m.Icon, m.EntityCategory)}
 			s.OnCommand = func(on bool) { _ = c.Send(&api.SwitchCommandRequest{Key: key, State: on}) }
 			apply[m.Key] = func(st proto.Message) { s.Set(st.(*api.SwitchStateResponse).State) }
+			if id == "auto_standby" {
+				standby = s
+			}
 			add(s, "s", id)
 		case *api.ListEntitiesNumberResponse:
 			id := slug(m.Name)
@@ -345,8 +336,8 @@ func (r *Relay) mirror(c *firmware.Client, listed []proto.Message) {
 	}
 	r.mu.Lock()
 	changed := strings.Join(shape, ",") != r.shape
-	r.client, r.entities, r.actions = c, entities, acts
-	r.apply, r.shape, r.byID = apply, strings.Join(shape, ","), byID
+	r.client, r.entities, r.actions, r.standby = c, entities, acts, standby
+	r.apply, r.shape = apply, strings.Join(shape, ",")
 	r.calls = map[uint32]chan *api.ExecuteServiceResponse{}
 	r.mu.Unlock()
 	if changed {
@@ -358,12 +349,8 @@ func (r *Relay) state(key uint32, m proto.Message) {
 	r.mu.Lock()
 	apply := r.apply[key]
 	r.mu.Unlock()
-	if apply == nil {
-		return
-	}
-	apply(m)
-	if r.opts.Updated != nil {
-		r.opts.Updated()
+	if apply != nil {
+		apply(m)
 	}
 }
 

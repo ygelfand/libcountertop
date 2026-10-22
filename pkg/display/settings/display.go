@@ -52,12 +52,6 @@ func (p *BasicPages) Display() *shell.Page {
 					Value: say.T("uisize." + cfg.UISize),
 				},
 				{
-					Glyph: gogui.IconHome,
-					Label: say.T("display.dashboard"),
-					Kind:  menu.Chevron,
-					Value: p.dashboardMode().Label(),
-				},
-				{
 					Glyph: gogui.IconMoon,
 					Label: say.T("display.idle"),
 					Kind:  menu.Chevron,
@@ -85,7 +79,6 @@ func (p *BasicPages) Display() *shell.Page {
 				p.open(func() shell.View { return p.Theme() }),
 				p.open(func() shell.View { return p.Style() }),
 				func(level int) { p.setSize(config.ScreenSizes()[sizes.Index(level)]) },
-				p.open(func() shell.View { return p.DashboardPage() }),
 				p.open(func() shell.View { return p.options.Idle.Page() }),
 				SegmentPick(config.Edges(), p.options.Screen.SetDrawer),
 				func(level int) { p.options.Screen.SetDockHide(hides[dock.Index(level)]) },

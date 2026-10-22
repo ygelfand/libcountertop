@@ -15,7 +15,7 @@ type Setting = setting.Setting[schema.Certs]
 func NewTable() *setting.Table[schema.Certs] {
 	text := func(name, icon string, field func(*schema.Certs) *string) Setting {
 		return setting.Words(
-			Setting{Name: name, Group: Group, Icon: icon, Local: true},
+			Setting{Name: name, Group: Group, Icon: icon},
 			textMost,
 			field,
 		)

@@ -44,6 +44,7 @@ type Engine struct {
 	cache      *cache
 	board      *Board
 	home       *Home
+	dashboard  *Dashboard
 	selections []Selection
 	knobs      *setting.Controls[config.Home]
 	mu         sync.Mutex
@@ -52,7 +53,7 @@ type Engine struct {
 
 func New(o Dependencies) *Engine {
 	ctx, stop := context.WithCancel(context.Background())
-	e := &Engine{options: o, ctx: ctx, stop: stop, home: &Home{}}
+	e := &Engine{options: o, ctx: ctx, stop: stop, home: &Home{}, dashboard: &Dashboard{}}
 	e.selections = []Selection{
 		{Key: "lights", Filter: ha.Filter{Domains: []string{"light"}}, engine: e},
 		{Key: "switches", Filter: ha.Filter{Domains: []string{"switch"}}, engine: e},

@@ -154,6 +154,7 @@ type Options struct {
 	Home      *homecontrol.Engine
 	HomeHA    homeview.Client
 	Saver     homeview.SaverMode
+	Visuals   homeview.Visuals
 	Tessera   *tesseraview.View
 	Firmware  *firmwareview.View
 	Forecast  Weather
@@ -247,13 +248,11 @@ func New(o Options) *App {
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},
 		Saver:           o.Saver,
+		Visuals:         o.Visuals,
 		UI:              o.UI,
 	})
 	if o.Tessera != nil {
 		a.home.Listen(o.Tessera)
-	}
-	if o.Firmware != nil {
-		a.home.UseFirmware(o.Firmware)
 	}
 	return a
 }

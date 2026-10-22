@@ -269,8 +269,8 @@ func (p *Player) Run(ctx context.Context) error {
 }
 
 func (p *Player) SetEnabled(on bool) {
-	if err := p.knobs.Change("on", setting.OnOff(on)); err != nil {
-		slog.Error("saving a setting failed", "setting", "sendspin on", "err", err)
+	if err := p.knobs.Change("sendspin", setting.OnOff(on)); err != nil {
+		slog.Error("saving a setting failed", "setting", "media.sendspin", "err", err)
 	}
 }
 

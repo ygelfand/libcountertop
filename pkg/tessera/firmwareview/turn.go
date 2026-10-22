@@ -14,40 +14,130 @@ import (
 )
 
 const (
-	turnTime = 320 * time.Millisecond
-	fadeTime = 240 * time.Millisecond
+	turnTime  = 320 * time.Millisecond
+	fadeTime  = 240 * time.Millisecond
+	holdTime  = time.Second
+	cancelled = 0.25
+	flick     = 0.6
 )
 
 type motion struct {
-	old *backend.Live
+	old    *backend.Live
+	want   func(page int)
+	follow func() bool
 
 	mu     sync.Mutex
 	kind   schema.TesseraTurn
-	began  time.Time
 	step   int
+	from   int
 	area   image.Rectangle
 	frame  image.Point
 	ground gogui.Color
+
+	dragging bool
+	x0, x    float32
+	fdown    bool
+	fx       float32
+	px       float32
+	pat, xat time.Time
+
+	began    time.Time
+	at, to   float32
+	held     time.Time
+	ignoring int
 }
 
 func newMotion() *motion { return &motion{old: backend.NewLive("tessera-firmware-old")} }
 
 func (m *motion) start(
 	kind schema.TesseraTurn,
-	step int,
+	step, from int,
 	area image.Rectangle,
 	frame image.Point,
 	ground gogui.Color,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.kind, m.began, m.step, m.area, m.frame, m.ground = kind, time.Now(), step, area, frame, ground
+	m.kind, m.step, m.from, m.area, m.frame, m.ground = kind, step, from, area, frame, ground
+	m.dragging = m.fdown && (m.follow == nil || m.follow())
+	m.x0, m.x = m.fx, m.fx
+	m.began, m.at, m.to, m.held = time.Now(), 0, 1, time.Time{}
+}
+
+func (m *motion) skip() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ignoring == 0 {
+		return false
+	}
+	m.ignoring--
+	m.kind, m.held = "", time.Time{}
+	return true
+}
+
+func (m *motion) requests(want func(page int), follow func() bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.want, m.follow = want, follow
+}
+
+func (m *motion) track(x float32, down bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	if down {
+		m.px, m.pat = m.fx, m.xat
+		m.fx, m.xat = x, now
+	}
+	m.fdown = down
+	if !m.dragging || m.kind == "" {
+		return
+	}
+	if down {
+		m.x = x
+		return
+	}
+	m.dragging = false
+	e := m.dragged()
+	speed := m.speed()
+	m.began, m.at, m.to = now, e, 1
+	if (e < cancelled && speed < flick || speed < -flick) && m.want != nil {
+		m.to = 0
+		m.ignoring++
+		m.want(m.from)
+	}
+}
+
+func (m *motion) speed() float32 {
+	w := float32(m.area.Dx())
+	secs := float32(m.xat.Sub(m.pat).Seconds())
+	if w <= 0 || secs <= 0 || m.pat.IsZero() {
+		return 0
+	}
+	dir := float32(1)
+	if m.step < 0 {
+		dir = -1
+	}
+	return dir * (m.px - m.fx) / w / secs
+}
+
+func (m *motion) dragged() float32 {
+	w := float32(m.area.Dx())
+	if w <= 0 {
+		return 0
+	}
+	dir := float32(1)
+	if m.step < 0 {
+		dir = -1
+	}
+	return min(max(dir*(m.x0-m.x)/w, 0), 1)
 }
 
 func (m *motion) moving() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.kind != "" && time.Since(m.began) < m.length()
+	_, live := m.progress()
+	return live
 }
 
 func (m *motion) length() time.Duration {
@@ -57,6 +147,36 @@ func (m *motion) length() time.Duration {
 	return turnTime
 }
 
+func (m *motion) progress() (float32, bool) {
+	if m.kind == "" {
+		return 0, false
+	}
+	if m.dragging {
+		return m.dragged(), true
+	}
+	if !m.held.IsZero() {
+		if time.Since(m.held) < holdTime {
+			return 0, true
+		}
+		m.kind, m.held = "", time.Time{}
+		return 0, false
+	}
+	span := float64(m.length()) * math.Abs(float64(m.to-m.at))
+	t := 1.0
+	if span > 0 {
+		t = float64(time.Since(m.began)) / span
+	}
+	if t >= 1 {
+		if m.to == 0 && m.ignoring > 0 {
+			m.held = time.Now()
+			return 0, true
+		}
+		m.kind = ""
+		return 0, false
+	}
+	return m.at + (m.to-m.at)*float32(1-math.Pow(1-t, 3)), true
+}
+
 type layer struct {
 	dx, scale, opacity float32
 }
@@ -64,15 +184,13 @@ type layer struct {
 func (m *motion) overlay(at ui.Rect, live string) gogui.View {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.kind == "" || m.frame.X == 0 || m.frame.Y == 0 {
+	if m.frame.X == 0 || m.frame.Y == 0 {
 		return nil
 	}
-	t := float64(time.Since(m.began)) / float64(m.length())
-	if t >= 1 {
-		m.kind = ""
+	e, ok := m.progress()
+	if !ok {
 		return nil
 	}
-	e := float32(1 - math.Pow(1-t, 3))
 	sx, sy := float32(at.W)/float32(m.frame.X), float32(at.H)/float32(m.frame.Y)
 	box := ui.Rect{
 		X: int(float32(m.area.Min.X) * sx),

@@ -151,7 +151,7 @@ func TestTheWaitDoublesUpToAnHour(t *testing.T) {
 }
 
 func TestThePinTakesFourToEightDigitsOrNothing(t *testing.T) {
-	row, ok := NewTable().Find("pin")
+	row, ok := NewTable().Find("lock_pin")
 	if !ok {
 		t.Fatal("no pin row")
 	}

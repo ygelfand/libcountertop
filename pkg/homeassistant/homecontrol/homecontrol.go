@@ -179,6 +179,12 @@ func (e *Engine) Page() *Home        { return e.home }
 func (*Home) Covers() bool           { return true }
 func (*Home) Timeout() time.Duration { return shell.SettingsTimeout }
 
+type Dashboard struct{}
+
+func (e *Engine) Dashboard() *Dashboard   { return e.dashboard }
+func (*Dashboard) Covers() bool           { return true }
+func (*Dashboard) Timeout() time.Duration { return shell.SettingsTimeout }
+
 func (e *Engine) ReturnHome() bool { return e.options.Settings.Read().Return }
 
 func (e *Engine) SetReturnHome(on bool) { e.set(tesseraReturn, setting.OnOff(on)) }
@@ -192,6 +198,10 @@ func (e *Engine) Turn() config.TesseraTurn { return e.options.Settings.Read().Tu
 func (e *Engine) SetTurn(t config.TesseraTurn) { e.set(tesseraTurn, string(t)) }
 
 func (e *Engine) Bottom() config.TesseraBottom { return e.options.Settings.Read().Bottom }
+
+func (e *Engine) Follow() bool { return e.options.Settings.Read().Follow }
+
+func (e *Engine) SetFollow(on bool) { e.set(tesseraFollow, setting.OnOff(on)) }
 
 func (e *Engine) SetBottom(b config.TesseraBottom) { e.set(tesseraBottom, string(b)) }
 

@@ -36,7 +36,7 @@ func NewTable() *setting.Table[schema.Cameras] {
 			Max: schema.CameraRotateMost, Slider: true,
 		}, func(c *schema.Cameras) *int { return &c.Rotate }),
 		setting.Words(
-			Setting{Name: "url", Group: Group, Icon: "mdi:web", Local: true},
+			Setting{Name: "url", Group: Group, Icon: "mdi:web"},
 			urlMost,
 			func(c *schema.Cameras) *string { return &c.URL },
 		),

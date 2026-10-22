@@ -1,122 +1,115 @@
 package homeview
 
 import (
-	"fmt"
-	"math"
 	"slices"
-	"strconv"
+
+	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	schema "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-const clockStep = 15
-
-var (
-	firmwareSwitches = []string{
-		"show_home_button",
-		"page_buttons",
-		"swipe_between_pages",
-		"back_to_page_1",
-		"back_to_page_1_on_standby",
-		"auto_standby",
-		"night_mode",
+func (view *Renderer) embeddedRows() ([]menu.Row, []func(int)) {
+	engine := view.options.Engine
+	themed, turn, bottom, follow := engine.Themed(), engine.Turn(), engine.Bottom(), engine.Follow()
+	bottoms := schema.TesseraBottoms()
+	labels := make([]string, len(bottoms))
+	for i, b := range bottoms {
+		labels[i] = b.Label()
 	}
-	firmwareNumbers = []string{"back_to_page_1_after", "standby_after"}
-	firmwareClocks  = []string{"night_starts", "night_ends"}
-)
+	rows := []menu.Row{
+		{
+			Label:   say.T("home.tessera.bottom"),
+			Kind:    menu.Segments,
+			Options: labels,
+			Level:   max(slices.Index(bottoms, bottom), 0),
+		},
+		{Label: say.T("home.tessera.themed"), Kind: menu.Toggle, On: themed},
+		{Label: say.T("home.tessera.turn"), Kind: menu.Chevron, Value: turn.Label()},
+		{Label: say.T("home.tessera.follow"), Kind: menu.Toggle, On: follow},
+	}
+	taps := []func(int){
+		func(i int) { engine.SetBottom(bottoms[i]) },
+		func(int) { engine.SetThemed(!themed) },
+		func(int) { view.options.Shell.Push(view.turnPage()) },
+		func(int) { engine.SetFollow(!follow) },
+	}
+	return rows, taps
+}
 
-func (view *Renderer) firmwarePage() *shell.Page {
+func (view *Renderer) gridPage() *shell.Page {
 	return &shell.Page{
-		Title: schema.HomeFirmware.Label(),
+		Title: say.T("home.tessera.grid"),
 		Build: func() ([]menu.Row, []func(int)) {
 			engine := view.options.Engine
-			themed, turn, bottom := engine.Themed(), engine.Turn(), engine.Bottom()
-			bottoms := schema.TesseraBottoms()
-			labels := make([]string, len(bottoms))
-			for i, b := range bottoms {
-				labels[i] = b.Label()
-			}
+			g := view.grid.shown(engine.Grid())
 			rows := []menu.Row{
-				{Label: say.T("home.tessera.themed"), Kind: menu.Toggle, On: themed},
-				{Label: say.T("home.tessera.turn"), Kind: menu.Chevron, Value: turn.Label()},
-				{
-					Label:   say.T("home.tessera.bottom"),
-					Kind:    menu.Segments,
-					Options: labels,
-					Level:   max(slices.Index(bottoms, bottom), 0),
-				},
+				gridRow(say.T("home.tessera.columns"), g.Columns),
+				gridRow(say.T("home.tessera.rows"), g.Rows),
 			}
 			taps := []func(int){
-				func(int) { engine.SetThemed(!themed) },
-				func(int) { view.options.Shell.Push(view.turnPage()) },
-				func(i int) { engine.SetBottom(bottoms[i]) },
-			}
-			if f := view.firmware; f != nil {
-				r, t := firmwareRows(f)
-				rows, taps = append(rows, r...), append(taps, t...)
+				func(level int) {
+					c := gridOf(level)
+					r := min(g.Rows, schema.TesseraCells/c)
+					view.grid.move(schema.TesseraGrid{Columns: c, Rows: r}, engine.SetGrid)
+				},
+				func(level int) {
+					r := gridOf(level)
+					c := min(g.Columns, schema.TesseraCells/r)
+					view.grid.move(schema.TesseraGrid{Columns: c, Rows: r}, engine.SetGrid)
+				},
 			}
 			return rows, taps
 		},
+		Side: view.gridPreview,
 	}
 }
 
-func firmwareRows(f FirmwareSettings) ([]menu.Row, []func(int)) {
-	var (
-		rows []menu.Row
-		taps []func(int)
-	)
-	for _, id := range firmwareSwitches {
-		s, ok := f.Switch(id)
-		if !ok {
-			continue
-		}
-		on := s.Get()
-		rows = append(rows, menu.Row{Label: say.T("home.firmware." + id), Kind: menu.Toggle, On: on})
-		taps = append(taps, func(int) { s.OnCommand(!on) })
+func (view *Renderer) gridPreview(w *gogui.Window) gogui.View {
+	g := view.grid.shown(view.options.Engine.Grid())
+	vw, vh := w.WindowSize()
+	across, down := g.Columns, g.Rows
+	if vh > vw {
+		across, down = g.Rows, g.Columns
 	}
-	for _, id := range firmwareNumbers {
-		n, ok := f.Number(id)
-		if !ok || n.Max <= n.Min {
-			continue
-		}
-		steps := stepsOf(n.Min, n.Max, n.Step)
-		at := func(level int) float64 { return n.Min + float64(steps.Index(level))*n.Step }
-		v := float64(n.Get())
-		rows = append(rows, menu.Row{
-			Label: say.T("home.firmware." + id),
-			Kind:  menu.Slider,
-			Level: steps.Level(int(math.Round((v - n.Min) / n.Step))),
-			Snap:  steps.Snap,
-			Value: seconds(v),
-		})
-		taps = append(taps, func(level int) { n.OnCommand(float32(at(level))) })
+	width := float32(vw) * 0.42
+	height := width * float32(vh) / float32(vw)
+	if most := float32(vh) * 0.7; height > most {
+		width, height = width*most/height, most
 	}
-	day := menu.Steps(24 * 60 / clockStep)
-	for _, id := range firmwareClocks {
-		t, ok := f.Clock(id)
-		if !ok {
-			continue
+	pal := view.options.UI.Palette()
+	gap := max(width/float32(across*24), 2)
+	lines := make([]gogui.View, 0, down)
+	for range down {
+		cells := make([]gogui.View, 0, across)
+		for range across {
+			cells = append(cells, gogui.Column(gogui.ContainerCfg{
+				Sizing:  gogui.FillFill,
+				Padding: gogui.NoPadding,
+				Radius:  gogui.RadiusMedium,
+				Color:   widgets.Color(pal.Surface),
+			}))
 		}
-		minutes, ok := clockMinutes(t.Get())
-		if !ok {
-			continue
-		}
-		rows = append(rows, menu.Row{
-			Label: say.T("home.firmware." + id),
-			Kind:  menu.Slider,
-			Level: day.Level(minutes / clockStep),
-			Snap:  day.Snap,
-			Value: t.Get(),
-		})
-		taps = append(taps, func(level int) {
-			m := day.Index(level) * clockStep
-			t.OnCommand(fmt.Sprintf("%02d:%02d", m/60, m%60))
-		})
+		lines = append(lines, gogui.Row(gogui.ContainerCfg{
+			Sizing:  gogui.FillFill,
+			Padding: gogui.NoPadding,
+			Spacing: gogui.SpacingPx(gap),
+			Content: cells,
+		}))
 	}
-	return rows, taps
+	return gogui.Column(gogui.ContainerCfg{
+		Sizing:  gogui.FixedFixed,
+		Width:   width,
+		Height:  height,
+		Padding: gogui.PaddingSmall,
+		Spacing: gogui.SpacingPx(gap),
+		Radius:  gogui.RadiusLarge,
+		Color:   widgets.Color(pal.Background),
+		Content: lines,
+	})
 }
 
 func (view *Renderer) turnPage() *shell.Page {
@@ -136,30 +129,4 @@ func (view *Renderer) turnPage() *shell.Page {
 			return rows, taps
 		},
 	}
-}
-
-func stepsOf(lo, hi, step float64) menu.StepScale {
-	if step <= 0 {
-		step = 1
-	}
-	return menu.Steps(int(math.Round((hi-lo)/step)) + 1)
-}
-
-func clockMinutes(s string) (int, bool) {
-	var h, m int
-	if _, err := fmt.Sscanf(s, "%d:%d", &h, &m); err != nil || h > 23 || m > 59 {
-		return 0, false
-	}
-	return h*60 + m, true
-}
-
-func seconds(v float64) string {
-	s := int(v)
-	switch {
-	case s >= 3600 && s%3600 == 0:
-		return strconv.Itoa(s/3600) + " h"
-	case s >= 60 && s%60 == 0:
-		return strconv.Itoa(s/60) + " min"
-	}
-	return strconv.Itoa(s) + " s"
 }

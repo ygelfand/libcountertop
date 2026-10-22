@@ -31,7 +31,7 @@ func (w WebAccess) Page(address func() string) *shell.Page {
 		if a := w.Admin; a != nil {
 			rows = append(rows, menu.Row{
 				Glyph: gogui.IconLock,
-				Label: say.T("frontend.setting.password"),
+				Label: say.T("access.setting.password"),
 				Kind:  menu.Password,
 				Value: a.Password(),
 				Save: func(v string) {

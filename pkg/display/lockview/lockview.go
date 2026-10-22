@@ -33,9 +33,10 @@ var pinShape = regexp.MustCompile(`^[0-9]{4,8}$`)
 var ErrShape = errors.New("lock: the pin takes 4 to 8 digits")
 
 func NewTable() *setting.Table[schema.Lock] {
-	return setting.NewTable("lock", []setting.Group{Group}, []setting.Setting[schema.Lock]{{
-		Name:  "pin",
+	return setting.NewTable("screen", []setting.Group{Group}, []setting.Setting[schema.Lock]{{
+		Name:  "lock_pin",
 		Group: Group,
+		ID:    "lock_pin",
 		Kind:  setting.Secret,
 		Icon:  "mdi:lock",
 		Read:  func(c *schema.Lock) string { return c.PIN },
@@ -215,7 +216,7 @@ func (g *Gate) Views(ui *widgets.UI) func(shell.View) *navigation.Screen {
 			}
 		case &g.setter:
 			return &navigation.Screen{
-				Title: say.T("lock.setting.pin"),
+				Title: say.T("screen.setting.lock_pin"),
 				View:  &g.setter,
 				Build: func(w *gogui.Window) gogui.View { return g.buildSetter(w, ui) },
 			}

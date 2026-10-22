@@ -63,12 +63,12 @@ func NewTable(more func() []setting.Option) *setting.Table[config.Call] {
 			func(c *config.Call) *config.CallAudience { return &c.AnswerFrom },
 		),
 		setting.Words(
-			Setting{Name: "answer_peers", Group: Group, Icon: "mdi:account-multiple", Local: true},
+			Setting{Name: "answer_peers", Group: Group, Icon: "mdi:account-multiple"},
 			255,
 			func(c *config.Call) *string { return &c.AnswerPeers },
 		),
 		setting.Words(
-			Setting{Name: "answer_users", Group: Group, Icon: "mdi:account-group", Local: true},
+			Setting{Name: "answer_users", Group: Group, Icon: "mdi:account-group"},
 			255,
 			func(c *config.Call) *string { return &c.AnswerUsers },
 		),

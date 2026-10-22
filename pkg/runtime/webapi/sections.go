@@ -12,21 +12,22 @@ type section struct {
 }
 
 var sections = []section{
-	{"settings.network", []string{"network", "certs", "frontend", "api", "access"}},
+	{"settings.network", []string{"network", "certs", "access"}},
 	{"settings.features", []string{
-		"cast", "airplay", "sendspin", "media", "bluetooth", "rtsp", "call",
+		"cast", "media", "bluetooth", "rtsp", "call",
 		"photos", "calendar", "todo",
 	}},
 	{"settings.display", []string{
-		"screen", "clock", "idle", "visual", "poster", "weather", "apps", "cameras", "lock",
+		"screen", "clock", "idle", "visual", "poster", "weather", "apps", "cameras",
 		"presence",
 	}},
 	{"home.title", []string{"home"}},
-	{"settings.volume", []string{"feedback", "microphone"}},
+	{"settings.volume", []string{"feedback", "microphone", "speaker"}},
 	{"alerts.page", []string{"alerts"}},
 	{"settings.camera", []string{"camera"}},
 	{"voice.title", []string{"voice"}},
 	{"settings.assistants", []string{"assistants", "ring"}},
+	{systemSection, []string{"diag"}},
 }
 
 const systemSection = "settings.system"

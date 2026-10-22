@@ -3,6 +3,7 @@ package schema
 import "github.com/ygelfand/libcountertop/pkg/settings/storage"
 
 type Shared struct {
+	Access    Access    `json:"access"`
 	AirPlay   AirPlay   `json:"airplay"`
 	Alerts    Alerts    `json:"alerts"`
 	API       API       `json:"api"`
@@ -15,6 +16,7 @@ type Shared struct {
 	Certs     Certs     `json:"certs"`
 	Cast      Cast      `json:"cast"`
 	Clock     Clock     `json:"clock"`
+	Diag      Diag      `json:"diag"`
 	Feedback  Feedback  `json:"feedback"`
 	Frontend  Frontend  `json:"frontend"`
 	Home      Home      `json:"home"`
@@ -50,6 +52,7 @@ func DefaultShared() Shared {
 		Cameras:   DefaultCameras(),
 		Cast:      DefaultCast(),
 		Clock:     DefaultClock(),
+		Diag:      DefaultDiag(),
 		Feedback:  DefaultFeedback(),
 		Home:      DefaultHome(),
 		Idle:      DefaultIdle(),
@@ -85,6 +88,7 @@ func (s Shared) Clone() Shared {
 type Sections[C any] struct {
 	Alerts    storage.Binding[C, Alerts]
 	API       storage.Binding[C, API]
+	Access    storage.Binding[C, Access]
 	Apps      storage.Binding[C, Apps]
 	Bluetooth storage.Binding[C, Bluetooth]
 	Calendar  storage.Binding[C, Calendar]
@@ -94,6 +98,7 @@ type Sections[C any] struct {
 	Certs     storage.Binding[C, Certs]
 	Cast      storage.Binding[C, Cast]
 	Clock     storage.Binding[C, Clock]
+	Diag      storage.Binding[C, Diag]
 	Feedback  storage.Binding[C, Feedback]
 	Frontend  storage.Binding[C, Frontend]
 	Home      storage.Binding[C, Home]
@@ -119,6 +124,7 @@ type Sections[C any] struct {
 
 func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared) Sections[C] {
 	return Sections[C]{
+		Access:    bind(store, shared, func(s *Shared) *Access { return &s.Access }),
 		Alerts:    bind(store, shared, func(s *Shared) *Alerts { return &s.Alerts }),
 		API:       bind(store, shared, func(s *Shared) *API { return &s.API }),
 		Apps:      bind(store, shared, func(s *Shared) *Apps { return &s.Apps }),
@@ -130,6 +136,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Certs:     bind(store, shared, func(s *Shared) *Certs { return &s.Certs }),
 		Cast:      bind(store, shared, func(s *Shared) *Cast { return &s.Cast }),
 		Clock:     bind(store, shared, func(s *Shared) *Clock { return &s.Clock }),
+		Diag:      bind(store, shared, func(s *Shared) *Diag { return &s.Diag }),
 		Feedback:  bind(store, shared, func(s *Shared) *Feedback { return &s.Feedback }),
 		Frontend:  bind(store, shared, func(s *Shared) *Frontend { return &s.Frontend }),
 		Home:      bind(store, shared, func(s *Shared) *Home { return &s.Home }),

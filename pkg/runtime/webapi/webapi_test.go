@@ -384,7 +384,7 @@ func TestSettingsReadAndWriteThroughTheRegistry(t *testing.T) {
 	_, settings, _, srv := fixture(t)
 	basic := func(r *http.Request) { r.SetBasicAuth("admin", settings.v.Password) }
 
-	resp := do(t, http.MethodGet, srv.URL+Prefix+"/settings/frontend/password", "", basic)
+	resp := do(t, http.MethodGet, srv.URL+Prefix+"/settings/access/password", "", basic)
 	var f setting.Field
 	if err := json.NewDecoder(resp.Body).Decode(&f); err != nil {
 		t.Fatal(err)
@@ -396,7 +396,7 @@ func TestSettingsReadAndWriteThroughTheRegistry(t *testing.T) {
 	resp = do(
 		t,
 		http.MethodPut,
-		srv.URL+Prefix+"/settings/frontend/password",
+		srv.URL+Prefix+"/settings/access/password",
 		`{"value":"swapped-pass"}`,
 		basic,
 	)

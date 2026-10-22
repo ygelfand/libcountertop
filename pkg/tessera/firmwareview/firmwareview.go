@@ -2,10 +2,12 @@ package firmwareview
 
 import (
 	"context"
+	"fmt"
 	"image"
 	"log/slog"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
@@ -21,7 +23,7 @@ import (
 
 type Options struct {
 	Helper   string
-	Dir      string
+	Screen   func(upright bool) Screen
 	Panel    func() (width, height int)
 	Diagonal float64
 	Language func() string
@@ -30,10 +32,15 @@ type Options struct {
 	Themed   func() bool
 	Turn     func() schema.TesseraTurn
 	Bottom   func() schema.TesseraBottom
+	Follow   func() bool
 	Product  string
 	Board    string
 	Redraw   func()
-	Relay    *firmwarerelay.Relay
+}
+
+type Screen struct {
+	Dir   string
+	Relay *firmwarerelay.Relay
 }
 
 type look struct {
@@ -49,13 +56,20 @@ type View struct {
 	motion *motion
 
 	mu        sync.Mutex
-	stop      context.CancelFunc
-	done      chan struct{}
-	helper    *firmware.Helper
-	shown     look
+	runs      []*run
+	front     *run
 	preferred string
 	turning   bool
 	down      bool
+}
+
+type run struct {
+	helper *firmware.Helper
+	screen Screen
+	look   look
+	feed   *feed
+	stop   context.CancelFunc
+	done   chan struct{}
 }
 
 func New(o Options) *View {
@@ -65,13 +79,31 @@ func New(o Options) *View {
 func (v *View) On() bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return v.helper != nil
+	return v.front != nil
+}
+
+func (v *View) Rests() bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.front != nil && v.front.screen.Relay != nil && v.front.screen.Relay.Standby()
+}
+
+func (v *View) relays() []*firmwarerelay.Relay {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	var out []*firmwarerelay.Relay
+	for _, r := range v.runs {
+		if r.screen.Relay != nil {
+			out = append(out, r.screen.Relay)
+		}
+	}
+	return out
 }
 
 func (v *View) Set(on bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if on == (v.helper != nil) {
+	if on == (v.front != nil) {
 		return
 	}
 	if !on {
@@ -104,38 +136,19 @@ func (v *View) prefs() string {
 func (v *View) Name() string { return "tessera firmware" }
 
 func (v *View) Entities() []esphome.Entity {
-	if v.opts.Relay == nil {
-		return nil
+	var out []esphome.Entity
+	for _, r := range v.relays() {
+		out = append(out, r.Entities()...)
 	}
-	return v.opts.Relay.Entities()
+	return out
 }
 
 func (v *View) Actions() []*esphome.Action {
-	if v.opts.Relay == nil {
-		return nil
+	var out []*esphome.Action
+	for _, r := range v.relays() {
+		out = append(out, r.Actions()...)
 	}
-	return v.opts.Relay.Actions()
-}
-
-func (v *View) Switch(id string) (*esphome.Switch, bool) {
-	if v.opts.Relay == nil {
-		return nil, false
-	}
-	return v.opts.Relay.Switch(id)
-}
-
-func (v *View) Number(id string) (*esphome.Number, bool) {
-	if v.opts.Relay == nil {
-		return nil, false
-	}
-	return v.opts.Relay.Number(id)
-}
-
-func (v *View) Clock(id string) (*esphome.Text, bool) {
-	if v.opts.Relay == nil {
-		return nil, false
-	}
-	return v.opts.Relay.Clock(id)
+	return out
 }
 
 func (v *View) language() string {
@@ -146,38 +159,89 @@ func (v *View) language() string {
 }
 
 func (v *View) halt() {
-	v.stop()
-	<-v.done
-	if err := v.helper.Close(); err != nil {
-		slog.Warn("tessera firmware close", "err", err)
+	for _, r := range v.runs {
+		r.stop()
+		<-r.done
+		if err := r.helper.Close(); err != nil {
+			slog.Warn("tessera firmware close", "err", err)
+		}
 	}
-	v.helper, v.stop, v.done = nil, nil, nil
+	v.runs, v.front = nil, nil
 }
 
 func (v *View) turn(l look) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.turning = false
-	if v.helper == nil || v.shown == l {
+	if v.front == nil || v.front.look == l {
+		return
+	}
+	if r := v.ready(l); r != nil {
+		v.show(r)
 		return
 	}
 	v.halt()
 	v.start(l)
 }
 
+func (v *View) ready(l look) *run {
+	for _, r := range v.runs {
+		if r.look == l {
+			return r
+		}
+	}
+	return nil
+}
+
+func (v *View) show(r *run) {
+	if v.front != nil && v.front != r {
+		v.front.feed.hide()
+		v.front.helper.Frame().Rest(false)
+	}
+	v.front = r
+	r.feed.reveal()
+	v.motion.requests(r.helper.Frame().Want, v.opts.Follow)
+}
+
 func (v *View) start(l look) {
+	v.preferred = v.prefs()
+	other := l
+	other.upright = !l.upright
+	looks := []look{l}
+	if v.opts.Screen(other.upright) != v.opts.Screen(l.upright) {
+		looks = append(looks, other)
+	}
+	for _, k := range looks {
+		r, err := v.launch(k)
+		if err != nil {
+			slog.Error("tessera firmware", "upright", k.upright, "err", err)
+			continue
+		}
+		v.runs = append(v.runs, r)
+	}
+	if r := v.ready(l); r != nil {
+		v.show(r)
+	}
+}
+
+func (v *View) launch(l look) (*run, error) {
 	w, h := v.opts.Panel()
 	if w <= 0 || h <= 0 {
-		return
+		return nil, fmt.Errorf("panel %dx%d", w, h)
 	}
-	v.preferred = v.prefs()
+	screen := v.opts.Screen(l.upright)
+	port := 0
+	if screen.Relay != nil {
+		port = screen.Relay.Port()
+	}
 	dpi := 0
 	if v.opts.Diagonal > 0 {
 		dpi = int(math.Round(math.Hypot(float64(w), float64(h)) / v.opts.Diagonal))
 	}
 	h2, err := firmware.Open(firmware.Options{
 		Helper:   v.opts.Helper,
-		Dir:      v.opts.Dir,
+		Dir:      screen.Dir,
+		Port:     port,
 		Width:    min(w, h),
 		Height:   max(w, h),
 		DPI:      dpi,
@@ -190,8 +254,7 @@ func (v *View) start(l look) {
 		Prefs:    []byte(v.preferred),
 	})
 	if err != nil {
-		slog.Error("tessera firmware", "err", err)
-		return
+		return nil, err
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -207,19 +270,40 @@ func (v *View) start(l look) {
 		var wg sync.WaitGroup
 		wg.Go(func() { _ = h2.Run(ctx) })
 		wg.Go(func() { feed.run(ctx) })
-		if v.opts.Relay != nil {
-			wg.Go(func() { _ = v.opts.Relay.Run(ctx) })
+		if screen.Relay != nil {
+			wg.Go(func() { _ = screen.Relay.Run(ctx) })
 		}
 		wg.Wait()
 	}()
-	v.helper, v.stop, v.done, v.shown = h2, stop, done, l
+	return &run{helper: h2, screen: screen, look: l, feed: feed, stop: stop, done: done}, nil
 }
 
 func (v *View) Draw(at ui.Rect) gogui.View {
+	v.Rest(false)
+	return v.draw(at, nil)
+}
+
+func (v *View) Saver(at ui.Rect, wake func(gogui.EventCtx)) gogui.View {
+	v.Rest(true)
+	return v.draw(at, wake)
+}
+
+func (v *View) Rest(on bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.front != nil {
+		v.front.helper.Frame().Rest(on)
+	}
+}
+
+func (v *View) draw(at ui.Rect, wake func(gogui.EventCtx)) gogui.View {
 	v.follow(v.look(at.H > at.W), v.prefs())
 	touch := func(down bool) func(gogui.EventCtx) {
 		return func(e gogui.EventCtx) {
 			v.touch(e, at, down)
+			if down && wake != nil {
+				wake(e)
+			}
 			e.Consume()
 		}
 	}
@@ -251,13 +335,15 @@ func (v *View) Draw(at ui.Rect) gogui.View {
 func (v *View) follow(l look, prefs string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if v.helper != nil && prefs != v.preferred {
+	if prefs != v.preferred {
 		v.preferred = prefs
-		if err := v.helper.Prefer([]byte(prefs)); err != nil {
-			slog.Warn("tessera firmware prefs", "err", err)
+		for _, r := range v.runs {
+			if err := r.helper.Prefer([]byte(prefs)); err != nil {
+				slog.Warn("tessera firmware prefs", "err", err)
+			}
 		}
 	}
-	if v.helper == nil || v.shown == l || v.turning {
+	if v.front == nil || v.front.look == l || v.turning {
 		return
 	}
 	v.turning = true
@@ -274,10 +360,10 @@ func (v *View) touch(e gogui.EventCtx, at ui.Rect, down bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.down = down
-	if v.helper == nil || e.Event == nil {
+	if v.front == nil || e.Event == nil {
 		return
 	}
-	f := v.helper.Frame()
+	f := v.front.helper.Frame()
 	w, h := f.Size()
 	if w == 0 || at.W == 0 || at.H == 0 {
 		return
@@ -286,6 +372,7 @@ func (v *View) touch(e gogui.EventCtx, at ui.Rect, down bool) {
 	x := int((e.Event.MouseX - s.X) * float32(w) / float32(at.W))
 	y := int((e.Event.MouseY - s.Y) * float32(h) / float32(at.H))
 	slog.Debug("touch out", "down", down, "x", x, "y", y)
+	v.motion.track(float32(x), down)
 	f.Touch(x, y, down)
 }
 
@@ -300,7 +387,16 @@ type feed struct {
 	w, h                 int
 	seq, turns           uint32
 	shown, moved         bool
+
+	on, fresh atomic.Bool
 }
+
+func (f *feed) reveal() {
+	f.fresh.Store(true)
+	f.on.Store(true)
+}
+
+func (f *feed) hide() { f.on.Store(false) }
 
 func (f *feed) run(ctx context.Context) {
 	tick := time.NewTicker(time.Second / 60)
@@ -310,6 +406,9 @@ func (f *feed) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+			if !f.on.Load() {
+				continue
+			}
 			moving := f.motion.moving()
 			if f.pull() || moving || f.moved {
 				f.redraw()
@@ -320,6 +419,9 @@ func (f *feed) run(ctx context.Context) {
 }
 
 func (f *feed) pull() bool {
+	if f.fresh.Swap(false) {
+		f.shown = false
+	}
 	if t := f.frame.Turn(); t.Count != f.turns {
 		f.turns = t.Count
 		f.turned(t)
@@ -357,7 +459,7 @@ func (f *feed) pull() bool {
 }
 
 func (f *feed) turned(t firmware.Turn) {
-	if !f.shown || f.turn == nil {
+	if !f.shown || f.turn == nil || f.motion.skip() {
 		return
 	}
 	kind := f.turn()
@@ -377,7 +479,7 @@ func (f *feed) turned(t firmware.Turn) {
 	f.motion.old.Write(f.w, f.h, area, f.old[:n])
 	p := f.old[:4]
 	ground := gogui.RGB(p[0], p[1], p[2])
-	f.motion.start(kind, t.Step, area, image.Pt(f.w, f.h), ground)
+	f.motion.start(kind, t.Step, t.From, area, image.Pt(f.w, f.h), ground)
 }
 
 func changedRows(a, b []byte, stride int) (top, bottom int) {

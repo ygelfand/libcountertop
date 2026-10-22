@@ -266,9 +266,9 @@ func (i *Idle) SetAfter(v schema.Delay) {
 	i.set("after", func(c *schema.Idle) { c.After = v })
 }
 
-func (i *Idle) Saver() schema.HomeMode { return i.options.Settings.Read().Saver }
+func (i *Idle) Saver() schema.SaverMode { return i.options.Settings.Read().Saver }
 
-func (i *Idle) SetSaver(v schema.HomeMode) {
+func (i *Idle) SetSaver(v schema.SaverMode) {
 	i.set("saver", func(c *schema.Idle) { c.Saver = v })
 }
 

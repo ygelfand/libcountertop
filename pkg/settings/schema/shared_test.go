@@ -25,6 +25,7 @@ func TestSharedFlattensIntoTheEmbeddingStruct(t *testing.T) {
 	}
 
 	want := []string{
+		"access",
 		"airplay",
 		"alerts",
 		"api",
@@ -37,6 +38,7 @@ func TestSharedFlattensIntoTheEmbeddingStruct(t *testing.T) {
 		"cast",
 		"certs",
 		"clock",
+		"diag",
 		"feedback",
 		"frontend",
 		"home",

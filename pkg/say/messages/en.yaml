@@ -8,8 +8,8 @@ about.title: About
 about.version: Version
 access.group.access: Access
 access.setting.adb: ADB over network
-airplay.group.airplay: AirPlay
-airplay.setting.on: AirPlay
+media.group.airplay: AirPlay
+media.setting.airplay: AirPlay
 alarm.add: Add alarm
 alarm.app: Alarms
 alarm.daily: Every day
@@ -64,8 +64,8 @@ align.center: Center
 align.left: Left
 align.random: Random
 align.right: Right
-api.group.api: Home Assistant
-api.setting.adopted: Adopted by Home Assistant
+access.group.api: Home Assistant
+access.setting.adopted: Adopted by Home Assistant
 apps.group.apps: Apps
 apps.empty: No apps
 apps.hint: Tap the star to keep an app in the dock. Drag a tile to move it.
@@ -76,6 +76,8 @@ assistants.off: "Off"
 assistants.pipeline: Pipeline
 assistants.pipeline.preferred: Preferred
 assistants.reply: Response playback
+assistants.group.stopword: Stop word
+assistants.setting.stop_sensitivity: Stop word sensitivity
 assistants.setting.buffer: Reply buffer
 assistants.setting.delivery: Response playback
 assistants.setting.follow_up: Follow-up time
@@ -96,9 +98,18 @@ assistants.waiting: Waiting for the model
 assistants.word: Wake word
 assistants.word.ha: Enable actions or pick in Home Assistant
 bluetooth.group.bluetooth: Bluetooth
+ring.group.ring: Ring
 ring.setting.effect: Wake light
+ring.setting.incoming: Incoming call light
+ring.setting.muted: Muted light
+ring.setting.reaction: Room reaction
 ring.setting.replying_effect: Replying light
+ring.setting.talking: In-call light
 ring.setting.thinking_effect: Thinking light
+ring.setting.trouble: Failure light
+speaker.group.speaker: Speaker
+speaker.setting.eq: Speaker EQ
+speaker.setting.resampling: Voice resampling
 bluetooth.setting.proxy: Bluetooth proxy
 bluetooth.setting.scan: Bluetooth scanning
 bluetooth.setting.speaker: Bluetooth speaker
@@ -374,7 +385,11 @@ controls.dock: Dock position
 controls.dock.hide: Hide dock after
 controls.volume: Volume panel position
 datetime.title: Date & time
+dashboard.title: Dashboard
 debug.fps: Visual frame rate limit
+diag.group.diagnostics: Diagnostics
+diag.setting.interval: Metrics interval
+diag.setting.min_cores: Minimum CPU cores
 debug.fps.value: "{{.N}} fps"
 debug.seed: Visual seed
 debug.seed.random: Random
@@ -399,7 +414,6 @@ display.alerts: Alert style
 display.auto: Adaptive brightness
 display.brightness: Brightness
 display.clock: Clock
-display.dashboard: Dashboard
 display.idle: Screen saver
 display.marks: Privacy indicators
 display.poster: Wallpaper
@@ -455,11 +469,12 @@ home.group.home: Home control
 home.group.none: Every device on its own card
 home.label.count: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.loading: Loading…
-home.dashboard: Dashboard
+home.dashboard: Mode
 home.saver: Screen saver
 mode.native: Native
 mode.tessera: Tessera
-mode.firmware: Tessera firmware
+mode.tessera_native: Tessera native
+mode.firmware: Tessera embedded
 home.noarea: No area
 home.none: None
 home.off: Home Assistant is off
@@ -487,11 +502,13 @@ home.setting.tessera.home_after_idle: "Tessera: back to the home page after the 
 home.setting.tessera.landscape: "Tessera: landscape screen"
 home.setting.tessera.portrait: "Tessera: portrait screen"
 home.setting.tessera.rows: Tessera tiles along the short side
-home.setting.tessera.themed: "Tessera firmware: use this device's theme"
-home.setting.tessera.turn: "Tessera firmware: page transition"
-home.setting.tessera.bottom: "Tessera firmware: swipe up from the bottom"
+home.setting.tessera.themed: "Tessera embedded: use this device's theme"
+home.setting.tessera.turn: "Tessera embedded: page transition"
+home.setting.tessera.bottom: "Tessera embedded: swipe up from the bottom"
+home.setting.tessera.follow: "Tessera embedded: page follows finger"
 home.tab.labels: Labels
 home.tab.manual: Manual
+home.tessera.grid: Grid
 home.tessera.columns: Long side
 home.tessera.landscape: Enable landscape
 home.tessera.portrait: Enable portrait
@@ -500,6 +517,7 @@ home.tessera.rows: Short side
 home.tessera.themed: Use this device's theme
 home.tessera.turn: Page transition
 home.tessera.bottom: Swipe up from the bottom
+home.tessera.follow: Page follows finger
 home.tile.all.off: All off
 home.tile.all.on: All on
 home.tile.area: "{{.N}} of {{.Of}} on"
@@ -526,8 +544,6 @@ idle.night.lux: Darker than
 idle.night.lux.value: "{{.N}} lx"
 idle.night.mode: Mode
 idle.none: None
-idle.saver: Mode
-idle.saver.tessera: Set it up in Tessera's screen settings
 idle.setting.after: Idle screen after
 idle.setting.align: Idle clock horizontal position
 idle.setting.face: Idle clock face
@@ -581,6 +597,7 @@ microphone.setting.denoise: Noise suppression
 microphone.setting.gain: Microphone gain
 microphone.setting.leveling: Microphone leveling
 microphone.setting.mixing: Microphone mixing
+microphone.setting.mute_led: Mute LED brightness
 microphone.setting.sensitivity: Room sensitivity
 mirror.app: Mirror
 mode.auto: Automatic
@@ -721,8 +738,8 @@ lock.off: "Off"
 lock.on: "On"
 lock.set: Set PIN
 lock.entity.pin: Settings Lock
-lock.group.lock: Lock
-lock.setting.pin: Settings Lock
+screen.group.lock: Lock
+screen.setting.lock_pin: Settings Lock
 lock.title: Settings
 lock.wait: "Try again in {{.Seconds}} s"
 lock.wrong: Wrong PIN
@@ -752,8 +769,8 @@ screen.setting.custom.text: Custom theme text
 screen.setting.custom.muted: Custom theme secondary text
 screen.setting.custom.accent: Custom theme accent
 screen.setting.custom.accent2: Custom theme second accent
-sendspin.group.sendspin: Sendspin
-sendspin.setting.on: Sendspin
+media.group.sendspin: Sendspin
+media.setting.sendspin: Sendspin
 settings.about: About
 settings.assistants: Voice assistants
 settings.camera: Camera
@@ -1185,6 +1202,6 @@ feedback.setting.mute: Mute sound
 feedback.setting.unmute: Unmute sound
 feedback.setting.hold: Mute hold sound
 frontend.entity.password: Admin password
-frontend.group.frontend: Web access
-frontend.setting.password: Admin password
+access.group.frontend: Web access
+access.setting.password: Admin password
 microphone.setting.mute_sound: Mute sound

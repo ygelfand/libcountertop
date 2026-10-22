@@ -32,7 +32,6 @@ type IdleSlots interface {
 type IdleClock interface {
 	SetAfter(config.Delay)
 	SetFace(config.Face)
-	SetSaver(config.HomeMode)
 }
 type IdleNight interface {
 	SetNight(config.Night)
@@ -189,7 +188,7 @@ func (p *IdlePages) Page() *shell.Page {
 				},
 			)
 			taps = append(taps, p.makePage(func() shell.View { return p.SaverWeather() }), nil)
-			rows, taps = p.withSaver(c, rows, taps)
+			rows, taps = p.withSensors(rows, taps)
 			return append(rows, menu.Row{
 					Label: say.T("idle.night"),
 					Hint:  say.T("idle.night.hint"),
@@ -248,33 +247,14 @@ func (p *IdlePages) Night() *shell.Page {
 
 const saverShared = 1
 
-func (p *IdlePages) withSaver(
-	c config.Idle,
-	rows []menu.Row,
-	taps []func(int),
-) ([]menu.Row, []func(int)) {
+func (p *IdlePages) withSensors(rows []menu.Row, taps []func(int)) ([]menu.Row, []func(int)) {
+	if p.options.Sensors == nil {
+		return rows, taps
+	}
 	head, headTaps := slices.Clone(rows[:saverShared]), slices.Clone(taps[:saverShared])
-	rest, restTaps := rows[saverShared:], taps[saverShared:]
-	if p.options.Sensors != nil {
-		r, t := p.options.Sensors().Build()
-		head, headTaps = append(head, r...), append(headTaps, t...)
-	}
-	if p.options.Home != nil && p.options.Home.Access() == ha.Allowed {
-		mode := p.options.Marks.Row(say.T("idle.saver"), config.SaverModes(), c.Saver)
-		if c.Tessera() {
-			mode.Hint = say.T("idle.saver.tessera")
-			for n := range rest {
-				rest[n].Dim = true
-				restTaps[n] = func(int) {}
-			}
-		}
-		head = append(head, mode)
-		headTaps = append(
-			headTaps,
-			p.options.Marks.Pick(config.SaverModes(), p.options.Idle.SetSaver),
-		)
-	}
-	return append(head, rest...), append(headTaps, restTaps...)
+	r, t := p.options.Sensors().Build()
+	head, headTaps = append(head, r...), append(headTaps, t...)
+	return append(head, rows[saverShared:]...), append(headTaps, taps[saverShared:]...)
 }
 
 func (p *IdlePages) SlotVisual(slot int) config.IdleVisual {

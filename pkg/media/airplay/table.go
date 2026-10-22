@@ -16,15 +16,15 @@ const Group setting.Group = "AirPlay"
 
 func NewTable() *Table {
 	var t *Table
-	t = setting.NewTable("airplay", []setting.Group{Group}, []Setting{
+	t = setting.NewTable("media", []setting.Group{Group}, []Setting{
 		{
-			Name: "on", Group: Group, ID: "airplay", Icon: "mdi:apple-airplay",
+			Name: "airplay", Group: Group, ID: "airplay", Icon: "mdi:apple-airplay",
 			Kind: setting.Toggle,
 			Read: func(c *schema.AirPlay) string { return setting.OnOff(c.Enabled) },
 			Write: func(c *schema.AirPlay, v string) error {
 				on, ok := setting.Boolean(v)
 				if !ok {
-					return t.MustRow("on").Bad(v, "on or off")
+					return t.MustRow("airplay").Bad(v, "on or off")
 				}
 				c.Enabled = on
 				return nil

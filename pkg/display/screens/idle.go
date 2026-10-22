@@ -34,6 +34,17 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		e.Window.InvalidateLayout()
 	}
 	night := v.Night()
+	if f := a.o.Firmware; f != nil && f.On() && f.Rests() && !night.Quiet() {
+		v.Close()
+		return gogui.Column(gogui.ContainerCfg{
+			ID:      "idle",
+			Sizing:  gogui.FillFill,
+			Padding: gogui.NoPadding,
+			Content: []gogui.View{
+				widgets.Placed(ui.Rect{W: vw, H: vh}, f.Saver(ui.Rect{W: vw, H: vh}, wake)),
+			},
+		})
+	}
 	if a.o.Tessera != nil && a.o.Settings().Idle.Tessera() && !night.Quiet() {
 		if layers := a.o.Tessera.Saver(w, ui.Rect{W: vw, H: vh}); layers != nil {
 			v.Close()

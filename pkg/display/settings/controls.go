@@ -102,7 +102,7 @@ func (p *BasicPages) System() *shell.Page {
 			}
 			rows = append(rows, menu.Row{
 				Glyph: gogui.IconLock,
-				Label: say.T("lock.setting.pin"),
+				Label: say.T("screen.setting.lock_pin"),
 				Kind:  menu.Chevron,
 				Value: value,
 			})
@@ -129,23 +129,26 @@ func (p *BasicPages) System() *shell.Page {
 
 func (p *BasicPages) Lock() *shell.Page {
 	l := p.options.Lock
-	return &shell.Page{Title: say.T("lock.setting.pin"), Build: func() ([]menu.Row, []func(int)) {
-		if !l.Locked() {
-			return []menu.Row{{Label: say.T("lock.set")}}, []func(int){func(int) { l.Change() }}
-		}
-		return []menu.Row{
-				{Label: say.T("lock.change")},
-				{Label: say.T("lock.clear"), Kind: menu.Chevron},
-			}, []func(int){
-				func(int) { l.Change() },
-				p.open(func() shell.View {
-					return ConfirmPage(say.T("lock.clear"), say.T("lock.clear.what"), func() {
-						l.Clear()
-						p.options.Shell.Pop()
-					})
-				}),
+	return &shell.Page{
+		Title: say.T("screen.setting.lock_pin"),
+		Build: func() ([]menu.Row, []func(int)) {
+			if !l.Locked() {
+				return []menu.Row{{Label: say.T("lock.set")}}, []func(int){func(int) { l.Change() }}
 			}
-	}}
+			return []menu.Row{
+					{Label: say.T("lock.change")},
+					{Label: say.T("lock.clear"), Kind: menu.Chevron},
+				}, []func(int){
+					func(int) { l.Change() },
+					p.open(func() shell.View {
+						return ConfirmPage(say.T("lock.clear"), say.T("lock.clear.what"), func() {
+							l.Clear()
+							p.options.Shell.Pop()
+						})
+					}),
+				}
+		},
+	}
 }
 func (p *BasicPages) DateTime() *shell.Page {
 	return &shell.Page{Title: say.T("datetime.title"), Build: func() ([]menu.Row, []func(int)) {

@@ -51,6 +51,12 @@ func RootPage(o RootDependencies) *shell.Page {
 			ThemeSays(o.Screen.Read().Theme),
 			func() shell.View { return o.Basic.Display() },
 		)
+		add(
+			gogui.IconTablet,
+			"dashboard.title",
+			"",
+			func() shell.View { return o.Home.Dashboard() },
+		)
 		add(gogui.IconHome, "home.title", "", func() shell.View { return o.Home.Page() })
 		add(
 			gogui.IconSpeaker,
