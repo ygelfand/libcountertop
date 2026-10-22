@@ -83,7 +83,7 @@ func (g grid) drop(from int, dx, dy float32, count int) int {
 }
 
 func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
-	vw, vh := w.WindowSize()
+	vw, _ := w.WindowSize()
 	width := float32(vw - 2*gogui.PadLarge)
 	g := layout(width)
 	list := a.List()
@@ -131,8 +131,9 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 	}
 	content = append(content, gogui.Label(note, widgets.Secondary()))
 
-	return widgets.Placed(ui.Rect{W: int(width), H: vh}, gogui.Column(gogui.ContainerCfg{
-		Sizing:  gogui.FillFill,
+	return gogui.Column(gogui.ContainerCfg{
+		Width:   width,
+		Sizing:  gogui.FixedFit,
 		Padding: gogui.NoPadding,
 		Spacing: gogui.SpacingPx(g.gap),
 		Content: content,
@@ -150,8 +151,13 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 			)
 			switch e.Event.GestureType {
 			case gogui.GesturePan:
-				a.pan(e, g, len(list))
+				if !a.pan(e, g, len(list)) {
+					return
+				}
 			case gogui.GestureSwipe:
+				if !a.dragging() {
+					return
+				}
 				a.held.End(e.Window, 0)
 			default:
 				return
@@ -159,7 +165,7 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 			e.Consume()
 			e.Window.InvalidateLayout()
 		},
-	}))
+	})
 }
 
 func (a *Apps) tile(look *widgets.UI, app App, side float32) gogui.View {
@@ -231,25 +237,39 @@ func (a *Apps) settling() bool {
 	return a.drag.from >= 0 || time.Since(a.drag.dropped) < settle
 }
 
-func (a *Apps) pan(e gogui.EventCtx, g grid, count int) {
+func (a *Apps) dragging() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.drag.from >= 0
+}
+
+func (a *Apps) pan(e gogui.EventCtx, g grid, count int) bool {
 	switch e.Event.GesturePhase {
 	case gogui.GesturePhaseBegan:
 		s := e.Layout.Shape
 		from := g.at(e.Event.CentroidX-s.X, e.Event.CentroidY-s.Y, count)
+		if from < 0 {
+			return false
+		}
 		a.mu.Lock()
 		a.drag = drag{from: from, dx: e.Event.GestureDX, dy: e.Event.GestureDY}
 		a.mu.Unlock()
 		a.held.Begin(e.Window, func(*gogui.Window, float32) { a.end(g, count) })
 	case gogui.GesturePhaseChanged:
 		a.mu.Lock()
-		if a.drag.from >= 0 {
-			a.drag.dx += e.Event.GestureDX
-			a.drag.dy += e.Event.GestureDY
+		defer a.mu.Unlock()
+		if a.drag.from < 0 {
+			return false
 		}
-		a.mu.Unlock()
+		a.drag.dx += e.Event.GestureDX
+		a.drag.dy += e.Event.GestureDY
 	default:
+		if !a.dragging() {
+			return false
+		}
 		a.held.End(e.Window, 0)
 	}
+	return true
 }
 
 func (a *Apps) end(g grid, count int) {
