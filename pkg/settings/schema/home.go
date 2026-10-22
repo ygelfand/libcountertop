@@ -17,6 +17,39 @@ type Home struct {
 	Return  bool                `json:"tessera_return"`
 	Wide    bool                `json:"tessera_landscape"`
 	Tall    bool                `json:"tessera_portrait"`
+	Themed  bool                `json:"tessera_themed"`
+	Turn    TesseraTurn         `json:"tessera_turn"`
+	Bottom  TesseraBottom       `json:"tessera_bottom"`
+}
+
+type TesseraBottom string
+
+const (
+	BottomDock TesseraBottom = "dock"
+	BottomHome TesseraBottom = "home"
+	BottomOff  TesseraBottom = "off"
+)
+
+func (b TesseraBottom) Label() string { return say.T("tessera.bottom." + string(b)) }
+
+func TesseraBottoms() []TesseraBottom { return []TesseraBottom{BottomDock, BottomHome, BottomOff} }
+
+type TesseraTurn string
+
+const (
+	TurnNone   TesseraTurn = "none"
+	TurnSlide  TesseraTurn = "slide"
+	TurnCover  TesseraTurn = "cover"
+	TurnReveal TesseraTurn = "reveal"
+	TurnDeck   TesseraTurn = "deck"
+	TurnZoom   TesseraTurn = "zoom"
+	TurnFade   TesseraTurn = "fade"
+)
+
+func (t TesseraTurn) Label() string { return say.T("tessera.turn." + string(t)) }
+
+func TesseraTurns() []TesseraTurn {
+	return []TesseraTurn{TurnNone, TurnSlide, TurnCover, TurnReveal, TurnDeck, TurnZoom, TurnFade}
 }
 
 const (
@@ -27,8 +60,9 @@ const (
 type HomeMode string
 
 const (
-	HomeNative  HomeMode = "native"
-	HomeTessera HomeMode = "tessera"
+	HomeNative   HomeMode = "native"
+	HomeTessera  HomeMode = "tessera"
+	HomeFirmware HomeMode = "firmware"
 )
 
 func (m HomeMode) Label() string {
@@ -37,11 +71,17 @@ func (m HomeMode) Label() string {
 		return say.T("mode.native")
 	case HomeTessera:
 		return say.T("mode.tessera")
+	case HomeFirmware:
+		return say.T("mode.firmware")
 	}
 	return string(m)
 }
 
-func HomeModes() []HomeMode { return []HomeMode{HomeNative, HomeTessera} }
+func (m HomeMode) Tessera() bool { return m == HomeTessera || m == HomeFirmware }
+
+func HomeModes() []HomeMode { return []HomeMode{HomeNative, HomeTessera, HomeFirmware} }
+
+func SaverModes() []HomeMode { return []HomeMode{HomeNative, HomeTessera} }
 
 type TesseraGrid struct {
 	Columns int `json:"columns"`
@@ -72,7 +112,15 @@ func (p HomePick) Clone() HomePick {
 }
 
 func DefaultHome() Home {
-	return Home{Enabled: true, Mode: HomeNative, Wide: true, Tall: true}
+	return Home{
+		Enabled: true,
+		Mode:    HomeNative,
+		Wide:    true,
+		Tall:    true,
+		Themed:  true,
+		Turn:    TurnSlide,
+		Bottom:  BottomDock,
+	}
 }
 
 func (h Home) Picked(key string) HomePick { return h.Picks[key] }
@@ -85,8 +133,8 @@ func (h Home) Grouped(key string) int {
 }
 
 func (h Home) Speaks() HomeMode {
-	if h.Mode == HomeTessera {
-		return HomeTessera
+	if h.Mode.Tessera() {
+		return h.Mode
 	}
 	return HomeNative
 }

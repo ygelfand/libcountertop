@@ -57,7 +57,7 @@ func (p *BasicPages) DashboardPage() *shell.Page {
 				p.open(func() shell.View { return p.options.Idle.DashboardWeather() }),
 				p.open(func() shell.View { return p.Poster() }),
 			}
-			if p.dashboardOffered() && mode == config.HomeTessera {
+			if p.dashboardOffered() && mode.Tessera() {
 				for n := range rows {
 					rows[n].Dim = true
 					acts[n] = func(int) {}
@@ -78,10 +78,12 @@ func (p *BasicPages) DashboardPage() *shell.Page {
 				return rows, acts
 			}
 			return append(
-					[]menu.Row{p.options.Marks.Row(say.T("display.dashboard"), mode)},
+					[]menu.Row{
+						p.options.Marks.Row(say.T("display.dashboard"), config.HomeModes(), mode),
+					},
 					rows...),
 				append(
-					[]func(int){p.options.Marks.Pick(p.options.Home.SetMode)},
+					[]func(int){p.options.Marks.Pick(config.HomeModes(), p.options.Home.SetMode)},
 					acts...)
 		},
 	}

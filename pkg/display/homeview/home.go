@@ -10,6 +10,8 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/settings"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
@@ -35,11 +37,13 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 	views := []gogui.View{master}
 	if saver := view.options.Saver; saver != nil {
 		views = append(views, view.options.UI.Row("saver", "home",
-			marks.Row(say.T("home.saver"), saver.Saver()), marks.Pick(saver.SetSaver), false))
+			marks.Row(say.T("home.saver"), schema.SaverModes(), saver.Saver()),
+			marks.Pick(schema.SaverModes(), saver.SetSaver), false))
 	}
 	views = append(views,
 		view.options.UI.Row("mode", "home",
-			marks.Row(say.T("home.dashboard"), engine.Speaks()), marks.Pick(engine.SetMode), false),
+			marks.Row(say.T("home.dashboard"), schema.HomeModes(), engine.Speaks()),
+			marks.Pick(schema.HomeModes(), engine.SetMode), false),
 		view.options.UI.Row("native", "home",
 			menu.Row{Label: schema.HomeNative.Label(), Kind: menu.Chevron, Dim: !engine.Native()},
 			func(int) { view.options.Shell.Push(view.NativePage()) }, false),
@@ -487,6 +491,12 @@ type Dependencies struct {
 	UI              *widgets.UI
 }
 
+type FirmwareSettings interface {
+	Switch(id string) (*esphome.Switch, bool)
+	Number(id string) (*esphome.Number, bool)
+	Clock(id string) (*esphome.Text, bool)
+}
+
 type SaverMode interface {
 	Saver() schema.HomeMode
 	SetSaver(schema.HomeMode)
@@ -499,8 +509,9 @@ type Listener interface {
 
 type Renderer struct {
 	options Dependencies
-	tessera Listener
-	grid    gridDraft
+	tessera  Listener
+	firmware FirmwareSettings
+	grid     gridDraft
 }
 
 const gridSettle = 400 * time.Millisecond
@@ -548,6 +559,8 @@ func (d *gridDraft) shown(saved schema.TesseraGrid) schema.TesseraGrid {
 }
 
 func (view *Renderer) Listen(l Listener) { view.tessera = l }
+
+func (view *Renderer) UseFirmware(f FirmwareSettings) { view.firmware = f }
 
 func New(o Dependencies) *Renderer { return &Renderer{options: o} }
 func reach() float32               { return style.Reach() }
@@ -650,6 +663,10 @@ func (view *Renderer) TesseraPage() *shell.Page {
 					func(int) { engine.SetLandscape(!wide) },
 					func(int) { engine.SetPortrait(!tall) },
 				)
+			}
+			if engine.Firmware() {
+				rows = append(rows, menu.Row{Label: schema.HomeFirmware.Label(), Kind: menu.Chevron})
+				taps = append(taps, func(int) { view.options.Shell.Push(view.firmwarePage()) })
 			}
 			if t := view.tessera; t != nil && engine.Tessera() {
 				if title, body := t.Hint(); title != "" {

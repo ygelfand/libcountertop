@@ -38,9 +38,10 @@ func (u *UI) Reset() {
 	u.Gestures = &Gestures{Release: func(e gogui.EventCtx) { u.Presses.Release(e) }}
 }
 
-func (u *UI) Kit() style.Kit { return style.ByName(u.settings.Read().Style).Kit }
-func (u *UI) Palette() theme.Theme {
-	s := u.settings.Read()
+func (u *UI) Kit() style.Kit       { return style.ByName(u.settings.Read().Style).Kit }
+func (u *UI) Palette() theme.Theme { return Palette(u.settings.Read()) }
+
+func Palette(s schema.Screen) theme.Theme {
 	if p, ok := theme.Resolve(style.Theme(s.Style, s.Theme), s.Custom); ok {
 		return p
 	}

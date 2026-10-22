@@ -214,6 +214,7 @@ func bootTheme(p theme.Theme) gui.Theme {
 	cfg.ColorBackground = widgets.Color(p.Background)
 	cfg.ColorPanel = widgets.Color(p.Surface)
 	cfg.ColorTextSecondary = widgets.Color(p.Muted)
+	cfg.SizeBorder = 0
 	return gui.ThemeMaker(cfg)
 }
 

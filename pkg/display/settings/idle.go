@@ -260,7 +260,7 @@ func (p *IdlePages) withSaver(
 		head, headTaps = append(head, r...), append(headTaps, t...)
 	}
 	if p.options.Home != nil && p.options.Home.Access() == ha.Allowed {
-		mode := p.options.Marks.Row(say.T("idle.saver"), c.Saver)
+		mode := p.options.Marks.Row(say.T("idle.saver"), config.SaverModes(), c.Saver)
 		if c.Tessera() {
 			mode.Hint = say.T("idle.saver.tessera")
 			for n := range rest {
@@ -269,7 +269,10 @@ func (p *IdlePages) withSaver(
 			}
 		}
 		head = append(head, mode)
-		headTaps = append(headTaps, p.options.Marks.Pick(p.options.Idle.SetSaver))
+		headTaps = append(
+			headTaps,
+			p.options.Marks.Pick(config.SaverModes(), p.options.Idle.SetSaver),
+		)
 	}
 	return append(head, rest...), append(headTaps, restTaps...)
 }

@@ -163,6 +163,7 @@ type Renderer struct {
 
 	images    map[string]picture
 	mem       map[string]memPicture
+	live      map[string]uint32
 	free      []uint32
 	frame     uint64
 	nextImage uint32
@@ -203,6 +204,7 @@ func New(sink Sink, w *gui.Window) (*Renderer, error) {
 		sink:   sink,
 		images: map[string]picture{},
 		mem:    map[string]memPicture{},
+		live:   map[string]uint32{},
 		events: make(chan gui.Event, 256),
 		wake:   make(chan struct{}, 1),
 	}
@@ -247,6 +249,7 @@ var phases = [...]gui.EventType{
 }
 
 func (r *Renderer) Touch(p Phase, id uint64, x, y float32) {
+	slog.Debug("touch in", "phase", int(p), "x", int(x), "y", int(y))
 	if p < Began || p > Cancelled {
 		return
 	}
@@ -480,6 +483,9 @@ func (r *Renderer) sweepMem() {
 }
 
 func (r *Renderer) picture(path string) picture {
+	if strings.HasPrefix(path, livePrefix) {
+		return r.livePicture(path)
+	}
 	if strings.HasPrefix(path, "mem:") {
 		return r.memPicture(path)
 	}

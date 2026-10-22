@@ -154,6 +154,7 @@ func Look(name, palette, size string, custom theme.Custom) gogui.Theme {
 	cfg.FocusRing = nil
 	cfg.ColorFocus = cfg.ColorInterior
 	cfg.ColorBorderFocus = cfg.ColorBorder
+	cfg.SizeBorder = 0
 
 	sizeNamed(size).Set(&cfg)
 	st.Shape(&cfg)

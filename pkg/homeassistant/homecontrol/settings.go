@@ -24,6 +24,9 @@ const (
 	tesseraReturn  = "tessera.home_after_idle"
 	tesseraWide    = "tessera.landscape"
 	tesseraTall    = "tessera.portrait"
+	tesseraThemed  = "tessera.themed"
+	tesseraTurn    = "tessera.turn"
+	tesseraBottom  = "tessera.bottom"
 )
 
 func (e *Engine) Controls() *setting.Controls[config.Home] { return e.knobs }
@@ -71,6 +74,20 @@ func (e *Engine) table() *setting.Table[config.Home] {
 		setting.Flag(
 			Setting{Name: tesseraTall, Group: Group, Icon: "mdi:phone-rotate-portrait"},
 			func(h *config.Home) *bool { return &h.Tall },
+		),
+		setting.Flag(
+			Setting{Name: tesseraThemed, Group: Group, Icon: "mdi:palette"},
+			func(h *config.Home) *bool { return &h.Themed },
+		),
+		setting.Pick(
+			Setting{Name: tesseraTurn, Group: Group, Icon: "mdi:page-next-outline"},
+			config.TesseraTurns(),
+			func(h *config.Home) *config.TesseraTurn { return &h.Turn },
+		),
+		setting.Pick(
+			Setting{Name: tesseraBottom, Group: Group, Icon: "mdi:gesture-swipe-up"},
+			config.TesseraBottoms(),
+			func(h *config.Home) *config.TesseraBottom { return &h.Bottom },
 		),
 	}
 	for _, s := range e.selections {
@@ -144,6 +161,10 @@ func (e *Engine) store(s Setting, v string) error {
 		e.Speaking.Emit(e.Speaks())
 	case tesseraColumns, tesseraRows:
 		e.Regrid.Emit(e.Grid())
+	}
+	switch s.Name {
+	case enabled, dashboardMode:
+		e.Redrawn.Emit(e.Firmware())
 	}
 	e.options.Shell.Redraw()
 	return err

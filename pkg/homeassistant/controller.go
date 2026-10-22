@@ -488,6 +488,36 @@ func (h *Controller) call(
 	return h.send(ctx, targets, req)
 }
 
+func (h *Controller) Relay(
+	ctx context.Context,
+	from *api.HomeassistantActionRequest,
+) ([]byte, error) {
+	req := &api.HomeassistantActionRequest{
+		Service:          from.Service,
+		Data:             from.Data,
+		DataTemplate:     from.DataTemplate,
+		Variables:        from.Variables,
+		IsEvent:          from.IsEvent,
+		WantsResponse:    from.WantsResponse,
+		ResponseTemplate: from.ResponseTemplate,
+	}
+	if !req.IsEvent {
+		return h.call(ctx, req)
+	}
+	h.mu.Lock()
+	targets, err := h.targets()
+	h.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range targets {
+		if err := t.Send(req); err != nil {
+			h.lost(t)
+		}
+	}
+	return nil, nil
+}
+
 func (h *Controller) targets() ([]sender, error) {
 	if len(h.links) == 0 {
 		return nil, ErrNotConnected

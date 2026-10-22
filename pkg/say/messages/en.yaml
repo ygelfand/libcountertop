@@ -459,6 +459,7 @@ home.dashboard: Dashboard
 home.saver: Screen saver
 mode.native: Native
 mode.tessera: Tessera
+mode.firmware: Tessera firmware
 home.noarea: No area
 home.none: None
 home.off: Home Assistant is off
@@ -486,6 +487,9 @@ home.setting.tessera.home_after_idle: "Tessera: back to the home page after the 
 home.setting.tessera.landscape: "Tessera: landscape screen"
 home.setting.tessera.portrait: "Tessera: portrait screen"
 home.setting.tessera.rows: Tessera tiles along the short side
+home.setting.tessera.themed: "Tessera firmware: use this device's theme"
+home.setting.tessera.turn: "Tessera firmware: page transition"
+home.setting.tessera.bottom: "Tessera firmware: swipe up from the bottom"
 home.tab.labels: Labels
 home.tab.manual: Manual
 home.tessera.columns: Long side
@@ -493,6 +497,9 @@ home.tessera.landscape: Enable landscape
 home.tessera.portrait: Enable portrait
 home.tessera.return: Go back to the home page after the screensaver
 home.tessera.rows: Short side
+home.tessera.themed: Use this device's theme
+home.tessera.turn: Page transition
+home.tessera.bottom: Swipe up from the bottom
 home.tile.all.off: All off
 home.tile.all.on: All on
 home.tile.area: "{{.N}} of {{.Of}} on"
@@ -934,6 +941,16 @@ tessera.energy.untracked: Untracked
 tessera.sun.rise: "Sunrise {{.T}}"
 tessera.sun.set: "Sunset {{.T}}"
 tessera.updating: Updating…
+tessera.bottom.dock: Page panel
+tessera.bottom.home: Home page
+tessera.bottom.off: Nothing
+tessera.turn.none: None
+tessera.turn.slide: Slide
+tessera.turn.cover: Cover
+tessera.turn.reveal: Reveal
+tessera.turn.deck: Deck
+tessera.turn.zoom: Zoom
+tessera.turn.fade: Fade
 tessera.vacuum.battery: "Battery {{.N}}%"
 tessera.vacuum.dock: Dock
 tessera.vacuum.locate: Locate

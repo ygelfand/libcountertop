@@ -36,6 +36,7 @@ type Dependencies struct {
 type Engine struct {
 	Speaking hook.Hook[config.HomeMode]
 	Regrid   hook.Hook[config.TesseraGrid]
+	Redrawn  hook.Hook[bool]
 
 	options    Dependencies
 	ctx        context.Context

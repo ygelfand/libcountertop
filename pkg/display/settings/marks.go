@@ -20,7 +20,7 @@ func (m ModeMarks) For(modes []config.HomeMode) []menu.Mark {
 	out := make([]menu.Mark, len(modes))
 	for i, mode := range modes {
 		switch mode {
-		case config.HomeTessera:
+		case config.HomeTessera, config.HomeFirmware:
 			out[i].SVG = m.Tessera
 		case config.HomeNative:
 			if m.Native != nil {
@@ -31,8 +31,7 @@ func (m ModeMarks) For(modes []config.HomeMode) []menu.Mark {
 	return out
 }
 
-func (m ModeMarks) Row(label string, chosen config.HomeMode) menu.Row {
-	modes := config.HomeModes()
+func (m ModeMarks) Row(label string, modes []config.HomeMode, chosen config.HomeMode) menu.Row {
 	labels := make([]string, len(modes))
 	for i, mode := range modes {
 		labels[i] = mode.Label()
@@ -46,8 +45,8 @@ func (m ModeMarks) Row(label string, chosen config.HomeMode) menu.Row {
 	}
 }
 
-func (m ModeMarks) Pick(set func(config.HomeMode)) func(int) {
-	return func(i int) { set(config.HomeModes()[i]) }
+func (m ModeMarks) Pick(modes []config.HomeMode, set func(config.HomeMode)) func(int) {
+	return func(i int) { set(modes[i]) }
 }
 
 func Themed(light, dark func() image.Image) func() image.Image {

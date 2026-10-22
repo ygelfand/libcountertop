@@ -49,6 +49,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/input/touch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
+	"github.com/ygelfand/libcountertop/pkg/tessera/firmwareview"
 	tesseraview "github.com/ygelfand/libcountertop/pkg/tessera/widgets"
 )
 
@@ -154,6 +155,7 @@ type Options struct {
 	HomeHA    homeview.Client
 	Saver     homeview.SaverMode
 	Tessera   *tesseraview.View
+	Firmware  *firmwareview.View
 	Forecast  Weather
 	Warnings  weatherview.Alerts
 	Alarms    alarmview.Alarms
@@ -249,6 +251,9 @@ func New(o Options) *App {
 	})
 	if o.Tessera != nil {
 		a.home.Listen(o.Tessera)
+	}
+	if o.Firmware != nil {
+		a.home.UseFirmware(o.Firmware)
 	}
 	return a
 }

@@ -88,7 +88,9 @@ func (e *Engine) Speaks() config.HomeMode {
 
 func (e *Engine) Native() bool { return e.Speaks() == config.HomeNative }
 
-func (e *Engine) Tessera() bool { return e.Speaks() == config.HomeTessera }
+func (e *Engine) Tessera() bool { return e.Speaks().Tessera() }
+
+func (e *Engine) Firmware() bool { return e.Speaks() == config.HomeFirmware }
 
 func (e *Engine) SetMode(m config.HomeMode) { e.set(dashboardMode, string(m)) }
 
@@ -180,6 +182,18 @@ func (*Home) Timeout() time.Duration { return shell.SettingsTimeout }
 func (e *Engine) ReturnHome() bool { return e.options.Settings.Read().Return }
 
 func (e *Engine) SetReturnHome(on bool) { e.set(tesseraReturn, setting.OnOff(on)) }
+
+func (e *Engine) Themed() bool { return e.options.Settings.Read().Themed }
+
+func (e *Engine) SetThemed(on bool) { e.set(tesseraThemed, setting.OnOff(on)) }
+
+func (e *Engine) Turn() config.TesseraTurn { return e.options.Settings.Read().Turn }
+
+func (e *Engine) SetTurn(t config.TesseraTurn) { e.set(tesseraTurn, string(t)) }
+
+func (e *Engine) Bottom() config.TesseraBottom { return e.options.Settings.Read().Bottom }
+
+func (e *Engine) SetBottom(b config.TesseraBottom) { e.set(tesseraBottom, string(b)) }
 
 func (e *Engine) Landscape() bool { return e.Tessera() && e.options.Settings.Read().Wide }
 

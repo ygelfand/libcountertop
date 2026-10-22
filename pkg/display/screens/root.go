@@ -112,23 +112,27 @@ func stack(layers []gogui.View) gogui.View {
 func (a *App) dashboard(w *gogui.Window) gogui.View {
 	vw, vh := w.WindowSize()
 	pal := a.ui.Palette()
-	tabs := a.o.Tabs.List()
-	showing, _ := a.o.Tabs.Showing()
 	margin := int(reach() * 0.5)
-	strip := ui.Rect{X: margin, Y: margin, W: vw - 2*margin, H: int(reach() * 2)}
-	top := 0
-	if len(tabs) > 0 {
-		top = strip.Y + strip.H
-	}
 
 	var layers []gogui.View
-	if a.o.Home != nil && a.o.Home.Tessera() {
-		layers = a.tesseraDash(w, vw, vh, top, margin)
-	} else {
+	switch {
+	case a.o.Firmware != nil && a.o.Firmware.On():
+		whole := ui.Rect{W: vw, H: vh}
+		layers = []gogui.View{widgets.Placed(whole, a.o.Firmware.Draw(whole))}
+	case a.o.Home != nil && a.o.Home.Tessera():
+		layers = a.tesseraDash(w, vw, vh, 0, margin)
+	default:
+		tabs := a.o.Tabs.List()
+		strip := ui.Rect{X: margin, Y: margin, W: vw - 2*margin, H: int(reach() * 2)}
+		top := 0
+		if len(tabs) > 0 {
+			top = strip.Y + strip.H
+		}
 		layers = a.nativeDash(w, vw, vh, top, margin, pal)
-	}
-	if len(tabs) > 0 {
-		layers = append(layers, a.tabStrip(strip, tabs, showing.Key))
+		if len(tabs) > 0 {
+			showing, _ := a.o.Tabs.Showing()
+			layers = append(layers, a.tabStrip(strip, tabs, showing.Key))
+		}
 	}
 
 	dash := gogui.Column(gogui.ContainerCfg{
