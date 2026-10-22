@@ -248,6 +248,7 @@ func New(o Options) *App {
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},
 		Saver:           o.Saver,
+		Standby:         standby(o.Firmware),
 		Visuals:         o.Visuals,
 		UI:              o.UI,
 	})

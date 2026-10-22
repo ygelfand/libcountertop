@@ -22,14 +22,30 @@ func (view *Renderer) embeddedRows() ([]menu.Row, []func(int)) {
 	}
 	rows := []menu.Row{
 		{
+			Glyph:   gogui.IconArrowUp,
 			Label:   say.T("home.tessera.bottom"),
 			Kind:    menu.Segments,
 			Options: labels,
 			Level:   max(slices.Index(bottoms, bottom), 0),
 		},
-		{Label: say.T("home.tessera.themed"), Kind: menu.Toggle, On: themed},
-		{Label: say.T("home.tessera.turn"), Kind: menu.Chevron, Value: turn.Label()},
-		{Label: say.T("home.tessera.follow"), Kind: menu.Toggle, On: follow},
+		{
+			Glyph: gogui.IconPalette,
+			Label: say.T("home.tessera.themed"),
+			Kind:  menu.Toggle,
+			On:    themed,
+		},
+		{
+			Glyph: gogui.IconLayer,
+			Label: say.T("home.tessera.turn"),
+			Kind:  menu.Chevron,
+			Value: turn.Label(),
+		},
+		{
+			Glyph: gogui.IconArrowRight,
+			Label: say.T("home.tessera.follow"),
+			Kind:  menu.Toggle,
+			On:    follow,
+		},
 	}
 	taps := []func(int){
 		func(i int) { engine.SetBottom(bottoms[i]) },

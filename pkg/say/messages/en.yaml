@@ -471,6 +471,7 @@ home.label.count: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.loading: Loading…
 home.dashboard: Mode
 home.saver: Screen saver
+home.saver.off: Turn on Auto standby in Tessera's screen settings to use its screen saver
 mode.native: Native
 mode.tessera: Tessera
 mode.tessera_native: Tessera native
@@ -482,7 +483,6 @@ home.off.hint: Turn on home control in Settings → Home Assistant
 home.picked.areas: "{{.N}} area{{if ne .N 1}}s{{end}}"
 home.picked.entities: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.picked.labels: "{{.N}} label{{if ne .N 1}}s{{end}}"
-home.refresh: Refresh
 home.refused: Actions not allowed
 home.refused.hint: Open ESPHome, press the settings cog on {{.Name}}, and enable “Allow the device to perform Home Assistant actions.”
 home.retry: Try again

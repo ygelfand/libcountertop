@@ -507,6 +507,7 @@ type Dependencies struct {
 	Logo            string
 	Marks           settings.ModeMarks
 	Saver           SaverMode
+	Standby         func() bool
 	Visuals         Visuals
 	UI              *widgets.UI
 }
@@ -597,15 +598,18 @@ func (view *Renderer) Dashboard(w *gogui.Window) gogui.View {
 	case title != "":
 		add(view.options.Visuals.LocalRows())
 	case view.options.Engine.Tessera():
-		add(view.modeRows())
+		add(view.saverRows())
 		add(view.tesseraRows())
 	default:
-		add(view.modeRows())
 		add(view.nativeRows())
 	}
-	add([]menu.Row{media}, []func(int){delay})
-	glyphs := slices.ContainsFunc(rows, func(r menu.Row) bool { return r.Glyph != "" })
-	views := make([]gogui.View, 0, len(rows)+2)
+	const glyphs = true
+	views := make([]gogui.View, 0, len(rows)+4)
+	views = append(views, view.options.UI.Row("media", "dashboard", media, delay, glyphs))
+	if title == "" {
+		views = append(views, view.modeLine(glyphs))
+	}
+	views = append(views, widgets.Divider())
 	for i, r := range rows {
 		views = append(views,
 			view.options.UI.Row(fmt.Sprintf("row-%d", i), "dashboard", r, taps[i], glyphs))
@@ -616,16 +620,68 @@ func (view *Renderer) Dashboard(w *gogui.Window) gogui.View {
 	return Column(views)
 }
 
-func (view *Renderer) modeRows() ([]menu.Row, []func(int)) {
-	engine, marks := view.options.Engine, view.options.Marks
-	rows := []menu.Row{
-		settings.ModeRow(marks, say.T("home.dashboard"), schema.HomeModes(), engine.Speaks()),
+func (view *Renderer) modeLine(glyphs bool) gogui.View {
+	engine := view.options.Engine
+	row := settings.ModeRow(
+		view.options.Marks,
+		say.T("home.dashboard"),
+		schema.HomeModes(),
+		engine.Speaks(),
+	)
+	row.Glyph = gogui.IconTablet
+	mode := view.options.UI.Row("mode", "dashboard", row,
+		settings.ModePick(schema.HomeModes(), engine.SetMode), glyphs)
+	refresh := view.options.UI.Toolkit.Pressable(gogui.Column, gogui.ContainerCfg{
+		ID:      "dashboard-refresh",
+		Padding: gogui.PaddingMedium,
+		Content: []gogui.View{icon(gogui.IconSync, gogui.CurrentTheme().Cfg.ColorTextSecondary)},
+	}, func(gogui.EventCtx) { engine.Refresh() })
+	return gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		VAlign:  gogui.VAlignMiddle,
+		Padding: gogui.NoPadding,
+		Content: []gogui.View{
+			gogui.Column(gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				Content: []gogui.View{mode},
+			}),
+			refresh,
+		},
+	})
+}
+
+func selectionGlyph(key string) string {
+	if key == "switches" {
+		return gogui.IconPlug
 	}
-	taps := []func(int){settings.ModePick(schema.HomeModes(), engine.SetMode)}
-	if saver := view.options.Saver; saver != nil && !engine.Firmware() {
-		rows = append(rows,
-			settings.ModeRow(marks, say.T("home.saver"), schema.SaverModes(), saver.Saver()))
-		taps = append(taps, settings.ModePick(schema.SaverModes(), saver.SetSaver))
+	return gogui.IconSunrise
+}
+
+func (view *Renderer) saverRows() ([]menu.Row, []func(int)) {
+	engine := view.options.Engine
+	var (
+		rows []menu.Row
+		taps []func(int)
+	)
+	if saver := view.options.Saver; saver != nil {
+		row := settings.ModeRow(
+			view.options.Marks,
+			say.T("home.saver"),
+			schema.SaverModes(),
+			saver.Saver(),
+		)
+		row.Glyph = gogui.IconMoon
+		pick := settings.ModePick(schema.SaverModes(), saver.SetSaver)
+		if engine.Firmware() && view.options.Standby != nil && !view.options.Standby() {
+			row.Hint = say.T("home.saver.off")
+			pick = settings.ModePick(schema.SaverModes(), func(m schema.SaverMode) {
+				if m != schema.SaverTessera {
+					saver.SetSaver(m)
+				}
+			})
+		}
+		rows, taps = append(rows, row), append(taps, pick)
 	}
 	return rows, taps
 }
@@ -637,14 +693,13 @@ func (view *Renderer) nativeRows() ([]menu.Row, []func(int)) {
 	engine := view.options.Engine
 	for _, s := range engine.Selections() {
 		rows = append(rows, menu.Row{
+			Glyph: selectionGlyph(s.Key),
 			Label: s.Name(),
 			Kind:  menu.Chevron,
 			Value: homecontrol.Summary(s.Pick()),
 		})
 		taps = append(taps, func(int) { view.options.Shell.Push(engine.SelectionPage(s)) })
 	}
-	rows = append(rows, menu.Row{Label: say.T("home.refresh")})
-	taps = append(taps, func(int) { engine.Refresh() })
 	return rows, taps
 }
 
@@ -698,11 +753,17 @@ func (view *Renderer) tesseraRows() ([]menu.Row, []func(int)) {
 	back := engine.ReturnHome()
 	rows = append(rows,
 		menu.Row{
+			Glyph: gogui.IconColumns,
 			Label: say.T("home.tessera.grid"),
 			Kind:  menu.Chevron,
 			Value: strconv.Itoa(g.Columns) + " × " + strconv.Itoa(g.Rows),
 		},
-		menu.Row{Label: say.T("home.tessera.return"), Kind: menu.Toggle, On: back},
+		menu.Row{
+			Glyph: gogui.IconHome,
+			Label: say.T("home.tessera.return"),
+			Kind:  menu.Toggle,
+			On:    back,
+		},
 	)
 	taps = append(taps,
 		func(int) { view.options.Shell.Push(view.gridPage()) },
@@ -711,8 +772,18 @@ func (view *Renderer) tesseraRows() ([]menu.Row, []func(int)) {
 	if t := view.tessera; t != nil && t.Turns() && !engine.Firmware() {
 		wide, tall := engine.Landscape(), engine.Portrait()
 		rows = append(rows,
-			menu.Row{Label: say.T("home.tessera.landscape"), Kind: menu.Toggle, On: wide},
-			menu.Row{Label: say.T("home.tessera.portrait"), Kind: menu.Toggle, On: tall},
+			menu.Row{
+				Glyph: gogui.IconDesktop,
+				Label: say.T("home.tessera.landscape"),
+				Kind:  menu.Toggle,
+				On:    wide,
+			},
+			menu.Row{
+				Glyph: gogui.IconMobile,
+				Label: say.T("home.tessera.portrait"),
+				Kind:  menu.Toggle,
+				On:    tall,
+			},
 		)
 		taps = append(taps,
 			func(int) { engine.SetLandscape(!wide) },

@@ -109,7 +109,6 @@ func (r *Relay) Standby() bool {
 	r.mu.Unlock()
 	return s != nil && s.Get()
 }
-
 func (r *Relay) forget() {
 	r.mu.Lock()
 	had := len(r.entities) > 0 || len(r.actions) > 0
