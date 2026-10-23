@@ -66,6 +66,10 @@ type event struct {
 }
 
 type Conversation struct {
+	// OnTrace observes accepted starts as "turn_start" or "follow_up". Set
+	// before Run; it runs synchronously on the event loop and must not block
+	// or re-enter the conversation. No transcript or reply is passed.
+	OnTrace func(kind string, slot int)
 	replyID uint64
 	options Dependencies
 	Word    func(int) (string, bool)
@@ -486,6 +490,13 @@ func (c *Conversation) start(n nextTurn) {
 
 	c.arm(c.listenFor(n))
 	c.startAudio(slot)
+	if c.OnTrace != nil {
+		kind := "turn_start"
+		if n.followUp {
+			kind = "follow_up"
+		}
+		c.OnTrace(kind, slot)
+	}
 	slog.Info("turn started", "slot", slot+1, "phrase", phrase, "follow_up", n.followUp)
 }
 
