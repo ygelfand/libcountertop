@@ -2,7 +2,9 @@ package firmware
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"os"
 	"slices"
 	"sync"
 
@@ -73,6 +75,7 @@ type Dependencies[M any] struct {
 	Busy      Indicator
 	OnFailure func()
 	Reconnect func()
+	ListPath  string
 }
 
 type Upgrade struct {
@@ -193,6 +196,10 @@ func New[M any](deps Dependencies[M]) *Firmware[M] {
 			},
 			Options:   []string{unpicked},
 			OnCommand: u.pick,
+		}
+		if builds := u.loadList(); len(builds) > 0 {
+			u.versions.Options = u.options(builds)
+			u.catalog = Catalog{Builds: builds}
 		}
 		u.versions.Set(unpicked)
 		u.apply = &esphome.Button{
@@ -407,10 +414,42 @@ func (u *Firmware[M]) List(ctx context.Context) error {
 	changed := !slices.Equal(options, u.options(before))
 	u.versions.SetOptions(options)
 	u.listed(Catalog{Finding: Current, Builds: builds})
-	if changed && u.deps.Reconnect != nil {
-		u.deps.Reconnect()
+	if changed {
+		u.saveList(builds)
+		if u.deps.Reconnect != nil {
+			u.deps.Reconnect()
+		}
 	}
 	return nil
+}
+
+func (u *Firmware[M]) loadList() []releases.Release {
+	if u.deps.ListPath == "" {
+		return nil
+	}
+	raw, err := os.ReadFile(u.deps.ListPath)
+	if err != nil {
+		return nil
+	}
+	var builds []releases.Release
+	if err := json.Unmarshal(raw, &builds); err != nil {
+		slog.Warn("the saved release list is unreadable", "path", u.deps.ListPath, "err", err)
+		return nil
+	}
+	return builds
+}
+
+func (u *Firmware[M]) saveList(builds []releases.Release) {
+	if u.deps.ListPath == "" {
+		return
+	}
+	raw, err := json.Marshal(builds)
+	if err == nil {
+		err = safe.WriteFile(u.deps.ListPath, raw, 0o600)
+	}
+	if err != nil {
+		slog.Warn("saving the release list failed", "path", u.deps.ListPath, "err", err)
+	}
 }
 
 func (u *Firmware[M]) options(builds []releases.Release) []string {

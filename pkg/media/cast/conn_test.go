@@ -2,6 +2,7 @@ package cast
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -439,5 +440,50 @@ func TestSendingToNobody(t *testing.T) {
 
 	if faults != 0 {
 		t.Errorf("%d faults for a sender that is not there", faults)
+	}
+}
+
+func TestTwoSendersWithTheSameNameKeepTheirOwnReplies(t *testing.T) {
+	s := NewService(NewReceiver("Kitchen"))
+
+	music := dial(t, s)
+	home := dial(t, s)
+
+	music.send(from("sender-0", NSConnection, Connect()))
+	home.send(from("sender-0", NSConnection, Connect()))
+	waitFor(t, s, 2)
+
+	s.mu.Lock()
+	var ids []string
+	for id := range s.conns {
+		ids = append(ids, id)
+	}
+	s.mu.Unlock()
+	if len(ids) != 2 {
+		t.Fatalf("two senders named sender-0 are known as %v", ids)
+	}
+	for i, id := range ids {
+		s.Send(Message{Source: "receiver-0", Destination: id, Namespace: NSReceiver,
+			Payload: fmt.Sprintf(`{"type":"RECEIVER_STATUS","requestId":%d}`, i+1)})
+	}
+	seen := map[int]bool{}
+	for _, c := range []*sender{music, home} {
+		got := c.expect()
+		h, _ := Kind(got.Payload)
+		if got.Destination != "sender-0" || seen[h.RequestID] {
+			t.Fatalf("a sender got request %d addressed to %q; already seen %v",
+				h.RequestID, got.Destination, seen)
+		}
+		seen[h.RequestID] = true
+	}
+
+	home.conn.Close()
+	deadline := time.Now().Add(patience)
+	for time.Now().Before(deadline) && s.Senders() > 1 {
+		time.Sleep(time.Millisecond)
+	}
+	music.send(from("sender-0", NSReceiver, `{"type":"GET_STATUS","requestId":8}`))
+	if got := music.expect(); got.Destination != "sender-0" {
+		t.Fatalf("after the other sender-0 left, the first one heard back as %q", got.Destination)
 	}
 }

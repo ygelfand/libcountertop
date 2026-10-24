@@ -79,7 +79,6 @@ const (
 	InputTask   Task = "input"
 	DisplayTask Task = "display"
 	AudioTask   Task = "audio"
-	MediaTask   Task = "media"
 )
 
 type Tree struct {

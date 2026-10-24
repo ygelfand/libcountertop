@@ -95,27 +95,17 @@ func Send(ctx context.Context, socket string, commands []string, out io.Writer) 
 
 type ClientOptions struct {
 	Name, Socket string
-	Local        func([]string) (string, error)
 }
 
 func ClientCommand(options ClientOptions) *cobra.Command {
-	localHelp := ""
-	if options.Local != nil {
-		localHelp = "\nUse -l to run supported commands locally without the daemon."
-	}
 	return &cobra.Command{
 		Use: "ctl [command...]", Short: "Drive the running " + options.Name,
 		Long: "Commands run against the daemon holding the hardware.\n" +
 			"Use task groups such as device, input, display and audio; ctl alone shows help.\n" +
 			"Separate commands with ; or use a single - to read one command per stdin line.\n" +
-			"A sequence stops at its first failure. --help asks the daemon for command help." + localHelp,
+			"A sequence stops at its first failure. --help asks the daemon for command help.",
 		SilenceUsage: true, DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 && args[0] == "-l" && options.Local != nil {
-				out, err := options.Local(args[1:])
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), out)
-				return err
-			}
 			if len(args) == 0 {
 				args = []string{"help"}
 			}

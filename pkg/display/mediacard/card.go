@@ -39,6 +39,7 @@ type Screen struct {
 }
 
 func (v *Screen) Covers() bool               { return true }
+func (v *Screen) Docks() bool                { return true }
 func (v *Screen) Shows(s config.Stream) bool { return s == config.StreamMedia }
 func (v *Screen) Timeout() time.Duration     { return shell.SettingsTimeout }
 func (v *Screen) Moved(elapsed time.Duration) bool {

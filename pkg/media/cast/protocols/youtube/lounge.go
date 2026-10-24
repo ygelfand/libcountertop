@@ -18,11 +18,10 @@ import (
 
 const Base = "https://www.youtube.com/api/lounge"
 
-// The themes a screen binds with: YouTube's own, YouTube Music's and YouTube TV's.
+// The themes a screen binds with: YouTube's own and YouTube Music's.
 const (
 	ThemeYouTube = "cl"
 	ThemeMusic   = "m"
-	ThemeTV      = "up"
 )
 
 // What a Chromecast calls itself on the lounge, from a captured session.

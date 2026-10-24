@@ -2,12 +2,16 @@ package releases
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -114,8 +118,45 @@ func ParseList(r io.Reader, keep int) ([]Release, error) {
 	return out, nil
 }
 
-func Manifest(repo, tag string) string {
-	return strings.TrimSuffix(repo, "/") + "/releases/download/" + tag + "/" + manifest
+func Manifest(repo, tag string) string { return Asset(repo, tag, manifest) }
+
+func Asset(repo, tag, name string) string {
+	return strings.TrimSuffix(repo, "/") + "/releases/download/" + tag + "/" + name
+}
+
+func Download(ctx context.Context, url, sum, dest string, limit int64) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("releases: fetching %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("releases: fetching %s: %s", url, resp.Status)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(dest), filepath.Base(dest)+".*")
+	if err != nil {
+		return fmt.Errorf("releases: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+	h := sha256.New()
+	n, err := io.Copy(io.MultiWriter(tmp, h), io.LimitReader(resp.Body, limit+1))
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return fmt.Errorf("releases: fetching %s: %w", url, err)
+	}
+	if n > limit {
+		return fmt.Errorf("releases: %s is larger than %d bytes", url, limit)
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); got != sum {
+		return fmt.Errorf("releases: %s has sha256 %s, want %s", url, got, sum)
+	}
+	return os.Rename(tmp.Name(), dest)
 }
 
 func fetch(ctx context.Context, url string, limit int64, read func(io.Reader) error) error {

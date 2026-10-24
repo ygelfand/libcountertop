@@ -42,6 +42,7 @@ type Player struct {
 	resample func(from int) func([]int16) []int16
 	drm      uint32
 	audio    uint32
+	borrowed bool
 
 	done      chan struct{}
 	once      sync.Once
@@ -54,6 +55,7 @@ type Player struct {
 	err      error
 	origin   time.Duration
 	based    bool
+	early    bool
 	heard    bool
 	resamp   func([]int16) []int16
 	rate     int
@@ -71,11 +73,31 @@ func Open(
 	license License,
 	resample func(from int) func([]int16) []int16,
 ) (*Player, error) {
+	return open(name, surf, true, cert, license, resample)
+}
+
+func OpenWithoutPrivacy(
+	name string,
+	surf *surface.Client,
+	license License,
+	resample func(from int) func([]int16) []int16,
+) (*Player, error) {
+	return open(name, surf, false, nil, license, resample)
+}
+
+func open(
+	name string,
+	surf *surface.Client,
+	privacy bool,
+	cert []byte,
+	license License,
+	resample func(from int) func([]int16) []int16,
+) (*Player, error) {
 	if surf == nil {
 		return nil, errors.New(name + ": the display helper is not connected")
 	}
 	p := New(name, surf, license, resample)
-	if err := surf.DRMOpen(p.drm, surface.Widevine, true, cert); err != nil {
+	if err := surf.DRMOpen(p.drm, surface.Widevine, privacy, cert); err != nil {
 		return nil, fmt.Errorf("%s: widevine: %w", name, err)
 	}
 	return p, nil
@@ -95,6 +117,27 @@ func New(
 	}
 	p.room = sync.NewCond(&p.mu)
 	return p
+}
+
+func (p *Player) Again() *Player {
+	q := New(p.Name, p.surf, p.license, p.resample)
+	q.drm, q.borrowed = p.drm, true
+	return q
+}
+
+func (p *Player) Request(init []byte) ([]byte, error) {
+	challenge, err := p.surf.DRMRequest(p.drm, init)
+	if err != nil {
+		return nil, fmt.Errorf("%s: key request: %w", p.Name, err)
+	}
+	return challenge, nil
+}
+
+func (p *Player) Provide(license []byte) error {
+	if err := p.surf.DRMProvide(p.drm, license); err != nil {
+		return fmt.Errorf("%s: key response: %w", p.Name, err)
+	}
+	return nil
 }
 
 func widevine(boxes [][]byte) []byte {
@@ -155,26 +198,37 @@ func (p *Player) OpenAudio(t cenc.Track) error {
 	return nil
 }
 
-func crypt(s cenc.Sample, subs []cenc.Subsample) *surface.Crypt {
+func crypt(t cenc.Track, s cenc.Sample, subs []cenc.Subsample) *surface.Crypt {
 	if !s.Encrypted {
 		return nil
 	}
-	return &cenc.Crypt{
+	c := &cenc.Crypt{
 		Mode:       cenc.CryptCENC,
 		Key:        s.KeyID,
 		IV:         s.IV,
 		Subsamples: slices.Clone(subs),
 	}
+	if t.Scheme == cenc.SchemeCBCS {
+		c.Mode, c.Encrypt, c.Skip = cenc.CryptCBCS, uint32(t.Crypt), uint32(t.Skip)
+	}
+	return c
 }
 
-func (p *Player) anchor(at time.Duration) time.Duration {
+func (p *Player) anchor(at time.Duration) (time.Duration, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.based {
 		p.origin, p.based = at, true
 		p.room.Broadcast()
 	}
-	return at - p.origin
+	return at - p.origin, p.early
+}
+
+func (p *Player) Begin(at time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.origin, p.based, p.early = at, true, true
+	p.room.Broadcast()
 }
 
 func (p *Player) Origin() (time.Duration, bool) {
@@ -188,12 +242,12 @@ func (p *Player) Picture(ctx context.Context, t cenc.Track, s cenc.Sample) error
 	if err != nil {
 		return err
 	}
-	at := p.anchor(s.At)
-	if at < 0 {
+	at, early := p.anchor(s.At)
+	if at < 0 && !early {
 		return nil
 	}
 	select {
-	case p.frames <- frame{data: data, at: at, crypt: crypt(s, subs)}:
+	case p.frames <- frame{data: data, at: at, crypt: crypt(t, s, subs)}:
 		p.readyOnce.Do(func() { close(p.ready) })
 		return nil
 	case <-ctx.Done():
@@ -203,7 +257,7 @@ func (p *Player) Picture(ctx context.Context, t cenc.Track, s cenc.Sample) error
 	}
 }
 
-func (p *Player) Sound(s cenc.Sample) error {
+func (p *Player) Sound(t cenc.Track, s cenc.Sample) error {
 	p.mu.Lock()
 	for !p.based {
 		select {
@@ -226,7 +280,7 @@ func (p *Player) Sound(s cenc.Sample) error {
 		p.pcm = append(p.pcm, make([]int16, gap*Channels)...)
 		p.mu.Unlock()
 	}
-	k := crypt(s, s.Subsamples)
+	k := crypt(t, s, s.Subsamples)
 	for {
 		out, err := p.surf.AudioSample(p.audio, s.At-origin, 0, k, s.Data)
 		if len(out.Data) > 0 {
@@ -355,5 +409,7 @@ func (p *Player) Failure() error {
 func (p *Player) Close() {
 	p.Fail(io.EOF)
 	_ = p.surf.AudioClose(p.audio)
-	_ = p.surf.DRMClose(p.drm)
+	if !p.borrowed {
+		_ = p.surf.DRMClose(p.drm)
+	}
 }

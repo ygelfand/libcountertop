@@ -2,10 +2,12 @@ package playback
 
 import (
 	"context"
+	"image"
 	"io"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/media/cenc"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 type Branded interface {
@@ -14,6 +16,18 @@ type Branded interface {
 
 type Seeker interface {
 	Seek(to time.Duration)
+}
+
+type Placer interface {
+	Place() (at time.Duration, ok bool)
+}
+
+type Failer interface {
+	Fail(err error)
+}
+
+type Backdrop interface {
+	Backdrop(img *image.RGBA)
 }
 
 type Mark struct {
@@ -125,9 +139,13 @@ type Showing struct {
 
 	Mark string
 
-	Length time.Duration
+	Length   time.Duration
+	Earliest time.Duration
+	Edge     time.Duration
 
 	LiveWithin time.Duration
+
+	Break *nowplaying.Break
 
 	HasNext, HasPrevious bool
 	NoPause              bool

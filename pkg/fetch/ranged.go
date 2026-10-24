@@ -29,6 +29,7 @@ type Ranged struct {
 	cancel context.CancelFunc
 	chunks chan piece
 	cur    []byte
+	pos    int64
 	size   int64
 	closed bool
 }
@@ -76,7 +77,7 @@ func (r *Ranged) Size() int64 {
 func (r *Ranged) start(from int64) {
 	ctx, cancel := context.WithCancel(r.parent)
 	chunks := make(chan piece, r.ahead)
-	r.cancel, r.chunks, r.cur = cancel, chunks, nil
+	r.cancel, r.chunks, r.cur, r.pos = cancel, chunks, nil, from
 	go r.fetch(ctx, chunks, from)
 }
 
@@ -257,6 +258,7 @@ func (r *Ranged) Read(p []byte) (int, error) {
 		if len(r.cur) > 0 {
 			n := copy(p, r.cur)
 			r.cur = r.cur[n:]
+			r.pos += int64(n)
 			r.mu.Unlock()
 			return n, nil
 		}
@@ -288,6 +290,34 @@ func (r *Ranged) From(off int64) {
 	defer r.mu.Unlock()
 	r.cancel()
 	r.start(off)
+}
+
+func (r *Ranged) Seek(offset int64, whence int) (int64, error) {
+	r.mu.Lock()
+	pos, size, near := r.pos, r.size, r.chunk*int64(r.ahead)
+	r.mu.Unlock()
+	to := offset
+	switch whence {
+	case io.SeekCurrent:
+		to += pos
+	case io.SeekEnd:
+		if size <= 0 {
+			return pos, errors.New("fetch: seeking from the end of a stream of unknown size")
+		}
+		to += size
+	}
+	switch {
+	case to < 0:
+		return pos, fmt.Errorf("fetch: seeking to %d", to)
+	case to == pos:
+	case to > pos && to-pos <= near:
+		if _, err := io.CopyN(io.Discard, r, to-pos); err != nil && !errors.Is(err, io.EOF) {
+			return pos, err
+		}
+	default:
+		r.From(to)
+	}
+	return to, nil
 }
 
 func (r *Ranged) Close() error {

@@ -153,7 +153,7 @@ func (g *Group) supervise(ctx context.Context, e *entry, acquired bool) {
 		e.set(StateRunning, nil)
 		began := time.Now()
 
-		err := run(ctx, e.svc)
+		err := run(ctx, e.svc.Name(), e.svc.Run)
 		ran := time.Since(began)
 
 		if ctx.Err() != nil {
@@ -171,7 +171,7 @@ func (g *Group) supervise(ctx context.Context, e *entry, acquired bool) {
 			)
 			return
 		}
-		if !e.policy.restart {
+		if !e.policy.restart || isPermanent(err) {
 			e.set(StateFailed, err)
 			slog.Error("service failed", "service", e.svc.Name(), "err", err)
 			return
@@ -241,15 +241,15 @@ func (g *Group) stop(started []*entry, wg *sync.WaitGroup) {
 	}
 }
 
-func run(ctx context.Context, svc Service) (err error) {
+func run(ctx context.Context, name string, f func(context.Context) error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("recovered from a panic",
-				"in", "service "+svc.Name(), "panic", r, "stack", string(debug.Stack()))
+				"in", "service "+name, "panic", r, "stack", string(debug.Stack()))
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
-	return svc.Run(ctx)
+	return f(ctx)
 }
 
 func (e *entry) start(ctx context.Context) error {

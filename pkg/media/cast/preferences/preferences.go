@@ -4,12 +4,9 @@ type YouTube struct {
 	Device, Music, Video string
 	Skip                 []string
 	OnDemand             bool
-	LiveDelay            int
 }
-type Prime struct{ Persist, SkipIntro bool }
 type Settings struct {
 	YouTube YouTube
-	Prime   Prime
 }
 type Provider struct {
 	Read   func() Settings
@@ -21,7 +18,7 @@ func (p Provider) Settings() Settings {
 	if p.Read != nil {
 		return p.Read()
 	}
-	return Settings{YouTube: YouTube{LiveDelay: 10, Skip: []string{"sponsor"}}}
+	return Settings{YouTube: YouTube{Skip: []string{"sponsor"}}}
 }
 
 func (p Provider) SaveScreens(device, music, video string) error {

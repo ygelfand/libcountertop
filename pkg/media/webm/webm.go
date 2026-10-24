@@ -2,42 +2,26 @@ package webm
 
 import (
 	"bufio"
-	"encoding/binary"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/at-wat/ebml-go"
 )
 
-// Element ids, from the Matroska specification.
 const (
-	idEBML               = 0x1A45DFA3
-	idSegment            = 0x18538067
-	idTracks             = 0x1654AE6B
-	idTrackEntry         = 0xAE
-	idTrackNumber        = 0xD7
-	idCodecID            = 0x86
-	idCodecPrivate       = 0x63A2
-	idAudio              = 0xE1
-	idSampleRate         = 0xB5
-	idChannels           = 0x9F
-	idCues               = 0x1C53BB6B
-	idCuePoint           = 0xBB
-	idCueTime            = 0xB3
-	idCueTrackPositions  = 0xB7
-	idCueClusterPosition = 0xF1
-	idVideo              = 0xE0
-	idPixelWidth         = 0xB0
-	idPixelHeight        = 0xBA
-	idInfo               = 0x1549A966
-	idTimecodeScale      = 0x2AD7B1
-	idCluster            = 0x1F43B675
-	idTimecode           = 0xE7
-	idSimpleBlock        = 0xA3
-	idBlockGroup         = 0xA0
-	idBlock              = 0xA1
+	idSegment       = 0x18538067
+	idTracks        = 0x1654AE6B
+	idCues          = 0x1C53BB6B
+	idInfo          = 0x1549A966
+	idTimecodeScale = 0x2AD7B1
+	idCluster       = 0x1F43B675
+	idTimecode      = 0xE7
+	idSimpleBlock   = 0xA3
+	idBlockGroup    = 0xA0
 )
 
-// Matroska unknown size: the element runs until its parent ends.
 const unknown = -1
 
 type Track struct {
@@ -64,6 +48,8 @@ type Reader struct {
 	scale   int64
 	cluster int64
 	track   *Track
+	other   *Track
+	pending []Frame
 
 	src       *counter
 	segStart  int64
@@ -89,11 +75,17 @@ func NewReader(r io.Reader) *Reader {
 	return &Reader{r: bufio.NewReaderSize(c, 64*1024), src: c, kind: 'A', scale: 1_000_000}
 }
 
+func NewVideoReader(r io.Reader) *Reader {
+	v := NewReader(r)
+	v.kind = 'V'
+	return v
+}
+
 func (r *Reader) pos() int64 { return r.src.n - int64(r.r.Buffered()) }
 
 func (r *Reader) Index() error {
 	for len(r.cues) == 0 && !r.clustered {
-		if _, err := r.step(); err != nil {
+		if err := r.step(); err != nil {
 			return err
 		}
 	}
@@ -113,173 +105,255 @@ func (r *Reader) Cue(at int64) (offset, time int64, ok bool) {
 func (r *Reader) Restart(src io.Reader, offset int64) {
 	r.src.r, r.src.n = src, offset
 	r.r.Reset(r.src)
-}
-
-func NewVideoReader(r io.Reader) *Reader {
-	v := NewReader(r)
-	v.kind = 'V'
-	return v
+	r.pending = nil
 }
 
 func (r *Reader) Track() (Track, error) {
 	for r.track == nil {
-		if _, err := r.step(); err != nil {
+		if err := r.step(); err != nil {
 			return Track{}, err
 		}
 	}
 	return *r.track, nil
 }
 
-func (r *Reader) Next() (Frame, error) {
+func NewFeeder() *Reader {
+	return &Reader{src: &counter{}, kind: 'A', scale: 1_000_000}
+}
+
+func (r *Reader) Feed(b []byte) (int, []Frame, error) {
+	r.src.r, r.src.n = bytes.NewReader(b), 0
+	r.r = bufio.NewReaderSize(r.src, 64*1024)
+	used := 0
 	for {
-		f, err := r.step()
-		if err != nil {
-			return Frame{}, err
+		if err := r.step(); err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				break
+			}
+			frames := r.pending
+			r.pending = nil
+			return used, frames, err
 		}
-		if f != nil && (r.track == nil || f.Track == r.track.Number) {
-			return *f, nil
+		used = int(r.pos())
+	}
+	frames := r.pending
+	r.pending = nil
+	return used, frames, nil
+}
+
+func (r *Reader) Tracks() []Track {
+	var out []Track
+	for _, t := range []*Track{r.track, r.other} {
+		if t != nil {
+			out = append(out, *t)
+		}
+	}
+	return out
+}
+
+func (r *Reader) Paired() (Track, bool) {
+	if r.other == nil {
+		return Track{}, false
+	}
+	return *r.other, true
+}
+
+func (r *Reader) NextPaired() (Frame, error) {
+	return r.next(func(f Frame) bool {
+		return (r.track != nil && f.Track == r.track.Number) ||
+			(r.other != nil && f.Track == r.other.Number)
+	})
+}
+
+func (r *Reader) Next() (Frame, error) {
+	return r.next(func(f Frame) bool { return r.track == nil || f.Track == r.track.Number })
+}
+
+func (r *Reader) next(want func(Frame) bool) (Frame, error) {
+	for {
+		for len(r.pending) > 0 {
+			f := r.pending[0]
+			r.pending = r.pending[1:]
+			if want(f) {
+				return f, nil
+			}
+		}
+		if err := r.step(); err != nil {
+			return Frame{}, err
 		}
 	}
 }
 
-func (r *Reader) step() (*Frame, error) {
+func (r *Reader) step() error {
 	id, err := r.id()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	size, err := r.size()
 	if err != nil {
-		return nil, noEOF(err)
+		return noEOF(err)
 	}
 
 	switch id {
 	case idSegment:
 		r.segStart = r.pos()
-		return nil, nil
+		return nil
 	case idCluster:
 		r.clustered = true
-		return nil, nil
-	case idBlockGroup, idInfo:
-		return nil, nil
-	case idCues:
-		return nil, r.readCues(size)
-	case idTracks:
-		return nil, r.tracks(size)
+		return nil
+	case idInfo:
+		return nil
 	case idTimecodeScale:
-		v, err := r.uint(size)
-		if err == nil && v > 0 {
-			r.scale = int64(v)
+		var v struct{ TimecodeScale uint64 }
+		if err := r.element(id, size, &v); err != nil {
+			return err
 		}
-		return nil, err
+		if v.TimecodeScale > 0 {
+			r.scale = int64(v.TimecodeScale)
+		}
+		return nil
 	case idTimecode:
-		v, err := r.uint(size)
-		r.cluster = int64(v)
-		return nil, err
-	case idSimpleBlock, idBlock:
-		return r.block(size)
+		var v struct{ Timecode uint64 }
+		err := r.element(id, size, &v)
+		r.cluster = int64(v.Timecode)
+		return err
+	case idTracks:
+		return r.tracks(size)
+	case idCues:
+		return r.readCues(size)
+	case idSimpleBlock:
+		body, err := r.bytes(size)
+		if err != nil {
+			return err
+		}
+		b, err := ebml.UnmarshalBlock(bytes.NewReader(body), size)
+		if err != nil {
+			return fmt.Errorf("webm: %w", err)
+		}
+		r.queue(*b, b.Keyframe)
+		return nil
+	case idBlockGroup:
+		var v struct {
+			BlockGroup struct {
+				Block          ebml.Block
+				ReferenceBlock []int64
+			}
+		}
+		if err := r.element(id, size, &v); err != nil {
+			return err
+		}
+		r.queue(v.BlockGroup.Block, len(v.BlockGroup.ReferenceBlock) == 0)
+		return nil
 	}
-	return nil, r.skip(size)
+	return r.skip(size)
+}
+
+func (r *Reader) queue(b ebml.Block, key bool) {
+	at := (r.cluster + int64(b.Timecode)) * r.scale
+	for _, data := range b.Data {
+		r.pending = append(r.pending, Frame{Track: b.TrackNumber, Time: at, Data: data, Key: key})
+	}
+}
+
+type trackEntry struct {
+	TrackNumber  uint64
+	CodecID      string
+	CodecPrivate []byte
+	Audio        struct {
+		SamplingFrequency float64
+		Channels          uint64
+	}
+	Video struct {
+		PixelWidth  uint64
+		PixelHeight uint64
+	}
 }
 
 func (r *Reader) tracks(size int64) error {
-	body, err := r.bytes(size)
-	if err != nil {
+	var v struct {
+		Tracks struct{ TrackEntry []trackEntry }
+	}
+	if err := r.element(idTracks, size, &v); err != nil {
 		return err
 	}
-	return each(body, func(id uint64, b []byte) error {
-		if id != idTrackEntry {
-			return nil
+	for _, e := range v.Tracks.TrackEntry {
+		if e.CodecID == "" {
+			continue
 		}
-		t := Track{}
-		err := each(b, func(id uint64, b []byte) error {
-			switch id {
-			case idTrackNumber:
-				t.Number = beUint(b)
-			case idCodecID:
-				t.Codec = string(b)
-			case idCodecPrivate:
-				t.Private = append([]byte(nil), b...)
-			case idAudio:
-				return each(b, func(id uint64, b []byte) error {
-					switch id {
-					case idSampleRate:
-						t.Rate = beFloat(b)
-					case idChannels:
-						t.Channels = int(beUint(b))
-					}
-					return nil
-				})
-			case idVideo:
-				return each(b, func(id uint64, b []byte) error {
-					switch id {
-					case idPixelWidth:
-						t.Width = int(beUint(b))
-					case idPixelHeight:
-						t.Height = int(beUint(b))
-					}
-					return nil
-				})
-			}
-			return nil
-		})
-		if err == nil && r.track == nil && t.Codec != "" && t.Codec[0] == r.kind {
-			r.track = &t
+		t := &Track{
+			Number:   e.TrackNumber,
+			Codec:    e.CodecID,
+			Private:  e.CodecPrivate,
+			Rate:     e.Audio.SamplingFrequency,
+			Channels: int(e.Audio.Channels),
+			Width:    int(e.Video.PixelWidth),
+			Height:   int(e.Video.PixelHeight),
 		}
-		return err
-	})
+		switch {
+		case r.track == nil && t.Codec[0] == r.kind:
+			r.track = t
+		case r.other == nil && t.Codec[0] != r.kind:
+			r.other = t
+		}
+	}
+	return nil
 }
 
 func (r *Reader) readCues(size int64) error {
-	body, err := r.bytes(size)
-	if err != nil {
+	var v struct {
+		Cues struct {
+			CuePoint []struct {
+				CueTime           uint64
+				CueTrackPositions []struct{ CueClusterPosition uint64 }
+			}
+		}
+	}
+	if err := r.element(idCues, size, &v); err != nil {
 		return err
 	}
-	return each(body, func(id uint64, b []byte) error {
-		if id != idCuePoint {
-			return nil
+	for _, p := range v.Cues.CuePoint {
+		if len(p.CueTrackPositions) == 0 {
+			continue
 		}
-		var c cue
-		err := each(b, func(id uint64, b []byte) error {
-			switch id {
-			case idCueTime:
-				c.time = int64(beUint(b))
-			case idCueTrackPositions:
-				return each(b, func(id uint64, b []byte) error {
-					if id == idCueClusterPosition {
-						c.pos = int64(beUint(b))
-					}
-					return nil
-				})
-			}
-			return nil
+		r.cues = append(r.cues, cue{
+			time: int64(p.CueTime),
+			pos:  int64(p.CueTrackPositions[0].CueClusterPosition),
 		})
-		if err == nil {
-			r.cues = append(r.cues, c)
-		}
-		return err
-	})
+	}
+	return nil
 }
 
-func (r *Reader) block(size int64) (*Frame, error) {
+func (r *Reader) element(id uint64, size int64, v any) error {
 	body, err := r.bytes(size)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	track, n := vint(body, true)
-	if n <= 0 || len(body) < n+3 {
-		return nil, fmt.Errorf("webm: a block too short to have a header")
+	var whole bytes.Buffer
+	whole.Grow(len(body) + 12)
+	writeID(&whole, id)
+	writeSize(&whole, len(body))
+	whole.Write(body)
+	if err := ebml.Unmarshal(&whole, v, ebml.WithIgnoreUnknown(true)); err != nil {
+		return fmt.Errorf("webm: %w", err)
 	}
-	rel := int16(binary.BigEndian.Uint16(body[n:]))
-	flags := body[n+2]
-	if flags&0x06 != 0 {
-		return nil, fmt.Errorf("webm: laced blocks are not handled")
+	return nil
+}
+
+func writeID(w *bytes.Buffer, id uint64) {
+	n := 1
+	for id>>(8*n) != 0 {
+		n++
 	}
-	return &Frame{
-		Track: track,
-		Time:  (r.cluster + int64(rel)) * r.scale,
-		Data:  body[n+3:],
-		Key:   flags&0x80 != 0,
-	}, nil
+	for i := n - 1; i >= 0; i-- {
+		w.WriteByte(byte(id >> (8 * i)))
+	}
+}
+
+func writeSize(w *bytes.Buffer, size int) {
+	w.WriteByte(0x01)
+	for i := 6; i >= 0; i-- {
+		w.WriteByte(byte(size >> (8 * i)))
+	}
 }
 
 func (r *Reader) id() (uint64, error) {
@@ -336,11 +410,6 @@ func (r *Reader) bytes(size int64) ([]byte, error) {
 	return b, noEOF(err)
 }
 
-func (r *Reader) uint(size int64) (uint64, error) {
-	b, err := r.bytes(size)
-	return beUint(b), err
-}
-
 func (r *Reader) skip(size int64) error {
 	if size == unknown {
 		return nil
@@ -349,66 +418,11 @@ func (r *Reader) skip(size int64) error {
 	return noEOF(err)
 }
 
-func each(b []byte, fn func(id uint64, body []byte) error) error {
-	for len(b) > 0 {
-		id, n := vint(b, false)
-		if n <= 0 {
-			return fmt.Errorf("webm: a malformed element id")
-		}
-		b = b[n:]
-		size, m := vint(b, true)
-		if m <= 0 || uint64(len(b)-m) < size {
-			return fmt.Errorf("webm: a malformed element size")
-		}
-		if err := fn(id, b[m:m+int(size)]); err != nil {
-			return err
-		}
-		b = b[m+int(size):]
-	}
-	return nil
-}
-
-func vint(b []byte, clear bool) (uint64, int) {
-	if len(b) == 0 {
-		return 0, 0
-	}
-	n := width(b[0])
-	if n == 0 || n > len(b) {
-		return 0, 0
-	}
-	v := uint64(b[0])
-	if clear {
-		v &= 0xFF >> n
-	}
-	for i := 1; i < n; i++ {
-		v = v<<8 | uint64(b[i])
-	}
-	return v, n
-}
-
 func width(first byte) int {
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		if first&(0x80>>i) != 0 {
 			return i + 1
 		}
-	}
-	return 0
-}
-
-func beUint(b []byte) uint64 {
-	var v uint64
-	for _, c := range b {
-		v = v<<8 | uint64(c)
-	}
-	return v
-}
-
-func beFloat(b []byte) float64 {
-	switch len(b) {
-	case 4:
-		return float64(float32frombits(binary.BigEndian.Uint32(b)))
-	case 8:
-		return float64frombits(binary.BigEndian.Uint64(b))
 	}
 	return 0
 }

@@ -84,7 +84,7 @@ func (r *Rail) Entries() []Entry {
 
 func (r *Rail) Gesture(g touch.Gesture) {
 	s := r.opts.Shell
-	if s.Open() || s.Closing() {
+	if !s.Docked() || s.Closing() {
 		return
 	}
 	if g.Kind != touch.Swipe || g.From != AsTouch(r.opts.Edge()) {

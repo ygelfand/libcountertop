@@ -83,10 +83,10 @@ func frosted(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.Slid
 					dc.FilledRoundedRect(0, h-f, w, f, r, ink.WithOpacity(0.85))
 					return
 				}
+				dc.FilledRoundedRect(0, 0, max(w*s.Pct, h), h, r, ink.WithOpacity(0.85))
 				for _, m := range marks {
 					dc.FilledRect(w*m.From, 0, max(w*(m.To-m.From), 1), h, m.Color.WithOpacity(0.7))
 				}
-				dc.FilledRoundedRect(0, 0, max(w*s.Pct, h), h, r, ink.WithOpacity(0.85))
 			},
 		}
 		if vertical {

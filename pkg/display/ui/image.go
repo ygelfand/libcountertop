@@ -17,6 +17,19 @@ func NewImage(w, h int, c theme.Color) *Image {
 	return img
 }
 
+func FromRGBA(img *image.RGBA) *Image {
+	box := img.Bounds()
+	out := &Image{w: box.Dx(), h: box.Dy(), px: make([]theme.Color, box.Dx()*box.Dy())}
+	for y := range out.h {
+		row := img.Pix[(box.Min.Y+y-img.Rect.Min.Y)*img.Stride:]
+		for x := range out.w {
+			p := row[(box.Min.X+x-img.Rect.Min.X)*4:]
+			out.px[y*out.w+x] = theme.Color{R: p[0], G: p[1], B: p[2]}
+		}
+	}
+	return out
+}
+
 func (i *Image) Size() (w, h int) { return i.w, i.h }
 
 func (i *Image) Set(x, y int, c theme.Color) {

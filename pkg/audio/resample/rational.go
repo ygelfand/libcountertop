@@ -2,6 +2,8 @@ package resample
 
 import (
 	"math"
+
+	"github.com/ygelfand/libcountertop/pkg/inference/vec"
 )
 
 const ratioTaps = 16
@@ -14,10 +16,11 @@ type Rational struct {
 
 	taps   int
 	filter []float32
+	kern   [][]float32
 
 	at int
 
-	tail []int16
+	hist [][]float32
 
 	skew, owed float64
 
@@ -39,6 +42,7 @@ func NewRational(from, to, channels int) *Rational {
 		}
 		r.taps = int(math.Ceil(ratioTaps / cut))
 		r.filter = lowpass(r.up, r.taps, cut)
+		r.kernels()
 	}
 	r.Reset()
 	return r
@@ -57,6 +61,7 @@ func NewSkewable(from, to, channels int) *Rational {
 		taps:     ratioTaps,
 		filter:   lowpass(skewGrid, ratioTaps, 1),
 	}
+	r.kernels()
 	r.Reset()
 	return r
 }
@@ -64,6 +69,18 @@ func NewSkewable(from, to, channels int) *Rational {
 func (r *Rational) Headroom(g float32) {
 	for i := range r.filter {
 		r.filter[i] *= g
+	}
+	r.kernels()
+}
+
+func (r *Rational) kernels() {
+	r.kern = make([][]float32, r.up)
+	for p := range r.up {
+		k := make([]float32, r.taps)
+		for i := range r.taps {
+			k[r.taps-1-i] = r.filter[p+i*r.up]
+		}
+		r.kern[p] = k
 	}
 }
 
@@ -75,8 +92,13 @@ func (r *Rational) Run(in []int16) []int16 {
 	}
 
 	ch := r.channels
-	buf := append(r.tail, in...)
-	frames := len(buf) / ch
+	for c, h := range r.hist {
+		for i := c; i < len(in); i += ch {
+			h = append(h, float32(in[i]))
+		}
+		r.hist[c] = h
+	}
+	frames := len(r.hist[0])
 
 	out := make([]int16, 0, (len(in)*r.up/r.down)+ch)
 
@@ -90,12 +112,10 @@ func (r *Rational) Run(in []int16) []int16 {
 			continue
 		}
 
-		phase := r.at % r.up
-		for c := range ch {
-			var sum float32
-			for k := range r.taps {
-				sum += r.filter[phase+k*r.up] * float32(buf[(idx-k)*ch+c])
-			}
+		kern := r.kern[r.at%r.up]
+		from := idx - r.taps + 1
+		for _, h := range r.hist {
+			sum := vec.Dot(kern, h[from:idx+1])
 			if sum > 32767 || sum < -32768 {
 				r.clipped++
 			}
@@ -108,7 +128,9 @@ func (r *Rational) Run(in []int16) []int16 {
 	drop := max(idx-(r.taps-1), 0)
 
 	r.at -= drop * r.up
-	r.tail = append(r.tail[:0], buf[drop*ch:]...)
+	for c, h := range r.hist {
+		r.hist[c] = append(h[:0], h[drop:]...)
+	}
 
 	return out
 }
@@ -117,7 +139,12 @@ func (r *Rational) Reset() {
 	r.at = 0
 	r.skew, r.owed = 0, 0
 
-	r.tail = append(r.tail[:0], make([]int16, (r.taps-1)*r.channels)...)
+	if len(r.hist) != r.channels {
+		r.hist = make([][]float32, r.channels)
+	}
+	for c := range r.hist {
+		r.hist[c] = append(r.hist[c][:0], make([]float32, r.taps-1)...)
+	}
 	r.at = (r.taps - 1) * r.up
 }
 

@@ -7,16 +7,15 @@ import (
 	"image"
 	"log/slog"
 	"os"
-	"os/exec"
 	"strconv"
 	"sync"
-	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"golang.org/x/sys/unix"
 
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
+	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -130,31 +129,15 @@ func (r *Receiver) run(ctx context.Context) {
 		slog.Error("airplay helper not installed", "path", r.opts.Helper, "err", err)
 		return
 	}
-	backoff := time.Second
-	for {
-		began := time.Now()
-		err := r.session(ctx)
-		if ctx.Err() != nil {
-			return
+	err := service.Keep(ctx, "airplay", func(ctx context.Context) error {
+		for {
+			if err := r.session(ctx); err != nil || ctx.Err() != nil {
+				return err
+			}
 		}
-		if err == nil {
-			backoff = time.Second
-			continue
-		}
-		if errors.Is(err, errVersion) {
-			slog.Error("airplay stopped", "err", err)
-			return
-		}
-		if time.Since(began) > time.Minute {
-			backoff = time.Second
-		}
-		slog.Warn("airplay helper stopped", "err", err, "restart_in", backoff)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(backoff):
-		}
-		backoff = min(2*backoff, 30*time.Second)
+	})
+	if err != nil {
+		slog.Error("airplay stopped", "err", err)
 	}
 }
 
@@ -183,29 +166,26 @@ func (r *Receiver) session(ctx context.Context) error {
 	theirs := os.NewFile(uintptr(fds[1]), "airplay-helper")
 	defer ours.Close()
 
-	cmd := exec.Command(
-		r.opts.Helper,
-		r.opts.Name(),
-		r.opts.MAC(),
-		r.opts.Keyfile,
-		strconv.Itoa(sentW),
-		strconv.Itoa(sentH),
-	)
-	cmd.ExtraFiles = []*os.File{theirs}
-	cmd.SysProcAttr = payload.DiesWithParent()
-	cmd.Stderr = os.Stderr
-	err = cmd.Start()
+	proc, err := payload.Start(payload.Command{
+		Path: r.opts.Helper,
+		Args: []string{
+			r.opts.Name(),
+			r.opts.MAC(),
+			r.opts.Keyfile,
+			strconv.Itoa(sentW),
+			strconv.Itoa(sentH),
+		},
+		Files: []*os.File{theirs},
+	})
 	theirs.Close()
 	if err != nil {
-		return fmt.Errorf("airplay: start %s: %w", r.opts.Helper, err)
+		return fmt.Errorf("airplay: %w", err)
 	}
-	var exited sync.WaitGroup
-	exited.Go(func() {
-		if err := cmd.Wait(); err != nil {
+	defer func() {
+		if err := proc.Wait(); err != nil {
 			slog.Debug("airplay helper exit", "err", err)
 		}
-	})
-	defer exited.Wait()
+	}()
 	live, restart := context.WithCancel(ctx)
 	defer restart()
 	stop := context.AfterFunc(live, func() { ours.Close() })
@@ -223,7 +203,7 @@ func (r *Receiver) session(ctx context.Context) error {
 		return err
 	}
 	if rd.version != version {
-		return fmt.Errorf("%w: %d", errVersion, rd.version)
+		return service.Permanent(fmt.Errorf("%w: %d", errVersion, rd.version))
 	}
 	slog.Info(
 		"airplay ready",

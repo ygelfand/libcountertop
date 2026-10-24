@@ -18,9 +18,12 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/media/urlplayer"
 	mdns "github.com/ygelfand/libcountertop/pkg/network/advertise"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
+
+const describeWait = 5 * time.Second
 
 type Config struct {
 	Name     func() string
@@ -64,6 +67,7 @@ type Server struct {
 
 	keys      *keys
 	protocols []cast.Protocol
+	player    *urlplayer.Player
 }
 
 func New(c Config) *Server {
@@ -82,45 +86,6 @@ func (s *Server) Retarget() {
 	s.mu.Unlock()
 	if k != nil {
 		k.Retarget()
-	}
-}
-
-type registrar interface {
-	ForgetRegistration()
-	Unsave()
-	Registered() bool
-}
-
-func (s *Server) registrars() []registrar {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var out []registrar
-	for _, p := range s.protocols {
-		if g, ok := p.(registrar); ok {
-			out = append(out, g)
-		}
-	}
-	return out
-}
-
-func (s *Server) Registered() bool {
-	for _, g := range s.registrars() {
-		if g.Registered() {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Server) ForgetRegistrations() {
-	for _, g := range s.registrars() {
-		g.ForgetRegistration()
-	}
-}
-
-func (s *Server) UnsaveRegistrations() {
-	for _, g := range s.registrars() {
-		g.Unsave()
 	}
 }
 
@@ -186,10 +151,18 @@ func (s *Server) Up() error {
 	service.Fault = func(err error) { slog.Debug("a cast sender sent something unreadable", "err", err) }
 
 	unspoken := map[string]bool{}
-	service.Receiver.Launched = func(app string) {
+	describer := fetch.Client(describeWait)
+	service.Receiver.Describe = func(app string) cast.AppConfig {
+		c, err := cast.Describe(context.Background(), describer, app)
+		if err != nil {
+			slog.Info("a cast app has no config", "id", app, "err", err)
+		}
+		return c
+	}
+	service.Receiver.Launched = func(app cast.App) {
 		unspoken = map[string]bool{}
-		slog.Info("a cast app launched", "app", cast.AppName(app), "id", app)
-		advert.Playing(true, cast.AppName(app))
+		slog.Info("a cast app launched", "app", app.Name, "id", app.ID)
+		advert.Playing(true, app.Name)
 	}
 	service.Receiver.Stopped = func(string) { advert.Playing(false, "") }
 	service.Receiver.Loaded = func(m cast.Media) {
@@ -214,10 +187,23 @@ func (s *Server) Up() error {
 	service.Receiver.CRL = s.keys.CRL
 	service.Receiver.Identity = func() cast.Device { return device }
 	if s.protocols == nil {
-		s.protocols = cast.Protocols(s.env(name, device), s.config.Apps)
+		env := s.env(name, device)
+		s.protocols = cast.Protocols(env, s.config.Apps)
+		if env.Output != nil {
+			s.player = urlplayer.New(urlplayer.Options{
+				HTTP:     env.Long,
+				Output:   env.Output,
+				Resample: env.Resample,
+				Screen:   env.Video != nil,
+				Target:   env.Video,
+			})
+		}
 	}
 	for _, p := range s.protocols {
 		service.Receiver.Register(p)
+	}
+	if s.player != nil {
+		service.Receiver.Player = s.player
 	}
 	started := time.Now()
 	service.Receiver.Eureka = func() cast.Eureka {
@@ -316,6 +302,16 @@ func (s *Server) env(name string, device cast.Device) cast.Env {
 				svc.Publish(control, p)
 			}
 		},
+		Advertise: func(app, name string, namespaces []string) {
+			if svc := s.current(); svc != nil {
+				svc.Advertise(app, name, namespaces)
+			}
+		},
+		End: func() {
+			if svc := s.current(); svc != nil {
+				svc.End()
+			}
+		},
 		Keep: store(s.config.AppDir),
 		Send: func(m cast.Message) {
 			if svc := s.current(); svc != nil {
@@ -324,7 +320,7 @@ func (s *Server) env(name string, device cast.Device) cast.Env {
 		},
 		Output: s.config.Output(func() {
 			if svc := s.current(); svc != nil {
-				svc.End()
+				svc.Done()
 			}
 		}),
 		Resample:    s.config.Resample,

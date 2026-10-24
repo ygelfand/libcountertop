@@ -35,7 +35,7 @@ type Filter struct {
 
 const entitiesTemplate = `{%- set ns = namespace(out=[]) -%}
 {%- for s in SOURCE -%}
-{%- if (CLASSES | length == 0 or s.attributes.device_class in CLASSES) and (LABELS | length == 0 or labels(s.entity_id) | select('in', LABELS) | list | length > 0) -%}
+{%- if (CLASSES | length == 0 or s.attributes.get('device_class') in CLASSES) and (LABELS | length == 0 or labels(s.entity_id) | select('in', LABELS) | list | length > 0) -%}
 {%- set at = namespace(d={}) -%}
 {%- for k in ATTRIBUTES if k in s.attributes -%}
 {%- set at.d = dict(at.d, **{k: s.attributes[k] | string}) -%}

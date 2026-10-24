@@ -8,17 +8,24 @@ import (
 	"testing"
 )
 
-func TestALaunchedAppIsReportedByItsOwnName(t *testing.T) {
+func TestALaunchedAppIsReportedByTheNameItsConfigGives(t *testing.T) {
+	configs := map[string]AppConfig{
+		"233637DE": {Name: "YouTube", Icon: "https://example.com/youtube.png"},
+		"C35B0678": {Name: "Music Assistant"},
+	}
 	for id, want := range map[string]string{
-		DefaultMediaReceiver: "Default Media Receiver",
-		"C35B0678":           "Music Assistant",
-		"233637DE":           "YouTube",
-		"DEADBEEF":           "Default Media Receiver",
+		"233637DE": "YouTube",
+		"C35B0678": "Music Assistant",
+		"DEADBEEF": "DEADBEEF",
 	} {
 		r := NewReceiver("Kitchen")
+		r.Describe = func(app string) AppConfig { return configs[app] }
 		r.start(id)
 		if got := r.app.DisplayName; got != want {
 			t.Errorf("%s runs as %q, want %q", id, got, want)
+		}
+		if got := r.app.IconURL; got != configs[id].Icon {
+			t.Errorf("%s shows icon %q, want %q", id, got, configs[id].Icon)
 		}
 	}
 }
@@ -33,8 +40,8 @@ func TestEveryAppIdIsEightUpperHexDigitsAndListedOnce(t *testing.T) {
 			t.Errorf("%s is listed twice", a.ID)
 		}
 		seen[a.ID] = true
-		if a.Icon != "" && !strings.HasPrefix(a.Icon, "https://") {
-			t.Errorf("%s's icon is not https: %s", a.Name, a.Icon)
+		if len(a.Protocols) == 0 {
+			t.Errorf("%s is listed without a protocol to route to", a.ID)
 		}
 	}
 }
@@ -85,6 +92,12 @@ var uuid = regexp.MustCompile(
 
 func TestALaunchedAppIsReportedTheWayARealDeviceReportsIt(t *testing.T) {
 	r := NewReceiver("Kitchen")
+	r.Describe = func(app string) AppConfig {
+		if app == "2DB7CC49" {
+			return AppConfig{Name: "YouTube Music", Icon: "https://example.com/music.png"}
+		}
+		return AppConfig{}
+	}
 	r.start("2DB7CC49")
 	a := r.app
 
@@ -124,10 +137,10 @@ func TestAProtocolHearsItsAppStartAndEnd(t *testing.T) {
 
 	r.start("4A6A109A")
 	r.release(IdleCancelled)
-	r.start("32EAB1DF")
+	r.start("233637DE")
 	r.release(IdleCancelled)
 
-	if want := []string{"started 32EAB1DF", "ended 32EAB1DF"}; !slices.Equal(log, want) {
+	if want := []string{"started 233637DE", "ended 233637DE"}; !slices.Equal(log, want) {
 		t.Errorf("heard %v, want %v", log, want)
 	}
 }

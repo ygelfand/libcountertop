@@ -274,6 +274,16 @@ func (p *Renderer) progress(
 ) gogui.View {
 	at := p.seeking.shown(now.Elapsed)
 	canSeek := sk != nil && sk.CanSeek()
+	lo, hi := time.Duration(0), now.Length
+	painted := spans(marks, now.Length)
+	if now.Edge > 0 {
+		lo, hi = now.Earliest, now.Edge
+		painted = append(
+			painted,
+			outOfReach(now.Length, 0, lo),
+			outOfReach(now.Length, hi, now.Length),
+		)
+	}
 	cfg := gogui.SliderCfg{
 		ID:       "seek",
 		Height:   reach(),
@@ -282,13 +292,13 @@ func (p *Renderer) progress(
 		Max:      float32(now.Length.Seconds()),
 		Disabled: !canSeek,
 		OnChange: func(v float32, e gogui.EventCtx) {
-			p.seeking.move(sk, time.Duration(v*float32(time.Second)))
+			p.seeking.move(sk, min(max(time.Duration(v*float32(time.Second)), lo), hi))
 			e.Window.InvalidateLayout()
 		},
 	}
-	bar := p.options.UI.Grip(p.kit.SeekBar(cfg, spans(marks, now.Length)))
+	bar := p.options.UI.Grip(p.kit.SeekBar(cfg, painted))
 	content := []gogui.View{bar}
-	if now.LiveWithin == 0 {
+	if now.LiveWithin == 0 || now.Edge > 0 {
 		wide := clockWidth(w, now.Length, st)
 		content = []gogui.View{
 			clockLabel(ClockText(at), wide, st, gogui.HAlignRight),

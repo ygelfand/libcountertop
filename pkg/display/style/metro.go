@@ -84,14 +84,14 @@ func flat(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.SliderP
 					dc.FilledRect(half+run*a, (across-bar)/2, run*(b-a), bar, c)
 				}
 				box(0, 1, rest)
-				for _, m := range marks {
-					box(m.From, max(m.To, m.From+0.002), m.Color)
-				}
 				head := s.Pct
 				if vertical {
 					head = 1 - s.Pct
 				}
 				box(0, head, active)
+				for _, m := range marks {
+					box(m.From, max(m.To, m.From+0.002), m.Color)
+				}
 			},
 		}
 		if vertical {

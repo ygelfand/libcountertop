@@ -43,9 +43,18 @@ func (standard) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts
 				if head > size {
 					dc.FilledRect(head-size/2, 0, size/2, size, played)
 				}
+				edge := func(f float32) float32 {
+					switch {
+					case f <= 0:
+						return 0
+					case f >= 1:
+						return dc.Width
+					}
+					return at(f)
+				}
 				for _, m := range marks {
-					x0 := at(m.From)
-					x1 := max(at(m.To), x0+1)
+					x0 := edge(m.From)
+					x1 := max(edge(m.To), x0+1)
 					dc.FilledRect(x0, 0, x1-x0, size, m.Color)
 				}
 			},

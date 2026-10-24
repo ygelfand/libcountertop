@@ -97,21 +97,30 @@ func (a *App) pickerScreen(p *homecontrol.Picker) *Screen {
 	}
 }
 
-func (a *App) rail(w *gogui.Window) gogui.View {
+type controlsBelow interface{ ControlsBelow() bool }
+
+func (a *App) rail(w *gogui.Window, covering *Screen) gogui.View {
 	var entries []widgets.RailEntry
 	for _, e := range a.o.Drawer.Entries() {
 		glyph := icons.Glyph(icons.Named(e.Icon))
 		entries = append(entries, widgets.RailEntry{Label: e.Label(), Glyph: glyph, Open: e.Open})
 	}
+	_, pinned := a.o.Shell.Dock()
 	var close func()
-	if _, pinned := a.o.Shell.Dock(); !pinned {
+	if !pinned {
 		close = a.o.Shell.HideDock
+	}
+	edge := a.o.Settings().Screen.Drawer
+	if covering != nil && pinned && edge == schema.EdgeBottom {
+		if c, ok := covering.View.(controlsBelow); ok && c.ControlsBelow() {
+			edge = schema.EdgeTop
+		}
 	}
 	return a.ui.Toolkit.Rail(
 		w,
 		widgets.RailOptions{
 			Entries: entries,
-			Edge:    a.o.Settings().Screen.Drawer,
+			Edge:    edge,
 			Close:   close,
 		},
 	)

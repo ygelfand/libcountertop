@@ -43,6 +43,12 @@ type VisualControl interface {
 	SetMaxFPS(int)
 	SetSeed(int)
 }
+type EngineControl interface {
+	LowMemory() bool
+	PageMemory() int
+	SetLowMemory(bool)
+	SetPageMemory(int)
+}
 type PrivacyControl interface{ SetMarks(bool) }
 type ADBControl interface {
 	ADB() bool
@@ -59,6 +65,7 @@ type BasicDependencies struct {
 	Screen                ScreenControl
 	Poster                PosterControl
 	Visuals               VisualControl
+	Engine                EngineControl
 	Privacy               PrivacyControl
 	Access                ADBControl
 	Zone                  ZoneControl
@@ -119,6 +126,8 @@ func (p *BasicPages) Debug() *shell.Page {
 		Build: func() ([]menu.Row, []func(int)) {
 			fps, seed := p.state().Visual.MaxFPS, p.state().Visual.Seed
 			adb := p.options.Access.ADB()
+			engine := p.options.Engine
+			lean, pageMB := engine.LowMemory(), engine.PageMemory()
 			return []menu.Row{
 					{
 						Glyph: gogui.IconTerminal,
@@ -141,11 +150,23 @@ func (p *BasicPages) Debug() *shell.Page {
 						Level: SeedLevel(seed),
 						Value: SeedSays(seed),
 					},
+					{Label: say.T("diag.setting.low_memory"), Kind: menu.Toggle, On: lean},
+					{
+						Label: say.T("diag.setting.page_memory"),
+						Kind:  menu.Slider,
+						Level: PageMemoryLevel(pageMB),
+						Snap:  PageMemorySnap,
+						Value: PageMemorySays(pageMB),
+					},
 				}, []func(int){
 					func(int) { p.options.Access.SetADB(!adb) },
 					p.open(p.options.VisualPage),
 					func(level int) { p.options.Visuals.SetMaxFPS(config.MaxFPSSteps[FpsIndex(level)]) },
 					func(level int) { p.options.Visuals.SetSeed(SeedOf(level)) },
+					func(int) { engine.SetLowMemory(!lean) },
+					func(level int) {
+						engine.SetPageMemory(config.PageMemorySteps[PageMemoryIndex(level)])
+					},
 				}
 		},
 	}
@@ -186,6 +207,27 @@ func SeedSays(seed int) string {
 
 func FpsSays(fps int) string {
 	return say.F("debug.fps.value", map[string]any{"N": fps})
+}
+
+func PageMemoryIndex(level int) int {
+	n := len(config.PageMemorySteps) - 1
+	return min(max((level*n+50)/100, 0), n)
+}
+
+func PageMemoryLevel(mb int) int {
+	i := max(slices.Index(config.PageMemorySteps, mb), 0)
+	return i * 100 / (len(config.PageMemorySteps) - 1)
+}
+
+func PageMemorySnap(level int) int {
+	return PageMemoryLevel(config.PageMemorySteps[PageMemoryIndex(level)])
+}
+
+func PageMemorySays(mb int) string {
+	if mb == 0 {
+		return say.T("diag.option.page_memory.none")
+	}
+	return say.F("debug.page_memory.value", map[string]any{"N": mb})
 }
 
 func (p *BasicPages) Style() *shell.Page {

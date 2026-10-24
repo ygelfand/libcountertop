@@ -59,7 +59,7 @@ type resumer interface {
 }
 
 type keeper interface {
-	Reuse(c *surface.Client, s videostream.Spec) (uint32, bool)
+	Reuse(c *surface.Client, s videostream.Spec) (uint32, videostream.Spec, bool)
 	Adopt(c *surface.Client, id uint32, s videostream.Spec)
 	Supersede(id uint32)
 }
@@ -121,9 +121,9 @@ func (pl Player) On(
 	var id uint32
 	reused := false
 	if keeps {
-		if kid, ok := k.Reuse(c, want); ok {
+		if kid, kept, ok := k.Reuse(c, want); ok {
 			if err := c.VideoFlush(kid); err == nil {
-				id, reused = kid, true
+				id, want, reused = kid, kept, true
 			}
 		}
 	}
@@ -137,7 +137,8 @@ func (pl Player) On(
 			return videostream.Report{}, fmt.Errorf("video: opening the decoder: %w", err)
 		}
 	}
-	if at, running := s.Clock(); c.VideoClock(id, at, running) != nil {
+	from, running := s.Clock()
+	if c.VideoClock(id, from, running) != nil {
 		return videostream.Report{}, errors.New("video: the display helper went away")
 	}
 	kept := reused
@@ -153,7 +154,7 @@ func (pl Player) On(
 	var rep videostream.Report
 	visible := reused
 	face := func(o geometry.Orientation) error {
-		x, y, m, at := placement(o, fw, fh, int(s.Width), int(s.Height))
+		x, y, m, at := placement(o, fw, fh, want.W, want.H)
 		rep.Orientation, rep.At = o, at
 		return c.VideoPlace(id, x, y, m, videoZ, visible)
 	}
@@ -286,7 +287,11 @@ func (pl Player) On(
 			}
 			resume()
 			last = f.At
-			pl, err := feed(f, 0)
+			var flags uint32
+			if !s.Sparse && f.At < from {
+				flags = surface.SampleHide
+			}
+			pl, err := feed(f, flags)
 			if err != nil {
 				return rep, fmt.Errorf("video: decoding: %w", err)
 			}

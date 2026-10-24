@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -82,88 +80,15 @@ func TestAPlayOrPauseWhileOpeningIsKeptForTheNextTrack(t *testing.T) {
 	}
 }
 
-type refusals struct {
-	counter
-	mu     sync.Mutex
-	played bool
-	failed []error
-}
-
-func (r *refusals) Play(playback.Source) { r.played = true }
-
-func (r *refusals) Failed(err error) {
-	r.mu.Lock()
-	r.failed = append(r.failed, err)
-	r.mu.Unlock()
-}
-
-func (r *refusals) failures() []error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return slices.Clone(r.failed)
-}
-
-func refusingTV(context.Context, TVRequest) (TVStream, error) {
-	return nil, errors.New("youtube tv: the phone sent no credential")
-}
-
-func TestOnlyADeviceWithVideoShowsPictures(t *testing.T) {
-	video := func() playback.Target { return playback.Target{} }
-	for _, tc := range []struct {
-		theme string
-		env   cast.Env
-		want  bool
-	}{
-		{ThemeYouTube, cast.Env{Video: video}, true},
-		{ThemeMusic, cast.Env{Video: video}, false},
-		{ThemeYouTube, cast.Env{}, false},
-	} {
-		if got := newStation(
-			context.Background(),
-			tc.theme,
-			tc.env,
-			nil,
-		).pictured(); got != tc.want {
-			t.Errorf(
-				"%s with video %v: pictured %v, want %v",
-				tc.theme,
-				tc.env.Video != nil,
-				got,
-				tc.want,
-			)
-		}
-	}
-}
-
-func TestYouTubeTVWithoutACredentialTellsTheCard(t *testing.T) {
-	out := &refusals{}
-	s := newStation(context.Background(), ThemeTV, cast.Env{Output: out}, refusingTV)
-	s.markAsked("32EAB1DF")
-	s.setPlaylist(map[string]string{"videoId": "YK51usOpBzc"})
-
-	for i := 0; i < 100 && len(out.failures()) == 0; i++ {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if f := out.failures(); out.played || len(f) != 1 ||
-		!strings.Contains(f[0].Error(), "no credential") {
-		t.Errorf("played %v, the card was told %v", out.played, f)
-	}
-	if got := s.logo(); got != cast.Lookup("32EAB1DF").Icon {
-		t.Errorf("the card shows %q", got)
-	}
-	k := &screens{tv: refusingTV, id: preferences.YouTube{Video: "v"}}
-	if _, _, ok := k.screen("32EAB1DF"); !ok {
-		t.Error("YouTube TV was given no screen to connect to")
-	}
-}
-
-func TestWithoutATVHookYouTubeTVIsNotOffered(t *testing.T) {
+func TestOnlyYouTubeAndYouTubeMusicGetAScreen(t *testing.T) {
 	k := &screens{id: preferences.YouTube{Video: "v", Music: "m"}}
 	if _, _, ok := k.screen("32EAB1DF"); ok {
-		t.Error("YouTube TV was offered with nothing to play it")
+		t.Error("YouTube TV was offered a screen")
 	}
-	if _, _, ok := k.screen("233637DE"); !ok {
-		t.Error("YouTube went missing along with YouTube TV")
+	for _, app := range []string{"233637DE", "2DB7CC49"} {
+		if _, _, ok := k.screen(app); !ok {
+			t.Errorf("%s was given no screen to connect to", app)
+		}
 	}
 }
 
@@ -220,7 +145,6 @@ func TestAVideoPlaysThroughToItsEnd(t *testing.T) {
 		ctx,
 		ThemeMusic,
 		cast.Env{HTTP: &http.Client{Timeout: time.Minute}, Output: out},
-		nil,
 	)
 	st.handle(
 		Message{
@@ -249,9 +173,8 @@ func TestTheStationPublishesToCast(t *testing.T) {
 	var got []*cast.Published
 	s := newStation(
 		context.Background(),
-		ThemeTV,
+		ThemeYouTube,
 		cast.Env{Publish: func(_ cast.Controls, p *cast.Published) { got = append(got, p) }},
-		nil,
 	)
 	s.list, s.index = "PL1", 2
 	s.reportLoading("vid", 0)

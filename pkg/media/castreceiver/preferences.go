@@ -13,14 +13,12 @@ func Preferences(requestIDPrefix string, s storage.Section[schema.Cast]) prefere
 			c := s.Read()
 			return preferences.Settings{
 				YouTube: preferences.YouTube{
-					Device:    c.YouTube.Device,
-					Music:     c.YouTube.Music,
-					Video:     c.YouTube.Video,
-					Skip:      c.YouTube.Skip,
-					OnDemand:  c.YouTube.OnDemand,
-					LiveDelay: c.YouTube.LiveDelay,
+					Device:   c.YouTube.Device,
+					Music:    c.YouTube.Music,
+					Video:    c.YouTube.Video,
+					Skip:     c.YouTube.Skip,
+					OnDemand: c.YouTube.OnDemand,
 				},
-				Prime: preferences.Prime{Persist: c.Prime.Persist, SkipIntro: c.Prime.SkipIntro},
 			}
 		},
 		Save: func(device, music, video string) error {

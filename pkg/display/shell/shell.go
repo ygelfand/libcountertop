@@ -29,6 +29,8 @@ type Waker interface{ Wakes() bool }
 
 type Keeper interface{ Keeps() bool }
 
+type Docker interface{ Docks() bool }
+
 type Shell struct {
 	mu         sync.Mutex
 	stack      []View
@@ -332,6 +334,21 @@ func (s *Shell) Touch() {
 	if s.Open() {
 		s.wake()
 	}
+}
+
+func (s *Shell) Docked() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return docks(s.stack)
+}
+
+func docks(stack []View) bool {
+	shown := Showing(stack)
+	if len(shown) == 0 || !shown[0].Covers() {
+		return true
+	}
+	d, ok := shown[0].(Docker)
+	return ok && d.Docks()
 }
 
 func (s *Shell) Dock() (shown, pinned bool) {

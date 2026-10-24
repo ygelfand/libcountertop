@@ -10,6 +10,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -23,19 +24,20 @@ type Page struct {
 	options Dependencies
 	c       Controls
 
-	mu      sync.Mutex
-	picture bool
-	loading bool
-	began   time.Time
-	note    string
-	logo    *ui.Image
-	frameW  int
-	frameH  int
-	shown   bool
-	paused  bool
-	until   time.Time
-	drawn   string
-	hold    *shell.Hold
+	mu       sync.Mutex
+	picture  bool
+	loading  bool
+	began    time.Time
+	note     string
+	logo     *ui.Image
+	backdrop *ui.Image
+	frameW   int
+	frameH   int
+	shown    bool
+	paused   bool
+	until    time.Time
+	drawn    string
+	hold     *shell.Hold
 }
 
 func (p *Page) Shows(s config.Stream) bool { return s == config.StreamMedia }
@@ -55,6 +57,7 @@ type Look struct {
 	Began    time.Time
 	Note     string
 	Logo     *ui.Image
+	Backdrop *ui.Image
 	FrameW   int
 	FrameH   int
 }
@@ -70,6 +73,7 @@ func (p *Page) Look() Look {
 		Began:    p.began,
 		Note:     p.note,
 		Logo:     p.logo,
+		Backdrop: p.backdrop,
 		FrameW:   p.frameW,
 		FrameH:   p.frameH,
 	}
@@ -95,6 +99,14 @@ func New(c Controls, o Dependencies) *Page {
 }
 
 func (p *Page) Covers() bool { return true }
+
+func (p *Page) ControlsBelow() bool { return true }
+
+func (p *Page) Docks() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.shown || !p.picture
+}
 
 func (p *Page) Follow(c Controls) {
 	p.mu.Lock()
@@ -170,6 +182,13 @@ func (p *Page) SetLogo(img *ui.Image) {
 	p.redraw()
 }
 
+func (p *Page) SetBackdrop(img *ui.Image) {
+	p.mu.Lock()
+	p.backdrop = img
+	p.mu.Unlock()
+	p.redraw()
+}
+
 func (p *Page) redraw() {
 	if p.options.Shell.Top() == p {
 		p.options.Shell.Redraw()
@@ -226,6 +245,13 @@ func Watched() time.Time {
 	return time.Unix(0, at)
 }
 
+func breakKey(b *nowplaying.Break) string {
+	if b == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d/%d@%d", b.Clip, b.Clips, b.At/time.Second)
+}
+
 func (p *Page) tick() {
 	now := p.controls().Now()
 	p.mu.Lock()
@@ -241,7 +267,7 @@ func (p *Page) tick() {
 	p.paused = now.Paused
 	spinning := p.loading && time.Since(p.began) > spinAfter
 	key := fmt.Sprintf(
-		"%v|%v|%d|%v|%v|%s|%s|%s|%d|%d|%d|%d",
+		"%v|%v|%d|%v|%v|%s|%s|%s|%d|%d|%d|%d|%s",
 		p.shown,
 		p.picture,
 		now.Elapsed/time.Second,
@@ -254,6 +280,7 @@ func (p *Page) tick() {
 		now.MarkID,
 		now.Can,
 		p.options.Volume.Level(),
+		breakKey(now.Break),
 	)
 	changed := key != p.drawn
 	p.drawn = key

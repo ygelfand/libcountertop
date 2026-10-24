@@ -3,6 +3,7 @@ package whistle
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -209,7 +210,7 @@ func TestVersionMismatchStops(t *testing.T) {
 	c, _ := client(t, "old")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := c.Run(ctx); err != errVersion {
+	if err := c.Run(ctx); !errors.Is(err, errVersion) {
 		t.Errorf("Run = %v, want %v", err, errVersion)
 	}
 }

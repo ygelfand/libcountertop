@@ -20,14 +20,23 @@ type Now struct {
 	Mark   []byte
 	MarkID uint64
 
-	Elapsed time.Duration
-	Length  time.Duration
+	Elapsed  time.Duration
+	Length   time.Duration
+	Earliest time.Duration
+	Edge     time.Duration
 
 	LiveWithin time.Duration
+
+	Break *Break
 
 	Queue []Track
 
 	Can Controls
+}
+
+type Break struct {
+	Clip, Clips int
+	At, Length  time.Duration
 }
 
 type Track struct {

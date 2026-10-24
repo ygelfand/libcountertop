@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -119,25 +120,27 @@ type Service struct {
 
 	mu    sync.Mutex
 	conns map[string]*Conn
-	open  map[*Conn]struct{}
+	open  map[*Conn]int
+	next  int
 }
 
 func NewService(r *Receiver) *Service {
-	return &Service{Receiver: r, conns: map[string]*Conn{}, open: map[*Conn]struct{}{}}
+	return &Service{Receiver: r, conns: map[string]*Conn{}, open: map[*Conn]int{}}
 }
 
 func (s *Service) Serve(c *Conn) error {
-	if !s.admit(c) {
+	n, ok := s.admit(c)
+	if !ok {
 		_ = c.Close()
 		return ErrGone
 	}
-	var known string
+	known := map[string]bool{}
 
 	defer func() {
 		_ = c.Close()
 		s.release(c)
-		if known != "" {
-			s.forget(known)
+		for id := range known {
+			s.forget(id)
 		}
 	}()
 
@@ -151,9 +154,12 @@ func (s *Service) Serve(c *Conn) error {
 			return err
 		}
 
-		if m.Source != "" && m.Source != known {
-			known = m.Source
-			s.remember(known, c)
+		if m.Source != "" {
+			m.Source = qualify(n, m.Source)
+			if !known[m.Source] {
+				known[m.Source] = true
+				s.remember(m.Source, c)
+			}
 		}
 
 		out, fault := s.handle(m)
@@ -163,7 +169,7 @@ func (s *Service) Serve(c *Conn) error {
 
 		for _, a := range out {
 			if a.Destination == m.Source {
-				if err := c.Write(a); err != nil {
+				if err := c.Write(onWire(a)); err != nil {
 					return err
 				}
 				continue
@@ -197,7 +203,7 @@ func (s *Service) Send(m Message) {
 	s.mu.Unlock()
 
 	for _, c := range to {
-		if err := c.Write(m); err != nil && !errors.Is(err, ErrGone) && s.Fault != nil {
+		if err := c.Write(onWire(m)); err != nil && !errors.Is(err, ErrGone) && s.Fault != nil {
 			s.Fault(err)
 		}
 	}
@@ -224,9 +230,25 @@ func (s *Service) Publish(control Controls, p *Published) {
 	s.Announce(out)
 }
 
+func (s *Service) Advertise(app, name string, namespaces []string) {
+	s.mu.Lock()
+	out := s.Receiver.Advertise(app, name, namespaces)
+	s.mu.Unlock()
+
+	s.Announce(out)
+}
+
 func (s *Service) End() {
 	s.mu.Lock()
 	out := s.Receiver.End()
+	s.mu.Unlock()
+
+	s.Announce(out)
+}
+
+func (s *Service) Done() {
+	s.mu.Lock()
+	out := s.Receiver.Done()
 	s.mu.Unlock()
 
 	s.Announce(out)
@@ -266,15 +288,16 @@ func (s *Service) Close() {
 	}
 }
 
-func (s *Service) admit(c *Conn) bool {
+func (s *Service) admit(c *Conn) (int, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.open == nil {
-		return false
+		return 0, false
 	}
-	s.open[c] = struct{}{}
-	return true
+	s.next++
+	s.open[c] = s.next
+	return s.next, true
 }
 
 func (s *Service) release(c *Conn) {
@@ -282,6 +305,15 @@ func (s *Service) release(c *Conn) {
 	defer s.mu.Unlock()
 
 	delete(s.open, c)
+}
+
+func qualify(conn int, source string) string { return fmt.Sprintf("%d:%s", conn, source) }
+
+func onWire(m Message) Message {
+	if _, source, ok := strings.Cut(m.Destination, ":"); ok && m.Destination != Broadcast {
+		m.Destination = source
+	}
+	return m
 }
 
 func (s *Service) Senders() int {

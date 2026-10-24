@@ -67,9 +67,6 @@ func TestStoppingWithoutStartingIsSafe(t *testing.T) {
 	if s.Playing() != nil {
 		t.Error("something is playing")
 	}
-	if s.Registered() {
-		t.Error("a protocol is registered before any ran")
-	}
 }
 
 func TestPreparingMakesCredentialsOnce(t *testing.T) {

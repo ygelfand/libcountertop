@@ -61,6 +61,10 @@ func (neon) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts {
 				half, run, mid := thumb/2, max(dc.Width-thumb, 1), dc.Height/2
 				x := func(f float32) float32 { return half + run*f }
 				dc.Line(x(0), mid, x(1), mid, dim, 2)
+				head := x(s.Pct)
+				dc.Line(x(0), mid, head, mid, lit.WithOpacity(0.2), 14)
+				dc.Line(x(0), mid, head, mid, lit.WithOpacity(0.4), 7)
+				dc.Line(x(0), mid, head, mid, lit, 3)
 				for _, m := range marks {
 					dc.Line(
 						x(m.From),
@@ -72,10 +76,6 @@ func (neon) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts {
 					)
 					dc.Line(x(m.From), mid, x(max(m.To, m.From+0.002)), mid, m.Color, 3)
 				}
-				head := x(s.Pct)
-				dc.Line(x(0), mid, head, mid, lit.WithOpacity(0.2), 14)
-				dc.Line(x(0), mid, head, mid, lit.WithOpacity(0.4), 7)
-				dc.Line(x(0), mid, head, mid, lit, 3)
 			},
 		})
 		dot := thumb * 0.7

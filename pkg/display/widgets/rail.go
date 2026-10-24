@@ -20,6 +20,10 @@ type RailOptions struct {
 	Close   func()
 }
 
+func RailDepth() float32 {
+	return style.Reach()*1.5 + 2*gogui.PaddingSmall.Top + gogui.PaddingMedium.Top
+}
+
 func (kit *Toolkit) Rail(w *gogui.Window, options RailOptions) gogui.View {
 	t := gogui.CurrentTheme()
 	vw, vh := w.WindowSize()

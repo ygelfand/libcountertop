@@ -1,7 +1,12 @@
-//go:build !linux
+//go:build !unix
 
 package payload
 
-import "syscall"
+import (
+	"os"
+	"syscall"
+)
 
-func DiesWithParent() *syscall.SysProcAttr { return nil }
+func attrs() *syscall.SysProcAttr { return nil }
+
+func killGroup(p *os.Process) { _ = p.Kill() }

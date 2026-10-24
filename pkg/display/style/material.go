@@ -100,14 +100,25 @@ func tonal(vertical bool, marks []Span, wave bool) func(gogui.SliderLookState) g
 					dc.FilledRoundedRect(a, (across-bar)/2, b-a, bar, bar/2, c)
 				}
 				box(at+gap, long, rest)
-				for _, m := range marks {
-					a, b := max(half+run*m.From, at+gap), half+run*m.To
-					box(a, b, m.Color)
+				spans := func() {
+					for _, m := range marks {
+						a, b := half+run*m.From, half+run*m.To
+						if m.From <= 0 {
+							a = 0
+						}
+						if m.To >= 1 {
+							b = long
+						}
+						box(a, min(b, at-gap), m.Color)
+						box(max(a, at+gap), b, m.Color)
+					}
 				}
 				if !wave || vertical {
 					box(0, at-gap, active)
+					spans()
 					return
 				}
+				defer spans()
 				amp, length := across*0.14, across*1.1
 				var pts []float32
 				for x := float32(0); x <= at-gap; x += 2 {

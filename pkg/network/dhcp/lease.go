@@ -76,6 +76,14 @@ func (l Lease) String() string {
 		l.Address.String(), l.Router, joinIPs(l.DNS), time.Until(l.Expires).Round(time.Second))
 }
 
+func (l *Lease) Nameservers() []string {
+	out := make([]string, 0, len(l.DNS))
+	for _, ip := range l.DNS {
+		out = append(out, ip.String())
+	}
+	return out
+}
+
 func joinIPs(ips []net.IP) string {
 	if len(ips) == 0 {
 		return "(none)"

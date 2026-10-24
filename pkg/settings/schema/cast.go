@@ -7,13 +7,6 @@ type Cast struct {
 	Bundle string `json:"bundle,omitempty"`
 
 	YouTube YouTube `json:"youtube,omitzero"`
-
-	Prime Prime `json:"prime,omitzero"`
-}
-
-type Prime struct {
-	Persist   bool `json:"persist,omitempty"`
-	SkipIntro bool `json:"skipIntro,omitempty"`
 }
 
 type YouTube struct {
@@ -24,15 +17,8 @@ type YouTube struct {
 	Skip []string `json:"skip"`
 
 	OnDemand bool `json:"onDemand,omitempty"`
-
-	LiveDelay int `json:"liveDelay"`
 }
 
-const (
-	LiveDelayLeast = 4
-	LiveDelayMost  = 60
-)
-
 func DefaultCast() Cast {
-	return Cast{Receiver: false, YouTube: YouTube{Skip: []string{"sponsor"}, LiveDelay: 10}}
+	return Cast{Receiver: false, YouTube: YouTube{Skip: []string{"sponsor"}}}
 }

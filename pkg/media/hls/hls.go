@@ -31,6 +31,7 @@ type Options struct {
 	Fastest  int
 	Lead     time.Duration
 	From     time.Time
+	At       time.Duration
 	Resample func(from int) func(stereo []int16) []int16
 }
 
@@ -42,11 +43,12 @@ type Frame struct {
 type Stream struct {
 	Width, Height int
 
-	o      Options
-	cancel context.CancelFunc
-	done   chan struct{}
-	sized  chan struct{}
-	once   sync.Once
+	o        Options
+	cancel   context.CancelFunc
+	done     chan struct{}
+	sized    chan struct{}
+	sizeOnce sync.Once
+	once     sync.Once
 
 	mu       sync.Mutex
 	room     *sync.Cond
@@ -64,6 +66,9 @@ type Stream struct {
 	channels int
 	resample func([]int16) []int16
 	decoded  []byte
+
+	ended bool
+	start time.Duration
 
 	frames chan Frame
 	sps    []byte
@@ -83,37 +88,39 @@ const (
 )
 
 func Open(ctx context.Context, master string, o Options) (*Stream, error) {
-	mv, err := fetchMaster(ctx, master, o)
+	pl, err := fetchPlaylist(ctx, master, o)
 	if err != nil {
 		return nil, err
 	}
-	n, err := narrowed(mv, o)
-	if err != nil {
-		return nil, err
-	}
-	v := n.Variants[0]
-	video, err := resolve(master, v.URI)
-	if err != nil {
-		return nil, err
-	}
-	audio, name := "", "muxed"
-	if len(n.Renditions) > 0 && n.Renditions[0].URI != nil {
-		if audio, err = resolve(master, *n.Renditions[0].URI); err != nil {
+	video, audio := master, ""
+	if mv, ok := pl.(*playlist.Multivariant); ok {
+		n, err := narrowed(mv, o)
+		if err != nil {
 			return nil, err
 		}
-		name = n.Renditions[0].Name
+		v := n.Variants[0]
+		if video, err = resolve(master, v.URI); err != nil {
+			return nil, err
+		}
+		name := "muxed"
+		if len(n.Renditions) > 0 && n.Renditions[0].URI != nil {
+			if audio, err = resolve(master, *n.Renditions[0].URI); err != nil {
+				return nil, err
+			}
+			name = n.Renditions[0].Name
+		}
+		slog.Info(
+			"hls variant",
+			"resolution",
+			v.Resolution,
+			"bandwidth",
+			v.Bandwidth,
+			"codecs",
+			strings.Join(v.Codecs, ","),
+			"audio",
+			name,
+		)
 	}
-	slog.Info(
-		"hls variant",
-		"resolution",
-		v.Resolution,
-		"bandwidth",
-		v.Bandwidth,
-		"codecs",
-		strings.Join(v.Codecs, ","),
-		"audio",
-		name,
-	)
 
 	run, cancel := context.WithCancel(context.Background())
 	s := &Stream{
@@ -200,7 +207,11 @@ func (s *Stream) Next(ctx context.Context) (Frame, error) {
 		return Frame{}, ctx.Err()
 	case <-s.anchored:
 	case <-s.done:
-		return Frame{}, s.failure()
+		select {
+		case <-s.anchored:
+		default:
+			return Frame{}, s.failure()
+		}
 	}
 	select {
 	case <-ctx.Done():
@@ -209,7 +220,13 @@ func (s *Stream) Next(ctx context.Context) (Frame, error) {
 		f.At = max(f.At-s.origin, 0)
 		return f, nil
 	case <-s.done:
-		return Frame{}, s.failure()
+		select {
+		case f := <-s.frames:
+			f.At = max(f.At-s.origin, 0)
+			return f, nil
+		default:
+			return Frame{}, s.failure()
+		}
 	}
 }
 
@@ -236,6 +253,11 @@ func (s *Stream) follow(ctx context.Context, u string, video, audio bool) error 
 		}
 		p.playlist(time.Since(began))
 		u = final
+		if video {
+			s.mu.Lock()
+			s.ended = m.Endlist
+			s.mu.Unlock()
+		}
 		stall = max(stallLeast, time.Duration(m.TargetDuration)*stallTargets*time.Second)
 		first := m.MediaSequence
 		last := first + len(m.Segments) - 1
@@ -253,7 +275,17 @@ func (s *Stream) follow(ctx context.Context, u string, video, audio bool) error 
 					first,
 				)
 			}
-			next = first + start(m, walls, s.o.Lead, s.o.From)
+			if m.Endlist {
+				i, from := into(m, s.o.At)
+				next = first + i
+				if video {
+					s.mu.Lock()
+					s.start = from
+					s.mu.Unlock()
+				}
+			} else {
+				next = first + start(m, walls, s.o.Lead, s.o.From)
+			}
 		}
 		template, at := "", -1
 		var wall time.Time
@@ -368,6 +400,29 @@ func start(m *playlist.Media, walls []time.Time, want time.Duration, from time.T
 		}
 	}
 	return i
+}
+
+func into(m *playlist.Media, at time.Duration) (int, time.Duration) {
+	var from time.Duration
+	for i, seg := range m.Segments {
+		if at < from+seg.Duration {
+			return i, from
+		}
+		from += seg.Duration
+	}
+	return len(m.Segments), from
+}
+
+func (s *Stream) Ended() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ended
+}
+
+func (s *Stream) Start() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.start
 }
 
 func clock(m *playlist.Media) []time.Time {
@@ -602,6 +657,9 @@ func (s *Stream) segment(data []byte, video, audio bool, wall time.Time) error {
 	case len(data) > 0 && data[0] == 0x47:
 		return s.transport(data, video, audio)
 	case audio:
+		if video {
+			s.measured()
+		}
 		return s.packed(data)
 	default:
 		return fmt.Errorf("unknown segment format, starts % x", data[:min(len(data), 4)])
@@ -614,9 +672,11 @@ func (s *Stream) transport(data []byte, video, audio bool) error {
 		return err
 	}
 	r.OnDecodeError(func(err error) { slog.Debug("hls ts", "err", err) })
+	pictured := false
 	for _, t := range r.Tracks() {
 		switch c := t.Codec.(type) {
 		case *tscodecs.H264:
+			pictured = true
 			if video {
 				r.OnDataH264(t, func(pts, _ int64, au [][]byte) error {
 					s.picture(ticks(pts), au)
@@ -632,6 +692,9 @@ func (s *Stream) transport(data []byte, video, audio bool) error {
 				)
 			}
 		}
+	}
+	if video && !pictured {
+		s.measured()
 	}
 	for {
 		if err := r.Read(); err != nil {
@@ -810,8 +873,17 @@ func (s *Stream) picture(at time.Duration, au [][]byte) {
 	if err != nil {
 		return
 	}
+	f := Frame{Data: data, At: at}
+	if s.ended {
+		select {
+		case s.frames <- f:
+			s.keyed = true
+		case <-s.done:
+		}
+		return
+	}
 	select {
-	case s.frames <- Frame{Data: data, At: at}:
+	case s.frames <- f:
 		s.keyed = true
 	case <-s.done:
 	default:
@@ -828,10 +900,24 @@ func (s *Stream) size() {
 		return
 	}
 	s.Width, s.Height = p.Width(), p.Height()
-	close(s.sized)
+	s.measured()
 }
 
+func (s *Stream) measured() { s.sizeOnce.Do(func() { close(s.sized) }) }
+
 func fetchMaster(ctx context.Context, master string, o Options) (*playlist.Multivariant, error) {
+	pl, err := fetchPlaylist(ctx, master, o)
+	if err != nil {
+		return nil, err
+	}
+	mv, ok := pl.(*playlist.Multivariant)
+	if !ok {
+		return nil, errors.New("hls: not a multivariant playlist")
+	}
+	return mv, nil
+}
+
+func fetchPlaylist(ctx context.Context, master string, o Options) (playlist.Playlist, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, master, nil)
 	if err != nil {
 		return nil, err
@@ -855,11 +941,7 @@ func fetchMaster(ctx context.Context, master string, o Options) (*playlist.Multi
 	if err != nil {
 		return nil, fmt.Errorf("hls: %w", err)
 	}
-	mv, ok := pl.(*playlist.Multivariant)
-	if !ok {
-		return nil, errors.New("hls: not a multivariant playlist")
-	}
-	return mv, nil
+	return pl, nil
 }
 
 func client(o Options) *http.Client {
@@ -871,6 +953,9 @@ func client(o Options) *http.Client {
 
 func narrowed(mv *playlist.Multivariant, o Options) (*playlist.Multivariant, error) {
 	v := pick(mv.Variants, o.Tallest, o.Fastest)
+	if v == nil {
+		v = pickSound(mv.Variants)
+	}
 	if v == nil {
 		return nil, errors.New("hls: no H.264 and AAC-LC variant within the size limits")
 	}
@@ -1085,6 +1170,19 @@ func pick(vs []*playlist.MultivariantVariant, tallest, fastest int) *playlist.Mu
 			continue
 		}
 		if fastest > 0 && v.FrameRate != nil && *v.FrameRate > float64(fastest)+0.5 {
+			continue
+		}
+		if best == nil || v.Bandwidth > best.Bandwidth {
+			best = v
+		}
+	}
+	return best
+}
+
+func pickSound(vs []*playlist.MultivariantVariant) *playlist.MultivariantVariant {
+	var best *playlist.MultivariantVariant
+	for _, v := range vs {
+		if len(v.Codecs) != 1 || v.Codecs[0] != "mp4a.40.2" {
 			continue
 		}
 		if best == nil || v.Bandwidth > best.Bandwidth {

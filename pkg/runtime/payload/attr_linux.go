@@ -1,5 +1,12 @@
 package payload
 
-import "syscall"
+import (
+	"os"
+	"syscall"
+)
 
-func DiesWithParent() *syscall.SysProcAttr { return &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL} }
+func attrs() *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL, Setpgid: true}
+}
+
+func killGroup(p *os.Process) { _ = syscall.Kill(-p.Pid, syscall.SIGKILL) }

@@ -3,6 +3,7 @@ package firmware
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -313,6 +314,32 @@ func TestHomeAssistantReconnectsOnlyWhenTheOptionsChange(t *testing.T) {
 	_ = u.List(context.Background())
 	if reconnects != 1 {
 		t.Errorf("reconnected %d times, want 1", reconnects)
+	}
+}
+
+func TestAListSavedLastBootNeedsNoReconnect(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "releases.json")
+	builds := []releases.Release{{Tag: "0.9"}, {Tag: "0.8"}}
+	deps := func(reconnect func()) Dependencies[manifest] {
+		return Dependencies[manifest]{
+			Source:    buildSource{source: &source{}, builds: builds},
+			Settings:  &settings{},
+			Version:   "1.0",
+			Channels:  []string{"stable"},
+			Reconnect: reconnect,
+			ListPath:  path,
+		}
+	}
+	_ = New(deps(func() {})).List(context.Background())
+
+	reconnects := 0
+	u := New(deps(func() { reconnects++ }))
+	if want := []string{unpicked, "0.9", "0.8"}; !slices.Equal(u.versions.Options, want) {
+		t.Errorf("a restart offered %v, want %v", u.versions.Options, want)
+	}
+	_ = u.List(context.Background())
+	if reconnects != 0 {
+		t.Errorf("the same list reconnected %d times", reconnects)
 	}
 }
 

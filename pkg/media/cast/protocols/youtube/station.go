@@ -13,6 +13,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/media/sponsorblock"
 )
 
 // The player states a screen reports, from a captured session.
@@ -26,7 +27,6 @@ const (
 type station struct {
 	theme   string
 	env     cast.Env
-	tv      TV
 	resolve *Resolver
 	ctx     context.Context
 
@@ -53,7 +53,7 @@ type station struct {
 	app              string
 
 	skipsFor string
-	skips    []Segment
+	skips    []sponsorblock.Segment
 
 	loud chan struct{}
 }
@@ -87,14 +87,13 @@ func (s *station) quiet(d time.Duration) bool {
 	return s.cur == nil && s.opening == nil && time.Since(s.lastHeard) >= d
 }
 
-func newStation(ctx context.Context, theme string, env cast.Env, tv TV) *station {
-	r := NewResolver(env.HTTP, env.Video)
+func newStation(ctx context.Context, theme string, env cast.Env) *station {
+	r := NewResolver(env.HTTP)
 	r.Resample = env.Resample
 	r.Preferences = env.Preferences
 	s := &station{
 		theme:   theme,
 		env:     env,
-		tv:      tv,
 		resolve: r,
 		ctx:     ctx,
 		loud:    make(chan struct{}, 1),
@@ -142,7 +141,7 @@ func (s *station) attend() {
 		return
 	}
 	s.env.Output.Attend(
-		&playback.Session{Label: label, Logo: s.logo(), Pictured: s.pictured()},
+		&playback.Session{Label: label, Logo: s.logo()},
 	)
 }
 
@@ -151,7 +150,7 @@ func (s *station) logo() string {
 	app := s.app
 	s.mu.Unlock()
 	if themes[app] == s.theme {
-		return cast.Lookup(app).Icon
+		return s.icon(app)
 	}
 	var ids []string
 	for id, theme := range themes {
@@ -162,13 +161,12 @@ func (s *station) logo() string {
 	if len(ids) == 0 {
 		return ""
 	}
-	return cast.Lookup(slices.Min(ids)).Icon
+	return s.icon(slices.Min(ids))
 }
 
-func (s *station) refused() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return cast.Lookup(s.app).Refused()
+func (s *station) icon(app string) string {
+	c, _ := cast.Describe(s.ctx, s.env.HTTP, app)
+	return c.Icon
 }
 
 func (s *station) label() string {
@@ -379,14 +377,6 @@ func (s *station) start(pos Position, at time.Duration) { s.open(pos, at, false)
 
 func (s *station) open(pos Position, at time.Duration, held bool) {
 	id := pos.Video
-	if err := s.refused(); err != nil {
-		slog.Info("youtube refused", "theme", s.theme, "video", id, "err", err)
-		if s.env.Output != nil {
-			s.env.Output.Failed(err)
-		}
-		s.report(stateStopped)
-		return
-	}
 	s.end(true)
 
 	s.mu.Lock()
@@ -456,7 +446,7 @@ func (s *station) open(pos Position, at time.Duration, held bool) {
 		switch {
 		case held:
 			s.report(statePaused)
-		case !t.Pictured() || s.env.Output == nil:
+		default:
 			s.report(statePlaying)
 		}
 		s.lookAround(ctx, t, pos)
@@ -602,7 +592,7 @@ func (s *station) seek(at time.Duration) {
 	s.open(pos, at, held)
 }
 
-func (s *station) skipWhenHeard(t *track, seg Segment) {
+func (s *station) skipWhenHeard(t *track, seg sponsorblock.Segment) {
 	until := time.Now().Add(skipWait)
 	for time.Now().Before(until) {
 		s.mu.Lock()

@@ -118,6 +118,39 @@ func TestASleepingScreenRefusesWhatDoesNotWakeIt(t *testing.T) {
 	}
 }
 
+type docking struct {
+	view
+	docks bool
+}
+
+func (d *docking) Docks() bool { return d.docks }
+
+func TestTheDockFollowsTheCoveringView(t *testing.T) {
+	s := &Shell{}
+	if !s.Docked() {
+		t.Error("an empty stack has no dock")
+	}
+	s.Push(&view{})
+	if !s.Docked() {
+		t.Error("a view that covers nothing hid the dock")
+	}
+	plain := &view{covers: true}
+	s.Push(plain)
+	if s.Docked() {
+		t.Error("a covering view that does not dock has the dock")
+	}
+	player := &docking{view: view{covers: true}, docks: true}
+	s.Push(player)
+	s.Push(&view{})
+	if !s.Docked() {
+		t.Error("a covering view that docks, under a card, has no dock")
+	}
+	player.docks = false
+	if s.Docked() {
+		t.Error("a covering view that stopped docking kept the dock")
+	}
+}
+
 func TestVisibleIsTheCoveringViewAndWhatIsAboveIt(t *testing.T) {
 	s := &Shell{}
 	under, page, card := &view{covers: true}, &view{covers: true}, &view{}

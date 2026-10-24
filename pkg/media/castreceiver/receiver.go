@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -23,7 +22,6 @@ type ReceiverOptions struct {
 	Settings storage.Section[schema.Cast]
 	DeviceID uint32
 	Network  func(ctx context.Context) bool
-	Want     func(setting.Group) bool
 	Server   Config
 }
 
@@ -50,7 +48,6 @@ func NewReceiver(opts ReceiverOptions) *Receiver {
 	r.knobs = &Controls{
 		Table:  NewTable(),
 		Device: opts.DeviceID,
-		Want:   opts.Want,
 		Read:   opts.Settings.Read,
 		Save:   r.save,
 	}
@@ -137,9 +134,6 @@ func (r *Receiver) apply(was, now schema.Cast) {
 			slog.Error("the cast receiver would not start", "err", err)
 		}
 	}
-	if was.Prime.Persist && !now.Prime.Persist {
-		r.server.UnsaveRegistrations()
-	}
 }
 
 func (r *Receiver) change(name, v string) {
@@ -149,19 +143,6 @@ func (r *Receiver) change(name, v string) {
 }
 
 func (r *Receiver) SetSkip(text string) { r.change("youtube.skip", text) }
-
-func (r *Receiver) SetLiveDelay(seconds int) {
-	seconds = min(max(seconds, schema.LiveDelayLeast), schema.LiveDelayMost)
-	r.change("youtube.livedelay", strconv.Itoa(seconds))
-}
-
-func (r *Receiver) SetLoungeOnDemand(on bool) {
-	if on {
-		r.change("youtube.lounge", loungeDemand)
-		return
-	}
-	r.change("youtube.lounge", loungeAlways)
-}
 
 func (r *Receiver) SetOracle(url string) {
 	url = strings.TrimSpace(url)
@@ -248,17 +229,6 @@ func (r *Receiver) Close() error {
 	r.server.Down()
 	return nil
 }
-
-func (r *Receiver) PrimeRegistered() bool { return r.server.Registered() }
-
-func (r *Receiver) ResetPrime() {
-	r.server.ForgetRegistrations()
-	slog.Info("prime video registration reset")
-}
-
-func (r *Receiver) SetPrimeSkipIntro(on bool) { r.change("prime.skipintro", setting.OnOff(on)) }
-
-func (r *Receiver) SetPrimePersist(on bool) { r.change("prime.persist", setting.OnOff(on)) }
 
 func (r *Receiver) SetReceiver(on bool) { r.change("receiver", setting.OnOff(on)) }
 

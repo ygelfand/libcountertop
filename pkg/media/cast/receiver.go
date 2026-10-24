@@ -44,7 +44,8 @@ type Receiver struct {
 
 	Volume func(level float64, muted bool)
 
-	Launched func(app string)
+	Describe func(app string) AppConfig
+	Launched func(app App)
 	Stopped  func(app string)
 
 	Loaded func(m Media)
@@ -184,6 +185,16 @@ func (r *Receiver) State() string { return r.state }
 func (r *Receiver) Media() *Media { return r.media }
 
 func (r *Receiver) Receive(m Message) ([]Message, error) {
+	if o := r.owner(); o != nil && m.Destination == r.app.TransportID &&
+		m.Namespace != NSHeartbeat {
+		var out []Message
+		if m.Namespace == NSConnection {
+			out, _ = r.connection(m)
+		}
+		more, err := o.Receive(r.app, m)
+		return append(out, more...), err
+	}
+
 	switch m.Namespace {
 	case NSConnection:
 		return r.connection(m)
@@ -351,6 +362,13 @@ func sessionID() string {
 func (r *Receiver) start(app string) {
 	id := sessionID()
 	known := Lookup(app)
+	if r.Describe != nil {
+		c := r.Describe(app)
+		known.Name, known.Icon = c.Name, c.Icon
+	}
+	if known.Name == "" {
+		known.Name = app
+	}
 
 	r.app = &Application{
 		AppID:          app,
@@ -368,7 +386,7 @@ func (r *Receiver) start(app string) {
 	r.bracket(known, true)
 
 	if r.Launched != nil {
-		r.Launched(app)
+		r.Launched(known)
 	}
 }
 
@@ -684,6 +702,13 @@ func (r *Receiver) Finished() []Message {
 		return nil
 	}
 	return []Message{r.mediaBroadcast(status)}
+}
+
+func (r *Receiver) Done() []Message {
+	if r.appMedia.control == nil && r.Player != nil && r.session != 0 {
+		return r.Finished()
+	}
+	return r.End()
 }
 
 func (r *Receiver) Forget() {

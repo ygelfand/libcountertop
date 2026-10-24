@@ -333,28 +333,15 @@ camera.setting.whitebalance: White balance
 camera.starting: Starting the camera
 camera.muted: Microphones are muted
 camera.shutter: Camera shutter is closed
-cast.group.primevideo: Prime Video
-cast.apps: Apps
 cast.enable: Enable
 cast.entity.receiver: Cast receiver
-cast.entity.youtube.livedelay: YouTube live delay
 cast.entity.youtube.lounge: YouTube lounge
 cast.entity.youtube.skip: YouTube SponsorBlock categories
 cast.group.cast: Cast
+cast.starting: Starting {{.Name}}…
 cast.option.youtube.lounge.always: Always
 cast.option.youtube.lounge.demand: On demand
-cast.prime: Prime Video
-cast.prime.persist: Persistent registration
-cast.prime.persist.hint: Every cast plays as the account that registered first
-cast.prime.registered: Registered
-cast.prime.reset: Reset registration
-cast.prime.skipintro: Skip intro
-cast.prime.skipintro.hint: Start after Amazon's opening bumper
-cast.prime.unregistered: Not registered
-cast.setting.prime.persist: Prime Video persistent registration
-cast.setting.prime.skipintro: Prime Video skip intro
 cast.setting.receiver: Receiver
-cast.setting.youtube.livedelay: YouTube live delay
 cast.setting.youtube.lounge: YouTube lounge
 cast.example.youtube.skip: sponsor, selfpromo, intro
 cast.setting.youtube.skip: SponsorBlock categories
@@ -390,7 +377,11 @@ debug.fps: Visual frame rate limit
 diag.group.diagnostics: Diagnostics
 diag.setting.interval: Metrics interval
 diag.setting.min_cores: Minimum CPU cores
+diag.setting.low_memory: Low memory mode
+diag.setting.page_memory: Page memory limit
+diag.option.page_memory.none: No limit
 debug.fps.value: "{{.N}} fps"
+debug.page_memory.value: "{{.N}} MB"
 debug.seed: Visual seed
 debug.seed.random: Random
 debug.seed.value: "#{{.N}}"
@@ -661,6 +652,8 @@ photos.status.unset: Not set up
 place.horizontal: Horizontal position
 place.size: Size
 place.vertical: Vertical position
+player.ad: Ad
+player.ad_clip: Ad {{.Clip}} of {{.Clips}}
 player.live: LIVE
 player.next: Up next
 player.now: Now playing
@@ -1183,15 +1176,9 @@ youtube.category.outro: Outro
 youtube.category.preview: Preview
 youtube.category.selfpromo: Self-promotion
 youtube.category.sponsor: Sponsor
-youtube.delay: Live delay
-youtube.delay.hint: How far behind live a stream plays
-youtube.delay.value: "{{.N}} s"
-youtube.demand: Connect only when casting
-youtube.demand.hint: Otherwise stays connected to YouTube
 youtube.skip: Skip segments
 youtube.skip.none: None
 youtube.skip.some: "{{.N}} kinds"
-youtube.title: YouTube
 zone.title: Time zone
 
 feedback.group.feedback: Feedback sounds

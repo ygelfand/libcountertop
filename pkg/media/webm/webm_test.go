@@ -9,6 +9,26 @@ import (
 	"testing"
 )
 
+const (
+	idEBML               = 0x1A45DFA3
+	idTrackEntry         = 0xAE
+	idTrackNumber        = 0xD7
+	idCodecID            = 0x86
+	idCodecPrivate       = 0x63A2
+	idAudio              = 0xE1
+	idSampleRate         = 0xB5
+	idChannels           = 0x9F
+	idVideo              = 0xE0
+	idPixelWidth         = 0xB0
+	idPixelHeight        = 0xBA
+	idCuePoint           = 0xBB
+	idCueTime            = 0xB3
+	idCueTrackPositions  = 0xB7
+	idCueClusterPosition = 0xF1
+	idBlock              = 0xA1
+	idReferenceBlock     = 0xFB
+)
+
 func el(id uint64, body []byte) []byte {
 	var out []byte
 	switch {
@@ -208,6 +228,39 @@ func TestTheIndexJumpsStraightToACluster(t *testing.T) {
 	}
 	if _, _, ok := r.Cue(-1); ok {
 		t.Error("a time before the first cue found one")
+	}
+}
+
+func TestLacedAndGroupedBlocksReadBack(t *testing.T) {
+	tracks := el(
+		idTracks,
+		el(idTrackEntry, cat(el(idTrackNumber, u(1)), el(idCodecID, []byte("A_AAC")))),
+	)
+	laced := append([]byte{0x81, 0, 0, 0x80 | 0x04, 2}, "aabbcc"...)
+	plain := func(data string) []byte { return append([]byte{0x81, 0, 10, 0}, data...) }
+	cluster := el(idCluster, cat(
+		el(idTimecode, u(0)),
+		el(idSimpleBlock, laced),
+		el(idBlockGroup, el(idBlock, plain("key"))),
+		el(idBlockGroup, cat(el(idBlock, plain("delta")), el(idReferenceBlock, []byte{0xF6}))),
+	))
+	s := cat(el(idEBML, el(0x4282, []byte("matroska"))), el(idSegment, cat(tracks, cluster)))
+
+	r := NewReader(bytes.NewReader(s))
+	for i, w := range []Frame{
+		{Data: []byte("aa"), Key: true},
+		{Data: []byte("bb"), Key: true},
+		{Data: []byte("cc"), Key: true},
+		{Time: 10_000_000, Data: []byte("key"), Key: true},
+		{Time: 10_000_000, Data: []byte("delta")},
+	} {
+		f, err := r.Next()
+		if err != nil {
+			t.Fatalf("frame %d: %v", i, err)
+		}
+		if f.Time != w.Time || string(f.Data) != string(w.Data) || f.Key != w.Key {
+			t.Errorf("frame %d is %+v, want %+v", i, f, w)
+		}
 	}
 }
 

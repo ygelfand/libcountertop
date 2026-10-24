@@ -7,17 +7,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/pion/opus"
 
-	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/hls"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/media/sponsorblock"
 	"github.com/ygelfand/libcountertop/pkg/media/webm"
 )
 
@@ -46,49 +44,19 @@ type track struct {
 	left     []int16
 	frame    []int16
 
-	skips   []Segment
+	skips   []sponsorblock.Segment
 	jumping bool
 
-	live  *hls.Stream
-	base  time.Time
-	prefs preferences.Provider
-
-	tv TVStream
+	live *hls.Stream
+	base time.Time
 }
 
-type TVRequest struct {
-	HTTP     *http.Client
-	Resample func(from int) func([]int16) []int16
-	Limits   playback.Target
-	Prefs    preferences.Provider
-	ID       string
-	Params   string
-	CTT      string
-	At       time.Duration
-}
-
-type TVStream interface {
-	Info() Track
-	Read(ctx context.Context, out []int16) (int, error)
-	Picture() playback.Picture
-	Showing() (info Track, album, mark string)
-	OnChange(func())
-	Close()
-}
-
-type TV func(context.Context, TVRequest) (TVStream, error)
+var errJumping = errors.New("youtube: jumping past a segment")
 
 var (
-	errJumping = errors.New("youtube: jumping past a segment")
-	errNoTV    = errors.New("youtube tv: this device does not play YouTube TV")
-)
-
-var (
-	_ playback.Source   = (*track)(nil)
-	_ playback.Pictures = (*track)(nil)
-	_ playback.Seeker   = (*track)(nil)
-	_ playback.Marked   = (*track)(nil)
-	_ playback.Live     = (*track)(nil)
+	_ playback.Source = (*track)(nil)
+	_ playback.Seeker = (*track)(nil)
+	_ playback.Marked = (*track)(nil)
 )
 
 func openTrack(
@@ -98,10 +66,7 @@ func openTrack(
 	id string,
 	at time.Duration,
 ) (*track, error) {
-	if st != nil && st.theme == ThemeTV {
-		return openTV(ctx, st, id, at)
-	}
-	skips := make(chan []Segment, 1)
+	skips := make(chan []sponsorblock.Segment, 1)
 	go func() { skips <- st.segments(ctx, r, id) }()
 
 	info, stream, err := r.Audio(ctx, id)
@@ -127,7 +92,6 @@ func openLive(
 	l *Live,
 	at time.Duration,
 ) (*track, error) {
-	lead := LiveLead(r.Preferences)
 	var from time.Time
 	if WallClock(at) {
 		from = time.Unix(0, int64(at))
@@ -138,9 +102,7 @@ func openLive(
 		hls.Options{
 			HTTP:     r.http,
 			Ask:      ask,
-			Tallest:  r.limits().Tallest,
-			Fastest:  r.limits().Fastest,
-			Lead:     lead,
+			Lead:     liveLead,
 			From:     from,
 			Resample: r.Resample,
 		},
@@ -148,7 +110,7 @@ func openLive(
 	if err != nil {
 		return nil, fmt.Errorf("youtube: %s: %w", l.Track.ID, err)
 	}
-	t := &track{info: l.Track, station: st, live: s, prefs: r.Preferences}
+	t := &track{info: l.Track, station: st, live: s}
 	if oldest, _, ok := s.Window(); ok {
 		t.base = oldest
 	}
@@ -166,157 +128,20 @@ func openLive(
 	return t, nil
 }
 
-func openTV(ctx context.Context, st *station, id string, at time.Duration) (*track, error) {
-	if st.tv == nil {
-		return nil, errNoTV
-	}
-	st.mu.Lock()
-	ctt, params := st.ctt, st.params
-	st.mu.Unlock()
-	u, err := st.tv(ctx, TVRequest{
-		HTTP:     st.env.HTTP,
-		Resample: st.env.Resample,
-		Limits:   st.resolve.limits(),
-		Prefs:    st.env.Preferences,
-		ID:       id,
-		Params:   params,
-		CTT:      ctt,
-		At:       at,
-	})
-	if err != nil {
-		return nil, err
-	}
-	t := &track{info: u.Info(), station: st, tv: u}
-	if st.env.Output != nil {
-		u.OnChange(func() { st.env.Output.Changed(t) })
-	}
-	return t, nil
-}
-
 const (
 	wallFloor   = 20 * 365 * 24 * time.Hour
 	rewindLeast = time.Minute
 	liveSlack   = 15 * time.Second
+	liveLead    = 10 * time.Second
 )
 
 func WallClock(at time.Duration) bool { return at > wallFloor }
-
-func LiveLead(p preferences.Provider) time.Duration {
-	return time.Duration(p.Settings().YouTube.LiveDelay) * time.Second
-}
 
 func (t *track) window() (oldest, edge time.Time, ok bool) {
 	if t.live == nil {
 		return time.Time{}, time.Time{}, false
 	}
 	return t.live.Window()
-}
-
-func (r *Resolver) Probe(ctx context.Context, id string, hold, back time.Duration) (string, error) {
-	_, stream, err := r.Audio(ctx, id)
-	l, ok := errors.AsType[*Live](err)
-	if !ok {
-		if stream != nil {
-			stream.Close()
-		}
-		return "", fmt.Errorf("youtube: %s is not live: %v", id, err)
-	}
-	var from time.Duration
-	if back > 0 {
-		from = time.Duration(time.Now().Add(-back).UnixNano())
-	}
-	t, err := openLive(ctx, r, nil, l, from)
-	if err != nil {
-		return "", err
-	}
-	defer t.close()
-
-	type seen struct {
-		n           int
-		first, last time.Duration
-		bytes       int
-		err         error
-	}
-	frames := make(chan seen, 1)
-	go func() {
-		var s seen
-		for {
-			f, err := t.live.Next(ctx)
-			if err != nil {
-				s.err = err
-				break
-			}
-			if s.n == 0 {
-				s.first = f.At
-			}
-			s.n, s.last, s.bytes = s.n+1, f.At, s.bytes+len(f.Data)
-			if s.last-s.first >= hold {
-				break
-			}
-		}
-		frames <- s
-	}()
-
-	buf := make([]int16, 4800)
-	var samples int
-	var aerr error
-	end := time.After(hold)
-read:
-	for {
-		select {
-		case <-end:
-			break read
-		default:
-		}
-		n, err := t.live.Read(buf)
-		samples += n / channels
-		if err != nil {
-			aerr = err
-			break
-		}
-		if n == 0 {
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-	t.live.Close()
-	f := <-frames
-	var b strings.Builder
-	fmt.Fprintf(&b, "picture   %dx%d\n", t.live.Width, t.live.Height)
-	if oldest, edge, ok := t.window(); ok {
-		began := t.live.Began()
-		fmt.Fprintf(
-			&b,
-			"window    %v long, oldest %s, edge %s\n",
-			edge.Sub(oldest).Round(time.Second),
-			oldest.Format(time.TimeOnly),
-			edge.Format(time.TimeOnly),
-		)
-		fmt.Fprintf(
-			&b,
-			"began     %s, %v behind the edge, position %v\n",
-			began.Format(time.TimeOnly),
-			edge.Sub(began).Round(time.Second),
-			t.Start().Round(time.Second),
-		)
-	} else {
-		fmt.Fprintf(&b, "window    none\n")
-	}
-	fmt.Fprintf(
-		&b,
-		"audio     %v decoded (at the source rate), err %v\n",
-		time.Duration(samples)*time.Second/rate,
-		aerr,
-	)
-	fmt.Fprintf(
-		&b,
-		"frames    %d, %d bytes, %v to %v, err %v\n",
-		f.n,
-		f.bytes,
-		f.first,
-		f.last,
-		f.err,
-	)
-	return b.String(), nil
 }
 
 func newTrack(info Track, stream io.ReadCloser, st *station, at time.Duration) (*track, error) {
@@ -389,9 +214,6 @@ func (t *track) Read(ctx context.Context, pcm []int16) (int, error) {
 	if t.live != nil {
 		return t.readLive(t.live.Read, pcm)
 	}
-	if t.tv != nil {
-		return t.readLive(func(out []int16) (int, error) { return t.tv.Read(ctx, out) }, pcm)
-	}
 
 	n := 0
 	for n < len(pcm) {
@@ -440,7 +262,7 @@ func (t *track) decode() error {
 		if at < t.start {
 			continue
 		}
-		if s, ok := inside(t.skips, t.start, at); ok {
+		if s, ok := sponsorblock.Inside(t.skips, t.start, at); ok {
 			t.jumping = true
 			if t.station != nil {
 				go t.station.skipWhenHeard(t, s)
@@ -477,8 +299,6 @@ func (t *track) Logo() string {
 	return t.station.logo()
 }
 
-func (t *track) Pictured() bool { return t.station != nil && t.station.pictured() }
-
 func (t *track) Waiting(w bool) {
 	if t.station == nil {
 		return
@@ -498,36 +318,10 @@ func (t *track) tell() {
 	t.station.report(t.station.state())
 }
 
-func (s *station) pictured() bool {
-	return s.env.Video != nil && (s.theme == ThemeYouTube || s.theme == ThemeTV)
-}
-
-func (t *track) Pictures(ctx context.Context) (io.ReadCloser, time.Duration, error) {
-	if !t.Pictured() {
-		return nil, 0, nil
-	}
-	_, stream, err := t.station.resolve.Video(ctx, t.info.ID)
-	return stream, t.start, err
-}
-
-func (t *track) Marks() []playback.Mark { return marks(t.skips) }
-
-func (t *track) Live(context.Context) (playback.Picture, error) {
-	if t.tv != nil {
-		return t.tv.Picture(), nil
-	}
-	if t.live == nil {
-		return playback.Picture{}, nil
-	}
-	next := func(ctx context.Context) ([]byte, time.Duration, error) {
-		f, err := t.live.Next(ctx)
-		return f.Data, f.At + t.Start(), err
-	}
-	return playback.Picture{H264: true, Width: t.live.Width, Height: t.live.Height, Next: next}, nil
-}
+func (t *track) Marks() []playback.Mark { return sponsorblock.Marks(t.skips) }
 
 func (t *track) Seek(to time.Duration) {
-	if t.station == nil || t.tv != nil {
+	if t.station == nil {
 		return
 	}
 	if t.live == nil {
@@ -551,10 +345,6 @@ func (t *track) Start() time.Duration {
 }
 
 func (t *track) close() {
-	if t.tv != nil {
-		t.tv.Close()
-		return
-	}
 	if t.live != nil {
 		t.live.Close()
 		return
@@ -569,13 +359,9 @@ func (t *track) Showing() playback.Showing {
 		Art:    t.info.Thumbnail,
 		Length: t.info.Duration,
 	}
-	if t.tv != nil {
-		info, album, mark := t.tv.Showing()
-		s.Title, s.Artist, s.Album, s.Art, s.Mark = info.Title, info.Author, album, info.Thumbnail, mark
-	}
 	if oldest, edge, ok := t.window(); ok && edge.Sub(oldest) >= rewindLeast && !t.base.IsZero() {
 		s.Length = edge.Sub(t.base)
-		s.LiveWithin = LiveLead(t.prefs) + liveSlack
+		s.LiveWithin = liveLead + liveSlack
 	}
 	if t.station != nil {
 		s.HasPrevious, s.HasNext = t.station.around()

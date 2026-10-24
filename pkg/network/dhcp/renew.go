@@ -27,7 +27,13 @@ func renewMessage(
 		dhcpv4.WithHwAddr(mac),
 		dhcpv4.WithMessageType(dhcpv4.MessageTypeRequest),
 		dhcpv4.WithOption(dhcpv4.OptHostName(hostname)),
-		dhcpv4.WithRequestedOptions(dhcpv4.OptionNTPServers),
+		dhcpv4.WithRequestedOptions(
+			dhcpv4.OptionSubnetMask,
+			dhcpv4.OptionRouter,
+			dhcpv4.OptionDomainName,
+			dhcpv4.OptionDomainNameServer,
+			dhcpv4.OptionNTPServers,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("dhcp: building a renewal: %w", err)

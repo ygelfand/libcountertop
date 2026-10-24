@@ -35,8 +35,8 @@ func (a *App) root(w *gogui.Window) gogui.View {
 	}
 	a.seeThrough(covering != nil && covering.Clear)
 	layers := []gogui.View{a.base(w, covering)}
-	if shown, _ := a.o.Shell.Dock(); shown && covering == nil && a.o.Offering() == "" {
-		layers = append(layers, widgets.Floating(0, a.rail(w)))
+	if shown, _ := a.o.Shell.Dock(); shown && a.o.Shell.Docked() && a.o.Offering() == "" {
+		layers = append(layers, widgets.Floating(0, a.rail(w, covering)))
 	}
 	for _, s := range above {
 		layers = append(layers, widgets.Floating(0, s.Build(w)))

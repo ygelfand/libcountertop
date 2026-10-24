@@ -121,7 +121,7 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 	r.Player = p
 
 	var launched, stopped string
-	r.Launched = func(app string) { launched = app }
+	r.Launched = func(app App) { launched = app.ID }
 	r.Stopped = func(app string) { stopped = app }
 
 	if out, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil || len(out) != 0 {

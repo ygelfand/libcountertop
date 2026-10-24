@@ -171,13 +171,21 @@ func (a *Server) Run(ctx context.Context) error {
 	}
 
 	for {
+		select {
+		case <-a.reconnect:
+		default:
+		}
+		if err := a.register(); err != nil {
+			return err
+		}
 		ln, err := net.Listen("tcp", a.srv.Addr)
 		if err != nil {
 			return fmt.Errorf("api: listen %s: %w", a.srv.Addr, err)
 		}
 		port := ln.Addr().(*net.TCPAddr).Port
 		a.port.Store(int32(port))
-		slog.Info("serving", "addr", ln.Addr(), "node", a.srv.Info.Name)
+		slog.Info("serving", "addr", ln.Addr(), "node", a.srv.Info.Name,
+			"bluetooth", a.srv.Info.BluetoothFeatures)
 
 		a.announced.Do(func() {
 			safe.Go("mdns", func() { a.advertise(ctx, port) })
@@ -199,11 +207,6 @@ func (a *Server) Run(ctx context.Context) error {
 		if err != nil || ctx.Err() != nil {
 			return err
 		}
-
-		if err := a.register(); err != nil {
-			return err
-		}
-		slog.Info("serving again", "bluetooth", a.srv.Info.BluetoothFeatures)
 	}
 }
 

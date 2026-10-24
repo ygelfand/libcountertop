@@ -116,6 +116,7 @@ const (
 const (
 	SampleKey = 1 << iota
 	SampleEnd
+	SampleHide
 )
 
 type Played struct {

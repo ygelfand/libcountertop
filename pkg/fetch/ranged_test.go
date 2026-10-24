@@ -87,6 +87,37 @@ func TestSeekStartsAgainFromTheOffset(t *testing.T) {
 	}
 }
 
+func TestSeekReadsWhereverItLands(t *testing.T) {
+	body := content(1000)
+	url, _ := served(t, body)
+	r := NewRanged(context.Background(), http.DefaultClient, url, 0, Chunks{Size: 100, Ahead: 2})
+	defer r.Close()
+
+	for _, c := range []struct {
+		offset int64
+		whence int
+		want   int64
+	}{
+		{120, io.SeekStart, 120},
+		{30, io.SeekCurrent, 160},
+		{900, io.SeekStart, 900},
+		{-50, io.SeekEnd, 950},
+		{10, io.SeekStart, 10},
+	} {
+		at, err := r.Seek(c.offset, c.whence)
+		if err != nil || at != c.want {
+			t.Fatalf("seek %d from %d: at %d, %v; want %d", c.offset, c.whence, at, err, c.want)
+		}
+		got := make([]byte, 10)
+		if _, err := io.ReadFull(r, got); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, body[c.want:c.want+10]) {
+			t.Errorf("after seeking to %d, read bytes that do not match", c.want)
+		}
+	}
+}
+
 func TestARefusedChunkIsTriedAgainAtAFreshURL(t *testing.T) {
 	body := content(300)
 	var refused atomic.Bool

@@ -1,22 +1,17 @@
 package firmware
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
+	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 )
 
 type Options struct {
@@ -40,7 +35,7 @@ type Helper struct {
 	frame *Frame
 
 	mu   sync.Mutex
-	proc *os.Process
+	proc *payload.Process
 }
 
 func Open(o Options) (*Helper, error) {
@@ -80,58 +75,35 @@ func (h *Helper) Prefer(prefs []byte) error {
 func (h *Helper) prefsPath() string { return filepath.Join(h.opts.Dir, "prefs") }
 
 func (h *Helper) Run(ctx context.Context) error {
-	backoff := time.Second
-	for {
-		began := time.Now()
-		err := h.session(ctx)
-		if ctx.Err() != nil {
-			return nil
-		}
-		if time.Since(began) > time.Minute {
-			backoff = time.Second
-		}
-		slog.Warn("tessera helper stopped", "err", err, "restart_in", backoff)
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(backoff):
-		}
-		backoff = min(2*backoff, 30*time.Second)
-	}
+	return service.Keep(ctx, "tessera", h.session)
 }
 
 func (h *Helper) session(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, h.opts.Helper)
-	cmd.Dir = h.opts.Dir
-	cmd.Env = append(os.Environ(),
-		"HOME="+h.opts.Dir,
-		"TESSERA_FB="+h.frame.path,
-		"TESSERA_WIDTH="+strconv.Itoa(h.opts.Width),
-		"TESSERA_HEIGHT="+strconv.Itoa(h.opts.Height),
-		"TESSERA_DPI="+strconv.Itoa(h.opts.DPI),
-		"TESSERA_UPRIGHT="+flag(h.opts.Upright),
-		"TESSERA_LANGUAGE="+h.opts.Language,
-		"TESSERA_PRODUCT="+h.opts.Product,
-		"TESSERA_BOARD="+h.opts.Board,
-	)
+	env := []string{
+		"HOME=" + h.opts.Dir,
+		"TESSERA_FB=" + h.frame.path,
+		"TESSERA_WIDTH=" + strconv.Itoa(h.opts.Width),
+		"TESSERA_HEIGHT=" + strconv.Itoa(h.opts.Height),
+		"TESSERA_DPI=" + strconv.Itoa(h.opts.DPI),
+		"TESSERA_UPRIGHT=" + flag(h.opts.Upright),
+		"TESSERA_LANGUAGE=" + h.opts.Language,
+		"TESSERA_PRODUCT=" + h.opts.Product,
+		"TESSERA_BOARD=" + h.opts.Board,
+	}
 	if h.opts.Port > 0 {
-		cmd.Env = append(cmd.Env, "TESSERA_PORT="+strconv.Itoa(h.opts.Port))
+		env = append(env, "TESSERA_PORT="+strconv.Itoa(h.opts.Port))
 	}
 	if h.opts.Columns > 0 && h.opts.Rows > 0 {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("TESSERA_GRID=%dx%d,%dx%d",
+		env = append(env, fmt.Sprintf("TESSERA_GRID=%dx%d,%dx%d",
 			h.opts.Columns, h.opts.Rows, h.opts.Rows, h.opts.Columns))
 	}
-	cmd.SysProcAttr = payload.DiesWithParent()
-	out, err := cmd.StdoutPipe()
+	proc, err := h.launch(env)
 	if err != nil {
-		return fmt.Errorf("tessera: %w", err)
-	}
-	cmd.Stderr = cmd.Stdout
-	if err := h.launch(cmd); err != nil {
 		return err
 	}
-	logLines(out)
-	err = cmd.Wait()
+	stop := context.AfterFunc(ctx, proc.Stop)
+	defer stop()
+	err = proc.Wait()
 	h.mu.Lock()
 	h.proc = nil
 	h.mu.Unlock()
@@ -141,20 +113,26 @@ func (h *Helper) session(ctx context.Context) error {
 	return err
 }
 
-func (h *Helper) launch(cmd *exec.Cmd) error {
+func (h *Helper) launch(env []string) (*payload.Process, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if len(h.opts.Prefs) > 0 {
 		if err := os.WriteFile(h.prefsPath(), h.opts.Prefs, 0o600); err != nil {
-			return fmt.Errorf("tessera: %w", err)
+			return nil, fmt.Errorf("tessera: %w", err)
 		}
-		cmd.Env = append(cmd.Env, "TESSERA_PREFS="+h.prefsPath())
+		env = append(env, "TESSERA_PREFS="+h.prefsPath())
 	}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("tessera: start %s: %w", h.opts.Helper, err)
+	proc, err := payload.Start(payload.Command{
+		Path: h.opts.Helper,
+		Dir:  h.opts.Dir,
+		Env:  env,
+		Log:  "tessera",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("tessera: %w", err)
 	}
-	h.proc = cmd.Process
-	return nil
+	h.proc = proc
+	return proc, nil
 }
 
 func flag(on bool) string {
@@ -162,16 +140,4 @@ func flag(on bool) string {
 		return "1"
 	}
 	return "0"
-}
-
-var escape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-
-func logLines(r io.Reader) {
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		slog.Debug("tessera", "line", escape.ReplaceAllString(s.Text(), ""))
-	}
-	if err := s.Err(); err != nil {
-		slog.Debug("tessera log ended", "err", err)
-	}
 }

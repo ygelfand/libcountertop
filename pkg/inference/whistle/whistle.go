@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/vad"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
+	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 )
 
 type Source interface {
@@ -100,27 +100,7 @@ func (c *Client) Run(ctx context.Context) error {
 	if c.opts.Source == nil {
 		return errors.New("whistle: no microphone source")
 	}
-	backoff := time.Second
-	for {
-		began := time.Now()
-		err := c.session(ctx)
-		if ctx.Err() != nil {
-			return nil
-		}
-		if errors.Is(err, errVersion) {
-			return err
-		}
-		if time.Since(began) > time.Minute {
-			backoff = time.Second
-		}
-		slog.Warn("voice helper stopped", "err", err, "restart_in", backoff)
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(backoff):
-		}
-		backoff = min(2*backoff, 30*time.Second)
-	}
+	return service.Keep(ctx, "voice", c.session)
 }
 
 func (c *Client) session(ctx context.Context) error {
@@ -140,20 +120,18 @@ func (c *Client) session(ctx context.Context) error {
 	theirs := os.NewFile(uintptr(fds[1]), "voice-helper")
 	defer ours.Close()
 
-	cmd := exec.Command(c.opts.Helper, c.opts.Model, strconv.Itoa(c.opts.Depth))
-	cmd.ExtraFiles = []*os.File{theirs}
-	cmd.SysProcAttr = payload.DiesWithParent()
-	cmd.Stderr = os.Stderr
-	err = cmd.Start()
+	proc, err := payload.Start(payload.Command{
+		Path:  c.opts.Helper,
+		Args:  []string{c.opts.Model, strconv.Itoa(c.opts.Depth)},
+		Files: []*os.File{theirs},
+	})
 	theirs.Close()
 	if err != nil {
-		return fmt.Errorf("whistle: start %s: %w", c.opts.Helper, err)
+		return fmt.Errorf("whistle: %w", err)
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
 	defer func() {
 		ours.Close()
-		if err := <-exited; err != nil {
+		if err := proc.Wait(); err != nil {
 			slog.Debug("voice helper exit", "err", err)
 		}
 	}()
@@ -163,6 +141,9 @@ func (c *Client) session(ctx context.Context) error {
 		return fmt.Errorf("whistle: waiting for ready: %w", err)
 	}
 	depth, err := ready(first)
+	if errors.Is(err, errVersion) {
+		return service.Permanent(err)
+	}
 	if err != nil {
 		return err
 	}

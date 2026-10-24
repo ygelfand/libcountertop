@@ -12,6 +12,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
@@ -21,6 +22,8 @@ const (
 
 var (
 	videoInk   = gogui.Color{R: 0xf2, G: 0xf2, B: 0xf2, A: 0xff}
+	adFill     = gogui.Color{R: 0xff, G: 0xcc, A: 0xff}
+	adInk      = gogui.Color{R: 0x10, G: 0x10, B: 0x10, A: 0xff}
 	videoQuiet = gogui.Color{R: 0xb0, G: 0xb0, B: 0xb0, A: 0xff}
 	videoScrim = gogui.Color{A: scrimAlpha}
 )
@@ -67,6 +70,7 @@ func (pv *Renderer) Video(w *gogui.Window, p *videoplayer.Page) gogui.View {
 		)
 	}
 	if look.Shown {
+		bottom := pv.railRoom()
 		layers = append(layers, floatAt(0, 0, float32(vw), 0, pv.videoHeader(p)))
 		layers = append(layers, gogui.Column(gogui.ContainerCfg{
 			Float:       true,
@@ -74,9 +78,14 @@ func (pv *Renderer) Video(w *gogui.Window, p *videoplayer.Page) gogui.View {
 			FloatTieOff: gogui.FloatBottomLeft,
 			Width:       float32(vw),
 			Sizing:      gogui.FixedFit,
-			Padding:     gogui.NoPadding,
+			Padding:     gogui.Padding{Bottom: bottom},
 			Content:     []gogui.View{pv.videoBand(w, p, look)},
 		}))
+	}
+	if look.Controls != nil {
+		if b := look.Controls.Now().Break; b != nil {
+			layers = append(layers, pv.ad(b))
+		}
 	}
 
 	cfg := full
@@ -92,6 +101,21 @@ func (pv *Renderer) Video(w *gogui.Window, p *videoplayer.Page) gogui.View {
 		e.Window.InvalidateLayout()
 	}
 	return gogui.Column(cfg)
+}
+
+func (pv *Renderer) railRoom() float32 {
+	shown, pinned := pv.options.Shell.Dock()
+	if !shown || pinned || pv.options.Dock == nil || pv.options.Dock() != schema.EdgeBottom {
+		return 0
+	}
+	return widgets.RailDepth()
+}
+
+func liveAt(now nowplaying.Now) time.Duration {
+	if now.Edge > 0 {
+		return now.Edge
+	}
+	return now.Length
 }
 
 func floatAt(x, y, w, h float32, v gogui.View) gogui.View {
@@ -122,6 +146,11 @@ func centredImage(src string, w, h float32) gogui.View {
 }
 
 func backdrop(look videoplayer.Look, vw, vh int) gogui.View {
+	if look.Backdrop != nil && look.Note == "" {
+		bw, bh := look.Backdrop.Size()
+		scale := min(float32(vw)/float32(max(bw, 1)), float32(vh)/float32(max(bh, 1)))
+		return centredImage(Still(look.Backdrop), float32(bw)*scale, float32(bh)*scale)
+	}
 	side := float32(min(vw, vh)) * 2 / 5
 	var content []gogui.View
 	if look.Logo != nil {
@@ -155,6 +184,8 @@ func backdrop(look videoplayer.Look, vw, vh int) gogui.View {
 }
 
 func (pv *Renderer) videoHeader(p *videoplayer.Page) gogui.View {
+	back := iconStyle(videoInk)
+	back.Size = reach() * 0.9
 	return gogui.Row(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
 		Padding: gogui.PaddingLarge,
@@ -163,7 +194,7 @@ func (pv *Renderer) videoHeader(p *videoplayer.Page) gogui.View {
 			pv.options.UI.Presses.Button(
 				"video-back",
 				gogui.IconArrowLeft,
-				iconStyle(videoInk),
+				back,
 				gogui.Color{},
 				func(e gogui.EventCtx) {
 					pv.options.Shell.Remove(p)
@@ -187,7 +218,7 @@ func (pv *Renderer) videoBand(
 		title = c.Label()
 	}
 	head := gogui.CurrentTheme().TextStyleDef
-	head.Color = videoInk
+	head.Color, head.Size = videoInk, head.Size*1.6
 	quiet := gogui.CurrentTheme().TextStyleDef
 	quiet.Color = videoQuiet
 
@@ -197,7 +228,12 @@ func (pv *Renderer) videoBand(
 	}
 	heading := []gogui.View{
 		gogui.Column(
-			gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: words},
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				Clip:    true,
+				Content: words,
+			},
 		),
 	}
 	if mark := ui.Picture(now.Mark, now.MarkID); mark != nil && vw > vh {
@@ -234,11 +270,23 @@ func (pv *Renderer) videoBand(
 			marks = mk.Marks()
 		}
 		rows = append(rows, pv.progress(w, now, sk, quiet, marks))
-		if now.LiveWithin > 0 {
-			rows = append(rows, pv.live(now, c, quiet))
-		}
 	}
-	rows = append(rows, pv.videoTransport(p, now, c), pv.loudness())
+	if now.LiveWithin > 0 {
+		rows = append(rows, pv.live(now, c, quiet))
+	}
+	side := reach() * 5
+	rows = append(rows, gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		Padding: gogui.NoPadding,
+		VAlign:  gogui.VAlignMiddle,
+		Content: []gogui.View{
+			pv.videoVolume(side),
+			pv.videoTransport(p, now, c),
+			gogui.Row(
+				gogui.ContainerCfg{Sizing: gogui.FixedFit, Width: side, Padding: gogui.NoPadding},
+			),
+		},
+	}))
 
 	return gogui.Column(gogui.ContainerCfg{
 		ID:      "video-band",
@@ -261,7 +309,8 @@ func (pv *Renderer) live(
 ) gogui.View {
 	fill := widgets.Color(pv.options.UI.Palette().Danger)
 	var content []gogui.View
-	if behind := now.Length - now.Elapsed; behind > now.LiveWithin {
+	edge := liveAt(now)
+	if behind := edge - now.Elapsed; behind > now.LiveWithin {
 		fill = gogui.Color{R: 0x60, G: 0x60, B: 0x60, A: 0xff}
 		content = append(content, gogui.Label("-"+ClockText(behind), st))
 	}
@@ -271,7 +320,6 @@ func (pv *Renderer) live(
 	)
 	pill := gogui.CurrentTheme().TextStyleDef
 	pill.Color = videoInk
-	length := now.Length
 	content = append(content, pv.options.UI.Presses.Pressable(gogui.Row, gogui.ContainerCfg{
 		ID:      "video-live",
 		Color:   fill,
@@ -279,8 +327,8 @@ func (pv *Renderer) live(
 		Padding: gogui.PaddingSmall,
 		Content: []gogui.View{gogui.Label(say.T("player.live"), pill)},
 	}, func(gogui.EventCtx) {
-		if c.CanSeek() {
-			c.Seek(length)
+		if c.CanSeek() && edge > 0 {
+			c.Seek(edge)
 		}
 	}))
 	return gogui.Row(
@@ -291,6 +339,29 @@ func (pv *Renderer) live(
 			Content: content,
 		},
 	)
+}
+
+func (pv *Renderer) ad(b *nowplaying.Break) gogui.View {
+	label := say.T("player.ad")
+	if b.Clips > 0 {
+		label = say.F("player.ad_clip", map[string]any{"Clip": b.Clip, "Clips": b.Clips})
+	}
+	if b.Length > 0 {
+		label += " · " + ClockText(max(b.Length-b.At, 0))
+	}
+	pill := gogui.CurrentTheme().TextStyleDef
+	pill.Color = adInk
+	return gogui.Row(gogui.ContainerCfg{
+		Float:        true,
+		FloatAnchor:  gogui.FloatTopRight,
+		FloatTieOff:  gogui.FloatTopRight,
+		FloatOffsetX: -reach() * 0.5,
+		FloatOffsetY: reach() * 0.5,
+		Color:        adFill,
+		Radius:       gogui.RadiusLarge,
+		Padding:      gogui.PaddingSmall,
+		Content:      []gogui.View{gogui.Label(label, pill)},
+	})
 }
 
 func (pv *Renderer) videoTransport(
@@ -304,7 +375,7 @@ func (pv *Renderer) videoTransport(
 		primary  bool
 		disabled bool
 	}
-	atLive := now.LiveWithin > 0 && now.Length-now.Elapsed <= now.LiveWithin
+	atLive := now.LiveWithin > 0 && liveAt(now) > 0 && liveAt(now)-now.Elapsed <= now.LiveWithin
 	middle := control{glyph: gogui.IconPlay, do: c.Play, primary: true}
 	if now.Playing && !now.Paused {
 		middle = control{glyph: gogui.IconPause, do: c.Pause, primary: true}
@@ -346,10 +417,10 @@ func (pv *Renderer) videoTransport(
 	var buttons []gogui.View
 	for i, b := range shown {
 		st, fill := t.TextStyleIconLarge, gogui.Color{R: 0x2a, G: 0x2a, B: 0x2a, A: 0xff}
-		st.Color, st.Size = videoInk, reach()*0.45
+		st.Color, st.Size = videoInk, reach()*0.9
 		if b.primary {
 			fill = t.Cfg.ColorAccent
-			st.Color, st.Size = t.Cfg.ColorBackground, reach()*0.75
+			st.Color, st.Size = t.Cfg.ColorBackground, reach()*1.2
 		}
 		var do func(gogui.EventCtx)
 		if b.disabled {
@@ -372,10 +443,36 @@ func (pv *Renderer) videoTransport(
 			Sizing:  gogui.FillFit,
 			HAlign:  gogui.HAlignCenter,
 			VAlign:  gogui.VAlignMiddle,
-			Spacing: gogui.SpacingLarge,
+			Spacing: gogui.SpacingPx(reach()),
 			Content: buttons,
 		},
 	)
+}
+
+func (pv *Renderer) videoVolume(width float32) gogui.View {
+	speaker := gogui.CurrentTheme().TextStyleIconLarge
+	speaker.Color, speaker.Size = videoInk, reach()*0.7
+	return gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FixedFit,
+		Width:   width,
+		Padding: gogui.NoPadding,
+		VAlign:  gogui.VAlignMiddle,
+		Spacing: gogui.SpacingMedium,
+		Content: []gogui.View{
+			gogui.Label(gogui.IconSpeaker, speaker),
+			pv.options.UI.Grip(pv.kit.Slider(gogui.SliderCfg{
+				ID:     "media-volume",
+				Height: reach(),
+				Sizing: gogui.FillFit,
+				Value:  float32(pv.options.Volume.Level()),
+				Max:    100,
+				OnChange: func(v float32, e gogui.EventCtx) {
+					pv.options.Volume.Set(int(v + 0.5))
+					e.Window.InvalidateLayout()
+				},
+			})),
+		},
+	})
 }
 
 func nonEmpty(ss ...string) []string {

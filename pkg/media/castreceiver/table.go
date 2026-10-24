@@ -1,10 +1,9 @@
 package castreceiver
 
 import (
-	"strconv"
 	"strings"
 
-	"github.com/ygelfand/libcountertop/pkg/media/cast/protocols/youtube"
+	"github.com/ygelfand/libcountertop/pkg/media/sponsorblock"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -17,8 +16,7 @@ type (
 )
 
 const (
-	Group      = setting.Group("Cast")
-	PrimeGroup = setting.Group("Prime Video")
+	Group = setting.Group("Cast")
 
 	loungeAlways = "always"
 	loungeDemand = "demand"
@@ -28,7 +26,7 @@ func NewTable() *Table {
 	var t *Table
 	t = setting.NewTable(
 		"cast",
-		[]setting.Group{Group, PrimeGroup},
+		[]setting.Group{Group},
 		rows(func() *Table { return t }),
 		setting.Messages{Text: say.T, Missing: say.Missing},
 	)
@@ -57,24 +55,10 @@ func rows(table func() *Table) []Setting {
 			Icon: "mdi:debug-step-over", Kind: setting.Text,
 			Read: func(c *schema.Cast) string { return strings.Join(c.YouTube.Skip, ",") },
 			Write: func(c *schema.Cast, v string) error {
-				c.YouTube.Skip = youtube.ParseCategories(v)
+				c.YouTube.Skip = sponsorblock.ParseCategories(v)
 				if c.YouTube.Skip == nil {
 					c.YouTube.Skip = []string{}
 				}
-				return nil
-			},
-		},
-		{
-			Name: "youtube.livedelay", Group: Group, ID: "youtube_live_delay",
-			Icon: "mdi:timer-sand", Kind: setting.Number, Slider: true,
-			Min: schema.LiveDelayLeast, Max: schema.LiveDelayMost, Unit: "s",
-			Read: func(c *schema.Cast) string { return strconv.Itoa(c.YouTube.LiveDelay) },
-			Write: func(c *schema.Cast, v string) error {
-				n, err := table().MustRow("youtube.livedelay").Number(v)
-				if err != nil {
-					return err
-				}
-				c.YouTube.LiveDelay = n
 				return nil
 			},
 		},
@@ -102,9 +86,5 @@ func rows(table func() *Table) []Setting {
 				return nil
 			},
 		},
-		toggle("prime.persist", PrimeGroup, "mdi:account-lock",
-			func(c *schema.Cast) *bool { return &c.Prime.Persist }),
-		toggle("prime.skipintro", PrimeGroup, "mdi:skip-forward",
-			func(c *schema.Cast) *bool { return &c.Prime.SkipIntro }),
 	}
 }

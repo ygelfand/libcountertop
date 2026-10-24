@@ -21,9 +21,11 @@ type Env struct {
 	SetVolume     func(level int)
 	VolumeChanged func(do func()) (stop func())
 
-	Publish func(control Controls, p *Published)
-	Send    func(m Message)
-	Keep    func(app string) Kept
+	Publish   func(control Controls, p *Published)
+	Send      func(m Message)
+	Advertise func(app, name string, namespaces []string)
+	End       func()
+	Keep      func(app string) Kept
 
 	Output playback.Output
 

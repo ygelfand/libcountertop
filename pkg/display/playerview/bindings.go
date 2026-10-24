@@ -48,20 +48,27 @@ func iconStyle(c gogui.Color) gogui.TextStyle {
 	st.Color = c
 	return st
 }
+func outOfReach(length, from, to time.Duration) style.Span {
+	return style.Span{
+		From:  float32(from) / float32(length),
+		To:    float32(to) / float32(length),
+		Color: gogui.Color{R: 0x20, G: 0x20, B: 0x20, A: 0xff},
+	}
+}
+
+const tick = 0.006
+
 func spans(marks []videoplayer.Mark, length time.Duration) []style.Span {
 	if length <= 0 {
 		return nil
 	}
 	out := make([]style.Span, 0, len(marks))
 	for _, m := range marks {
-		out = append(
-			out,
-			style.Span{
-				From:  float32(m.From) / float32(length),
-				To:    float32(m.To) / float32(length),
-				Color: widgets.Color(m.Color),
-			},
-		)
+		from, to := float32(m.From)/float32(length), float32(m.To)/float32(length)
+		if to-from < tick {
+			from, to = min(from, 1-tick), min(from, 1-tick)+tick
+		}
+		out = append(out, style.Span{From: from, To: to, Color: widgets.Color(m.Color)})
 	}
 	return out
 }

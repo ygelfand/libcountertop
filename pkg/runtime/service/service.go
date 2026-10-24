@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -82,6 +83,19 @@ func Restart(initial, max time.Duration) Option {
 
 func Once() Option {
 	return func(p *policy) { p.restart = false }
+}
+
+type permanent struct{ err error }
+
+func (p permanent) Error() string { return p.err.Error() }
+
+func (p permanent) Unwrap() error { return p.err }
+
+func Permanent(err error) error { return permanent{err: err} }
+
+func isPermanent(err error) bool {
+	var p permanent
+	return errors.As(err, &p)
 }
 
 func defaults() policy {

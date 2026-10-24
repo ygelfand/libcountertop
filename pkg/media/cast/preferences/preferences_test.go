@@ -1,22 +1,23 @@
 package preferences
 
 import (
+	"slices"
 	"testing"
 )
 
 func TestProviderReadsLiveSettingsAndSavesThroughProduct(t *testing.T) {
-	live := Settings{YouTube: YouTube{LiveDelay: 12}, Prime: Prime{Persist: true}}
+	live := Settings{YouTube: YouTube{Skip: []string{"intro"}}}
 	var saved []string
 	p := Provider{
 		Read:   func() Settings { return live },
 		Prefix: "speaker",
 		Save:   func(d, m, v string) error { saved = []string{d, m, v}; return nil },
 	}
-	if p.Settings().YouTube.LiveDelay != 12 || !p.Settings().Prime.Persist {
+	if !slices.Equal(p.Settings().YouTube.Skip, []string{"intro"}) {
 		t.Fatal(p.Settings())
 	}
-	live.YouTube.LiveDelay = 20
-	if p.Settings().YouTube.LiveDelay != 20 {
+	live.YouTube.Skip = []string{"outro"}
+	if !slices.Equal(p.Settings().YouTube.Skip, []string{"outro"}) {
 		t.Fatal("cached preferences")
 	}
 	if err := p.SaveScreens("d", "m", "v"); err != nil || len(saved) != 3 || saved[2] != "v" {
@@ -29,7 +30,8 @@ func TestProviderReadsLiveSettingsAndSavesThroughProduct(t *testing.T) {
 
 func TestAnEmptyProviderFallsBackToDefaults(t *testing.T) {
 	var p Provider
-	if p.Settings().YouTube.LiveDelay != 10 || p.RequestIDPrefix() != "countertop" {
+	if !slices.Equal(p.Settings().YouTube.Skip, []string{"sponsor"}) ||
+		p.RequestIDPrefix() != "countertop" {
 		t.Fatal(p.Settings(), p.RequestIDPrefix())
 	}
 	if err := p.SaveScreens("d", "m", "v"); err != nil {

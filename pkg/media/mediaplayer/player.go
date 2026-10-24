@@ -251,6 +251,8 @@ func (p *Player[P]) Began(s nowplaying.Source) {
 	}
 }
 
+func (p *Player[P]) Present(s nowplaying.Source) { p.Begun.Emit(s) }
+
 func (p *Player[P]) Ended(s nowplaying.Source) { p.owner.End(s) }
 
 func (p *Player[P]) External(s nowplaying.Source) {

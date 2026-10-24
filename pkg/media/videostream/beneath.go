@@ -40,13 +40,13 @@ func (b *Beneath) Resuming() {
 	}
 }
 
-func (b *Beneath) Reuse(c *surface.Client, s Spec) (uint32, bool) {
+func (b *Beneath) Reuse(c *surface.Client, s Spec) (uint32, Spec, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.c != c || b.kept == 0 || b.spec != s {
-		return 0, false
+	if b.c != c || b.kept == 0 || b.spec.Codec != s.Codec || b.spec.Session != s.Session {
+		return 0, Spec{}, false
 	}
-	return b.kept, true
+	return b.kept, b.spec, true
 }
 
 func (b *Beneath) Adopt(c *surface.Client, id uint32, s Spec) {

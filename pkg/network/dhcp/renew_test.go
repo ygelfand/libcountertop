@@ -50,6 +50,20 @@ func TestARenewalNamesNoServer(t *testing.T) {
 	}
 }
 
+func TestARenewalAsksForWhatTheLeaseIsBuiltFrom(t *testing.T) {
+	asked := renewal(t).ParameterRequestList()
+	for _, want := range []dhcpv4.OptionCode{
+		dhcpv4.OptionSubnetMask,
+		dhcpv4.OptionRouter,
+		dhcpv4.OptionDomainNameServer,
+		dhcpv4.OptionNTPServers,
+	} {
+		if !asked.Has(want) {
+			t.Errorf("a renewal does not ask for %s", want)
+		}
+	}
+}
+
 func TestARenewalDoesNotAskToBeBroadcastAt(t *testing.T) {
 	if renewal(t).IsBroadcast() {
 		t.Error("a renewal asked for a broadcast reply")

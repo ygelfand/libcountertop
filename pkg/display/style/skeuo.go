@@ -134,6 +134,12 @@ func groove(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.Slide
 					)
 				}
 				box(0, 1, gogui.Black.WithOpacity(0.55), gogui.Black.WithOpacity(0.2))
+				box(
+					0,
+					head,
+					mix(t.ColorAccent, gogui.White, 0.35),
+					mix(t.ColorAccent, gogui.Black, 0.15),
+				)
 				for _, m := range marks {
 					box(
 						m.From,
@@ -142,12 +148,6 @@ func groove(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.Slide
 						mix(m.Color, gogui.Black, 0.2),
 					)
 				}
-				box(
-					0,
-					head,
-					mix(t.ColorAccent, gogui.White, 0.35),
-					mix(t.ColorAccent, gogui.Black, 0.15),
-				)
 			},
 		}
 		if vertical {
