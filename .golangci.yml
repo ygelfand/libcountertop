@@ -32,6 +32,9 @@ linters:
         - fmt.Fprintln
 
   exclusions:
+    paths:
+      - pkg/display/compositor/internal/(bin|debug|objstore|set|wire|wlclient|xsync)/
+      - pkg/display/compositor/internal/wayland/(client|server)\.go
     rules:
       - linters: [errcheck]
         source: "^\\s*defer "

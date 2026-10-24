@@ -56,6 +56,7 @@
 
 #define SAMPLE_KEY 1
 #define SAMPLE_END 2
+#define SAMPLE_HIDE 4
 
 #define ERR_CODEC 5
 #define ERR_AGAIN 6

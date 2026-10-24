@@ -87,6 +87,13 @@ static void *output(void *arg) {
 			v->ended = 1;
 			continue;
 		}
+		pthread_mutex_lock(&v->mu);
+		int hidden = v->hiding && info.presentationTimeUs <= v->hide_us;
+		pthread_mutex_unlock(&v->mu);
+		if (hidden) {
+			AMediaCodec_releaseOutputBuffer(v->codec, idx, 0);
+			continue;
+		}
 		int render = 1, abandon = 0;
 		for (;;) {
 			if (v->closing || v->flushing) { abandon = 1; break; }
@@ -178,6 +185,12 @@ int video_sample(video *v, int64_t pts, uint32_t flags, const drm_sample *crypt,
 		st = ERR_ARGS;
 	} else {
 		memcpy(buf, data, len);
+		if (flags & SAMPLE_HIDE) {
+			pthread_mutex_lock(&v->mu);
+			if (!v->hiding || pts > v->hide_us) v->hide_us = pts;
+			v->hiding = 1;
+			pthread_mutex_unlock(&v->mu);
+		}
 		uint32_t cf = flags & SAMPLE_END ? AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM : 0;
 		if (crypt && crypt->mode != CRYPT_CLEAR) {
 			AMediaCodecCryptoInfo *info = v->crypto ? drm_info(crypt, len) : NULL;
@@ -208,6 +221,7 @@ int video_flush(video *v) {
 	pthread_mutex_lock(&v->mu);
 	v->media_us = 0;
 	v->running = 0;
+	v->hiding = 0;
 	pthread_mutex_unlock(&v->mu);
 	v->flushing = 0;
 	pthread_cond_broadcast(&v->park_cv);

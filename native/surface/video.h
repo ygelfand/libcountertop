@@ -16,8 +16,8 @@ typedef struct {
 	int has_out, has_maker;
 	pthread_mutex_t mu, park_mu;
 	pthread_cond_t park_cv;
-	int64_t media_us, mono_us;
-	int running;
+	int64_t media_us, mono_us, hide_us;
+	int running, hiding;
 	volatile int closing, ended, ready, failed, flushing, parked;
 	volatile uint32_t gen, shown, dropped;
 } video;

@@ -9,6 +9,7 @@ require (
 	github.com/Sendspin/sendspin-go v1.8.2
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/asticode/go-astits v1.16.0
+	github.com/at-wat/ebml-go v0.19.4
 	github.com/beevik/ntp v1.5.0
 	github.com/bluenviron/gohlslib/v2 v2.4.5
 	github.com/bluenviron/mediacommon/v2 v2.9.5
@@ -18,6 +19,7 @@ require (
 	github.com/go-gui-org/go-gui v0.91.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/jfreymuth/vorbis v1.0.2
 	github.com/kkdai/youtube/v2 v2.10.6
 	github.com/libp2p/zeroconf/v2 v2.2.0
 	github.com/mdlayher/genetlink v1.4.0
@@ -31,6 +33,7 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/pion/webrtc/v4 v4.2.22
 	github.com/tphakala/go-aac v0.7.0
+	github.com/ulikunitz/xz v0.5.17
 	github.com/ygelfand/go-esphome-device v0.0.17
 	github.com/zserge/microwakeword v0.0.0-20260330234603-bfaf3840114e
 	golang.org/x/image v0.47.0
@@ -42,6 +45,7 @@ require (
 require (
 	charm.land/bubbles/v2 v2.0.0 // indirect
 	charm.land/bubbletea/v2 v2.0.2 // indirect
+	github.com/abema/go-mp4 v1.7.3 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect
 	github.com/charmbracelet/colorprofile v0.4.2 // indirect
@@ -70,6 +74,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a // indirect
 )
 
 require (
