@@ -601,6 +601,7 @@ onboard.or: or enter this address
 onboard.title: Add me to Home Assistant
 photos.entity.albums: Photo albums
 photos.entity.favorites: Photos favorites only
+photos.entity.google: Google Photos album links
 photos.entity.interval: Photo interval
 photos.entity.key: Immich API key
 photos.entity.memories: Photo memories first
@@ -612,11 +613,13 @@ photos.entity.server: Immich server
 photos.entity.tags: Photo tags
 photos.group.photos: Photos
 photos.example.albums: Family, Summer 2026
+photos.example.google: https://photos.app.goo.gl/example
 photos.example.people: Alex, Sam
 photos.example.server: https://photos.example.com
 photos.example.tags: kitchen, favorites
 photos.setting.albums: Albums
 photos.setting.favorites: Favorites only
+photos.setting.google: Google Photos albums
 photos.setting.interval: Next photo every
 photos.setting.key: API key
 photos.setting.memories: Memories first
@@ -628,6 +631,9 @@ photos.setting.server: Immich server
 photos.setting.tags: Tags
 photos.status.connecting: Connecting…
 photos.status.empty: No photos match
+photos.status.google: Connected · Google Photos
+photos.status.google.link: That Google Photos album isn't public
+photos.status.google.unreachable: Can't reach Google Photos
 photos.status.key: Wrong API key
 photos.status.old: "Immich {{.Version}}: needs 3.2 or newer"
 photos.status.ready: "Connected · Immich {{.Version}}"

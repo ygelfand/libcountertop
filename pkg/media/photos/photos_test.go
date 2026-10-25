@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -230,5 +232,100 @@ func TestChangingTheSelectionStartsOver(t *testing.T) {
 	filter, _ := srv.searches[1]["filter"].(map[string]any)
 	if filter["isFavorite"] == nil {
 		t.Errorf("second search %v", filter)
+	}
+}
+
+// googleAlbum fakes a public shared album with still photos named by id.
+func googleAlbum(t *testing.T, ids ...string) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var downloaded atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /share/{album}", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<html><head><title>Trips - Google Photos</title></head>` +
+			`<body><script>{"snAcKc":{request:["album",null,null,"auth"]}}</script></body></html>`))
+	})
+	mux.HandleFunc(
+		"POST /u/0/_/PhotosUi/data/batchexecute",
+		func(w http.ResponseWriter, r *http.Request) {
+			items := make([]any, 0, len(ids))
+			for _, id := range ids {
+				items = append(items, []any{
+					id,
+					[]any{"http://" + r.Host + "/p/" + id + "=w4000-h2000", 4000.0, 2000.0},
+					1600000000000.0,
+					nil,
+					nil,
+					1600000001000.0,
+					map[string]any{},
+				})
+			}
+			inner, _ := json.Marshal([]any{nil, items, ""})
+			line, _ := json.Marshal([]any{[]any{"wrb.fr", "snAcKc", string(inner)}})
+			_, _ = fmt.Fprintf(w, ")]}'\n\n%s\n", line)
+		},
+	)
+	mux.HandleFunc("GET /p/{id}", func(w http.ResponseWriter, r *http.Request) {
+		downloaded.Add(1)
+		id, _, _ := strings.Cut(r.PathValue("id"), "=")
+		_, _ = w.Write([]byte("jpeg " + id))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv, &downloaded
+}
+
+func TestGoogleAlbumsFillTheDeckAndSaySo(t *testing.T) {
+	srv, downloaded := googleAlbum(t, "one", "two", "three")
+	l, _ := library(
+		t,
+		schema.Photos{Google: srv.URL + "/share/album"},
+		t.TempDir(),
+	)
+	l.step(context.Background())
+
+	st := l.State()
+	if st.Status != Ready || st.Source != "google" {
+		t.Fatalf("state %+v", st)
+	}
+	if downloaded.Load() != 3 {
+		t.Errorf("downloaded %d pictures, want 3", downloaded.Load())
+	}
+	want := map[string]bool{"one": true, "two": true, "three": true}
+	for range 3 {
+		p, ok := l.Next()
+		if !ok || !want[p.ID] || string(p.Data) != "jpeg "+p.ID {
+			t.Fatalf("picture %+v %v", p, ok)
+		}
+		delete(want, p.ID)
+		if p.Taken.Year() != 2020 {
+			t.Errorf("taken %v", p.Taken)
+		}
+	}
+}
+
+func TestABrokenGoogleLinkSaysSo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<title>Sign in</title>"))
+	}))
+	t.Cleanup(srv.Close)
+	l, _ := library(t, schema.Photos{Google: srv.URL + "/share/x"}, t.TempDir())
+	l.step(context.Background())
+	if st := l.State(); st.Status != Link || st.Source != "google" {
+		t.Fatalf("state %+v", st)
+	}
+}
+
+func TestGoogleAlbumsWinOverImmich(t *testing.T) {
+	srv, _ := googleAlbum(t, "one")
+	l, _ := library(
+		t,
+		schema.Photos{Server: "http://127.0.0.1:1", Key: "k", Google: srv.URL + "/share/album"},
+		t.TempDir(),
+	)
+	l.step(context.Background())
+	if st := l.State(); st.Status != Ready || st.Source != "google" {
+		t.Fatalf("state %+v", st)
 	}
 }

@@ -8,6 +8,7 @@ import (
 type Photos struct {
 	Server    string `json:"server"`
 	Key       string `json:"key"`
+	Google    string `json:"google"`
 	Albums    string `json:"albums"`
 	Tags      string `json:"tags"`
 	People    string `json:"people"`

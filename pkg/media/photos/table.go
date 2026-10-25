@@ -34,6 +34,11 @@ func NewTable() *Table {
 		),
 		key,
 		setting.Words(
+			Setting{Name: "google", Group: Group, Icon: "mdi:google-photos"},
+			listMost,
+			func(c *schema.Photos) *string { return &c.Google },
+		),
+		setting.Words(
 			Setting{Name: "albums", Group: Group, Icon: "mdi:image-album"},
 			listMost,
 			func(c *schema.Photos) *string { return &c.Albums },

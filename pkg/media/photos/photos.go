@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/media/googlephotos"
 	"github.com/ygelfand/libcountertop/pkg/media/immich"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
@@ -30,6 +32,11 @@ const (
 	index      = "index.json"
 )
 
+const (
+	immichName = "immich"
+	googleName = "google"
+)
+
 type Status int
 
 const (
@@ -41,10 +48,12 @@ const (
 	Unreachable
 	Unknown
 	Empty
+	Link
 )
 
 type State struct {
 	Status  Status
+	Source  string
 	Version string
 	Pending int
 	Missing string
@@ -69,6 +78,7 @@ type Options struct {
 
 type entry struct {
 	ID     string   `json:"id"`
+	URL    string   `json:"url,omitempty"`
 	Taken  string   `json:"taken,omitempty"`
 	Place  string   `json:"place,omitempty"`
 	People []string `json:"people,omitempty"`
@@ -82,16 +92,14 @@ type Library struct {
 	knobs  *Controls
 	status *esphome.TextSensor
 
-	mu       sync.Mutex
-	state    State
-	applied  schema.Photos
-	sel      immich.Selection
-	resolved bool
-	deck     []entry
-	ready    []entry
-	next     int
-	memories string
-	failed   time.Time
+	mu      sync.Mutex
+	state   State
+	applied schema.Photos
+	src     source
+	deck    []entry
+	ready   []entry
+	next    int
+	failed  time.Time
 }
 
 func New(o Options) *Library {
@@ -175,7 +183,7 @@ func (l *Library) Next() (Picture, bool) {
 
 func (l *Library) step(ctx context.Context) {
 	cfg := l.o.Settings.Read()
-	if cfg.Server == "" {
+	if !configured(cfg) {
 		l.reset(cfg)
 		l.set(State{Status: Unset})
 		return
@@ -185,26 +193,28 @@ func (l *Library) step(ctx context.Context) {
 		l.set(State{Status: Connecting})
 	}
 	l.mu.Lock()
-	failed := l.failed
+	src, failed := l.src, l.failed
 	l.mu.Unlock()
+	if src == nil {
+		return
+	}
 	if !failed.IsZero() && l.o.Now().Sub(failed) < retryAfter {
 		return
 	}
-	c := immich.New(cfg.Server, cfg.Key)
-	if err := l.prepare(ctx, c, cfg); err != nil {
-		l.fail(err)
+	if err := src.Connect(ctx); err != nil {
+		l.fail(src, err)
 		return
 	}
-	if err := l.refill(ctx, c, cfg); err != nil {
-		l.fail(err)
+	if err := l.refill(ctx, src); err != nil {
+		l.fail(src, err)
 		return
 	}
-	if err := l.prefetch(ctx, c); err != nil {
-		l.fail(err)
+	if err := l.prefetch(ctx, src); err != nil {
+		l.fail(src, err)
 		return
 	}
 	l.mu.Lock()
-	st := State{Status: Ready, Version: l.state.Version, Pending: len(l.deck)}
+	st := State{Status: Ready, Source: src.Name(), Version: src.Describe(), Pending: len(l.deck)}
 	if len(l.ready) == 0 && len(l.deck) == 0 {
 		st.Status = Empty
 	}
@@ -213,90 +223,44 @@ func (l *Library) step(ctx context.Context) {
 	l.set(st)
 }
 
-func (l *Library) prepare(ctx context.Context, c *immich.Client, cfg schema.Photos) error {
+func (l *Library) refill(ctx context.Context, src source) error {
 	l.mu.Lock()
-	done := l.resolved
+	want := 0
+	if len(l.deck) < l.o.Keep {
+		want = deckSize
+	}
 	l.mu.Unlock()
-	if done {
+
+	fresh, err := src.Draw(ctx, want)
+	if err != nil {
+		return err
+	}
+	if len(fresh) == 0 {
 		return nil
-	}
-	about, err := c.About(ctx)
-	if err != nil {
-		return err
-	}
-	if !immich.Supported(about.Version) {
-		l.set(State{Status: TooOld, Version: about.Version})
-		return errTooOld
-	}
-	sel, err := resolve(ctx, c, cfg)
-	if err != nil {
-		return err
-	}
-	l.mu.Lock()
-	l.sel, l.resolved = sel, true
-	l.state.Version = about.Version
-	l.mu.Unlock()
-	return nil
-}
-
-func (l *Library) refill(ctx context.Context, c *immich.Client, cfg schema.Photos) error {
-	today := l.o.Now().Format(time.DateOnly)
-	l.mu.Lock()
-	sel, low, memories := l.sel, len(l.deck) < l.o.Keep, cfg.Memories && l.memories != today
-	l.mu.Unlock()
-
-	var fresh []entry
-	if memories {
-		found, err := c.Memories(ctx, l.o.Now())
-		if err != nil {
-			return err
-		}
-		for _, m := range found {
-			for _, a := range m.Assets {
-				if a.Type == "" || a.Type == "IMAGE" {
-					fresh = append(fresh, describe(a, m.Data.Year))
-				}
-			}
-		}
-	}
-	var drawn []entry
-	if low {
-		found, err := c.Random(ctx, sel, deckSize)
-		if err != nil {
-			return err
-		}
-		for _, a := range found {
-			drawn = append(drawn, describe(a, 0))
-		}
 	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if memories {
-		l.memories = today
-	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool, len(l.ready)+len(l.deck))
 	for _, e := range l.ready {
 		seen[e.ID] = true
 	}
 	for _, e := range l.deck {
 		seen[e.ID] = true
 	}
-	keep := func(in []entry) []entry {
-		var out []entry
-		for _, e := range in {
-			if !seen[e.ID] {
-				seen[e.ID] = true
-				out = append(out, e)
-			}
+	var add []entry
+	for _, e := range fresh {
+		if seen[e.ID] {
+			continue
 		}
-		return out
+		seen[e.ID] = true
+		add = append(add, e)
 	}
-	l.deck = append(append(keep(fresh), l.deck...), keep(drawn)...)
+	l.deck = append(add, l.deck...)
 	return nil
 }
 
-func (l *Library) prefetch(ctx context.Context, c *immich.Client) error {
+func (l *Library) prefetch(ctx context.Context, src source) error {
 	for {
 		l.mu.Lock()
 		if len(l.ready)-l.next >= l.o.Keep || len(l.deck) == 0 {
@@ -306,7 +270,7 @@ func (l *Library) prefetch(ctx context.Context, c *immich.Client) error {
 		e := l.deck[0]
 		l.mu.Unlock()
 
-		data, err := c.Preview(ctx, e.ID)
+		data, err := src.Fetch(ctx, e)
 		if err != nil {
 			return err
 		}
@@ -344,10 +308,11 @@ func (l *Library) trim() {
 
 func (l *Library) reset(cfg schema.Photos) {
 	l.mu.Lock()
-	had := len(l.ready) > 0 && !same(cfg, l.applied) && l.applied.Server != ""
+	changed := !same(cfg, l.applied)
+	had := changed && len(l.ready) > 0 && configured(l.applied)
 	l.applied = cfg
-	l.sel, l.resolved = immich.Selection{}, false
-	l.deck, l.memories, l.failed = nil, "", time.Time{}
+	l.src = newSource(cfg, l.o.Now)
+	l.deck, l.failed = nil, time.Time{}
 	if had {
 		for _, e := range l.ready {
 			_ = os.Remove(l.file(e.ID))
@@ -360,23 +325,17 @@ func (l *Library) reset(cfg schema.Photos) {
 	}
 }
 
-func (l *Library) fail(err error) {
+func (l *Library) fail(src source, err error) {
+	st, missing := src.Classify(err)
+	slog.Warn("photos", "err", err)
+	if st == TooOld {
+		l.set(State{Status: st, Source: src.Name(), Version: src.Describe()})
+		return
+	}
 	l.mu.Lock()
 	l.failed = l.o.Now()
-	version := l.state.Version
 	l.mu.Unlock()
-	var missing *missingError
-	switch {
-	case errors.Is(err, errTooOld):
-		return
-	case errors.Is(err, immich.ErrKey):
-		l.set(State{Status: BadKey, Version: version})
-	case errors.As(err, &missing):
-		l.set(State{Status: Unknown, Version: version, Missing: missing.name})
-	default:
-		l.set(State{Status: Unreachable, Version: version})
-	}
-	slog.Warn("photos", "err", err)
+	l.set(State{Status: st, Source: src.Name(), Version: src.Describe(), Missing: missing})
 }
 
 func (l *Library) set(st State) {
@@ -391,21 +350,30 @@ func (l *Library) set(st State) {
 }
 
 func (st State) Says() string {
+	google := st.Source == googleName
 	switch st.Status {
 	case Connecting:
 		return say.T("photos.status.connecting")
 	case Ready:
+		if google {
+			return say.T("photos.status.google")
+		}
 		return say.F("photos.status.ready", map[string]any{"Version": st.Version})
 	case BadKey:
 		return say.T("photos.status.key")
 	case TooOld:
 		return say.F("photos.status.old", map[string]any{"Version": st.Version})
 	case Unreachable:
+		if google {
+			return say.T("photos.status.google.unreachable")
+		}
 		return say.T("photos.status.unreachable")
 	case Unknown:
 		return say.F("photos.status.unknown", map[string]any{"Name": st.Missing})
 	case Empty:
 		return say.T("photos.status.empty")
+	case Link:
+		return say.T("photos.status.google.link")
 	}
 	return say.T("photos.status.unset")
 }
@@ -460,6 +428,197 @@ func (l *Library) save() {
 }
 
 var errTooOld = errors.New("photos: immich is older than 3.2")
+
+// source is one place pictures come from. Immich and public Google Photos
+// albums both plug in here; everything about the deck, the cache and the
+// status is shared.
+type source interface {
+	// Connect resolves the configuration once. It is retried after a failure.
+	Connect(ctx context.Context) error
+	// Draw returns new entries, most wanted first.
+	Draw(ctx context.Context, want int) ([]entry, error)
+	// Fetch downloads one picture.
+	Fetch(ctx context.Context, e entry) ([]byte, error)
+	// Name is the source kind, used to pick status wording.
+	Name() string
+	// Describe is the connected detail, such as the Immich version.
+	Describe() string
+	// Classify turns a failure into a status and an optional missing name.
+	Classify(err error) (Status, string)
+}
+
+func newSource(cfg schema.Photos, now func() time.Time) source {
+	if links := googlephotos.SplitLinks(cfg.Google); len(links) > 0 {
+		return &googleSource{client: googlephotos.New(), links: links, now: now}
+	}
+	if cfg.Server == "" {
+		return nil
+	}
+	return &immichSource{client: immich.New(cfg.Server, cfg.Key), cfg: cfg, now: now}
+}
+
+func configured(c schema.Photos) bool {
+	return c.Server != "" || len(googlephotos.SplitLinks(c.Google)) > 0
+}
+
+type immichSource struct {
+	client *immich.Client
+	cfg    schema.Photos
+	now    func() time.Time
+
+	connected bool
+	version   string
+	sel       immich.Selection
+	memories  string
+}
+
+func (s *immichSource) Name() string { return immichName }
+
+func (s *immichSource) Describe() string { return s.version }
+
+func (s *immichSource) Connect(ctx context.Context) error {
+	if s.connected {
+		return nil
+	}
+	about, err := s.client.About(ctx)
+	if err != nil {
+		return err
+	}
+	s.version = about.Version
+	if !immich.Supported(about.Version) {
+		return errTooOld
+	}
+	sel, err := resolve(ctx, s.client, s.cfg)
+	if err != nil {
+		return err
+	}
+	s.sel, s.connected = sel, true
+	return nil
+}
+
+func (s *immichSource) Draw(ctx context.Context, want int) ([]entry, error) {
+	var out []entry
+	today := s.now().Format(time.DateOnly)
+	memories := s.cfg.Memories && s.memories != today
+	if memories {
+		found, err := s.client.Memories(ctx, s.now())
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range found {
+			for _, a := range m.Assets {
+				if a.Type == "" || a.Type == "IMAGE" {
+					out = append(out, describe(a, m.Data.Year))
+				}
+			}
+		}
+	}
+	if want > 0 {
+		found, err := s.client.Random(ctx, s.sel, want)
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range found {
+			out = append(out, describe(a, 0))
+		}
+	}
+	if memories {
+		s.memories = today
+	}
+	return out, nil
+}
+
+func (s *immichSource) Fetch(ctx context.Context, e entry) ([]byte, error) {
+	return s.client.Preview(ctx, e.ID)
+}
+
+func (s *immichSource) Classify(err error) (Status, string) {
+	var missing *missingError
+	switch {
+	case errors.Is(err, errTooOld):
+		return TooOld, ""
+	case errors.Is(err, immich.ErrKey):
+		return BadKey, ""
+	case errors.As(err, &missing):
+		return Unknown, missing.name
+	default:
+		return Unreachable, ""
+	}
+}
+
+type googleSource struct {
+	client *googlephotos.Client
+	links  []string
+	now    func() time.Time
+
+	connected bool
+	albums    []googlephotos.Album
+	pending   []googlephotos.Photo
+}
+
+func (s *googleSource) Name() string { return googleName }
+
+func (s *googleSource) Describe() string { return "" }
+
+func (s *googleSource) Connect(ctx context.Context) error {
+	if s.connected {
+		return nil
+	}
+	albums := make([]googlephotos.Album, 0, len(s.links))
+	for _, link := range s.links {
+		album, err := s.client.Album(ctx, link)
+		if err != nil {
+			return err
+		}
+		albums = append(albums, album)
+	}
+	s.albums, s.connected = albums, true
+	return nil
+}
+
+func (s *googleSource) Draw(_ context.Context, want int) ([]entry, error) {
+	if want <= 0 {
+		return nil, nil
+	}
+	if len(s.pending) == 0 {
+		s.pending = s.shuffle()
+	}
+	n := min(want, len(s.pending))
+	out := make([]entry, 0, n)
+	for _, p := range s.pending[:n] {
+		e := entry{ID: p.ID, URL: p.URL}
+		if !p.Taken.IsZero() {
+			e.Taken = p.Taken.UTC().Format(time.RFC3339)
+			e.Year = p.Taken.Year()
+		}
+		out = append(out, e)
+	}
+	s.pending = s.pending[n:]
+	return out, nil
+}
+
+func (s *googleSource) shuffle() []googlephotos.Photo {
+	var all []googlephotos.Photo
+	for _, a := range s.albums {
+		all = append(all, a.Photos...)
+	}
+	rand.Shuffle(len(all), func(i, j int) { all[i], all[j] = all[j], all[i] })
+	return all
+}
+
+func (s *googleSource) Fetch(ctx context.Context, e entry) ([]byte, error) {
+	if e.URL == "" {
+		return nil, fmt.Errorf("photos: no link for %s", e.ID)
+	}
+	return s.client.Picture(ctx, e.URL)
+}
+
+func (s *googleSource) Classify(err error) (Status, string) {
+	if errors.Is(err, googlephotos.ErrLink) {
+		return Link, ""
+	}
+	return Unreachable, ""
+}
 
 type missingError struct{ name string }
 
@@ -551,7 +710,7 @@ func place(x *immich.Exif) string {
 }
 
 func same(a, b schema.Photos) bool {
-	return a.Server == b.Server && a.Key == b.Key && a.Albums == b.Albums &&
-		a.Tags == b.Tags && a.People == b.People && a.Favorites == b.Favorites &&
-		a.Memories == b.Memories
+	return a.Server == b.Server && a.Key == b.Key && a.Google == b.Google &&
+		a.Albums == b.Albums && a.Tags == b.Tags && a.People == b.People &&
+		a.Favorites == b.Favorites && a.Memories == b.Memories
 }
