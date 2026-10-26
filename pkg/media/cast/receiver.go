@@ -59,6 +59,7 @@ type Receiver struct {
 	Challenged func(c Challenge, answered bool)
 
 	Available func(app string) bool
+	Refused   func(app string)
 
 	Identity func() Device
 
@@ -342,6 +343,13 @@ func (r *Receiver) launch(m Message, h Header) ([]Message, error) {
 	}
 
 	// Music Assistant launches C35B0678 and raises on a refusal.
+
+	if r.Available != nil && !r.Available(req.AppID) {
+		if r.Refused != nil {
+			r.Refused(req.AppID)
+		}
+		return []Message{reply(m, NSReceiver, LaunchError(h.RequestID, ReasonUnknownAppID))}, nil
+	}
 
 	if r.app == nil || r.app.AppID != req.AppID {
 		r.release(IdleInterrupted)

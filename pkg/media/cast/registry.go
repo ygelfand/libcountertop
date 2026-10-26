@@ -25,6 +25,7 @@ type Env struct {
 	Send      func(m Message)
 	Advertise func(app, name string, namespaces []string)
 	End       func()
+	Refuse    func(app string)
 	Keep      func(app string) Kept
 
 	Output playback.Output

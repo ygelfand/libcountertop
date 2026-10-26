@@ -4,19 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
-	"github.com/ygelfand/libcountertop/pkg/hook"
-	"github.com/ygelfand/libcountertop/pkg/media/immich"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -26,14 +22,15 @@ import (
 const (
 	tick       = 5 * time.Second
 	retryAfter = time.Minute
-	deckSize   = 250
 	index      = "index.json"
+	bytesMost  = 48 << 20
 )
 
 type Status int
 
 const (
 	Unset Status = iota
+	Off
 	Connecting
 	Ready
 	BadKey
@@ -41,17 +38,18 @@ const (
 	Unreachable
 	Unknown
 	Empty
+	NoPermission
 )
 
 type State struct {
 	Status  Status
 	Version string
-	Pending int
 	Missing string
 }
 
 type Picture struct {
 	ID     string
+	Source string
 	Data   []byte
 	Taken  time.Time
 	Place  string
@@ -60,38 +58,46 @@ type Picture struct {
 }
 
 type Options struct {
-	Settings storage.Section[schema.Photos]
-	Dir      string
-	Keep     int
-	Now      func() time.Time
-	DeviceID uint32
+	Settings  storage.Section[schema.Photos]
+	Dir       string
+	Keep      int
+	Now       func() time.Time
+	DeviceID  uint32
+	Providers []Provider
+	Most      func() int
+	BytesMost int64
 }
 
 type entry struct {
+	Source string   `json:"source"`
 	ID     string   `json:"id"`
 	Taken  string   `json:"taken,omitempty"`
 	Place  string   `json:"place,omitempty"`
 	People []string `json:"people,omitempty"`
 	Year   int      `json:"year,omitempty"`
+	Size   int64    `json:"size,omitempty"`
+}
+
+type feed struct {
+	p       Provider
+	sensor  *esphome.TextSensor
+	state   State
+	applied schema.Photos
+	known   bool
+	session Session
+	version string
+	deck    []entry
+	failed  time.Time
 }
 
 type Library struct {
-	Changed hook.Hook[State]
+	o     Options
+	knobs *Controls
+	feeds []*feed
 
-	o      Options
-	knobs  *Controls
-	status *esphome.TextSensor
-
-	mu       sync.Mutex
-	state    State
-	applied  schema.Photos
-	sel      immich.Selection
-	resolved bool
-	deck     []entry
-	ready    []entry
-	next     int
-	memories string
-	failed   time.Time
+	mu    sync.Mutex
+	ready []entry
+	next  int
 }
 
 func New(o Options) *Library {
@@ -101,6 +107,12 @@ func New(o Options) *Library {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
+	if o.Providers == nil {
+		o.Providers = []Provider{Immich(), Google(o.Most)}
+	}
+	if o.BytesMost <= 0 {
+		o.BytesMost = bytesMost
+	}
 	l := &Library{o: o}
 	l.knobs = &Controls{
 		Table:  NewTable(),
@@ -108,23 +120,38 @@ func New(o Options) *Library {
 		Read:   o.Settings.Read,
 		Save:   func(s Setting, v string) error { return setting.Store(o.Settings, s, v) },
 	}
-	l.status = &esphome.TextSensor{Base: esphome.Base{
-		ObjectID: "photos_status", Name: "Photos status", Icon: "mdi:image-multiple",
-		Category: esphome.CategoryDiagnostic, DeviceID: o.DeviceID,
-	}}
+	for _, p := range o.Providers {
+		l.feeds = append(l.feeds, &feed{p: p, sensor: &esphome.TextSensor{Base: esphome.Base{
+			ObjectID: "photos_" + p.Key() + "_status",
+			Name:     say.F("photos.entity.status", map[string]any{"Source": p.Name()}),
+			Icon:     "mdi:image-multiple",
+			Category: esphome.CategoryDiagnostic,
+			DeviceID: o.DeviceID,
+		}}})
+	}
 	l.load()
 	return l
 }
 
 func (l *Library) Name() string { return "photos" }
 
-func (l *Library) Entities() []esphome.Entity { return append(l.knobs.Entities(), l.status) }
+func (l *Library) Entities() []esphome.Entity {
+	out := l.knobs.Entities()
+	for _, f := range l.feeds {
+		out = append(out, f.sensor)
+	}
+	return out
+}
 
 func (l *Library) Settings() *Controls { return l.knobs }
 
+func (l *Library) Providers() []Provider { return slices.Clone(l.o.Providers) }
+
 func (l *Library) Restore(c schema.Photos) {
 	l.knobs.PublishFrom(c)
-	l.status.Set(l.State().Says())
+	for _, f := range l.feeds {
+		f.sensor.Set(l.State(f.p.Key()).Says())
+	}
 }
 
 func (l *Library) Run(ctx context.Context) error {
@@ -140,10 +167,15 @@ func (l *Library) Run(ctx context.Context) error {
 	}
 }
 
-func (l *Library) State() State {
+func (l *Library) State(key string) State {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.state
+	for _, f := range l.feeds {
+		if f.p.Key() == key {
+			return f.state
+		}
+	}
+	return State{}
 }
 
 func (l *Library) Next() (Picture, bool) {
@@ -156,15 +188,16 @@ func (l *Library) Next() (Picture, bool) {
 	l.next++
 	l.mu.Unlock()
 
-	data, err := os.ReadFile(l.file(e.ID))
+	data, err := os.ReadFile(l.file(e))
 	if err != nil {
 		slog.Warn("reading a cached photo failed", "asset", e.ID, "err", err)
-		l.forget(e.ID)
+		l.forget(e)
 		return Picture{}, false
 	}
 	taken, _ := time.Parse(time.RFC3339, e.Taken)
 	return Picture{
 		ID:     e.ID,
+		Source: e.Source,
 		Data:   data,
 		Taken:  taken,
 		Place:  e.Place,
@@ -175,159 +208,142 @@ func (l *Library) Next() (Picture, bool) {
 
 func (l *Library) step(ctx context.Context) {
 	cfg := l.o.Settings.Read()
-	if cfg.Server == "" {
-		l.reset(cfg)
-		l.set(State{Status: Unset})
+	for _, f := range l.feeds {
+		l.draw(ctx, f, cfg)
+	}
+	l.prefetch(ctx)
+	for _, f := range l.feeds {
+		l.settle(f)
+	}
+}
+
+func (l *Library) draw(ctx context.Context, f *feed, cfg schema.Photos) {
+	if st := f.p.Status(cfg); st != Connecting {
+		l.close(f)
+		l.set(f, State{Status: st})
 		return
 	}
-	if !same(cfg, l.applied) {
-		l.reset(cfg)
-		l.set(State{Status: Connecting})
+	if !f.known || !f.p.Same(cfg, f.applied) {
+		l.restart(f, cfg)
+		l.set(f, State{Status: Connecting})
 	}
 	l.mu.Lock()
-	failed := l.failed
+	failed := f.failed
 	l.mu.Unlock()
 	if !failed.IsZero() && l.o.Now().Sub(failed) < retryAfter {
 		return
 	}
-	c := immich.New(cfg.Server, cfg.Key)
-	if err := l.prepare(ctx, c, cfg); err != nil {
-		l.fail(err)
-		return
-	}
-	if err := l.refill(ctx, c, cfg); err != nil {
-		l.fail(err)
-		return
-	}
-	if err := l.prefetch(ctx, c); err != nil {
-		l.fail(err)
-		return
-	}
-	l.mu.Lock()
-	st := State{Status: Ready, Version: l.state.Version, Pending: len(l.deck)}
-	if len(l.ready) == 0 && len(l.deck) == 0 {
-		st.Status = Empty
-	}
-	l.failed = time.Time{}
-	l.mu.Unlock()
-	l.set(st)
-}
-
-func (l *Library) prepare(ctx context.Context, c *immich.Client, cfg schema.Photos) error {
-	l.mu.Lock()
-	done := l.resolved
-	l.mu.Unlock()
-	if done {
-		return nil
-	}
-	about, err := c.About(ctx)
-	if err != nil {
-		return err
-	}
-	if !immich.Supported(about.Version) {
-		l.set(State{Status: TooOld, Version: about.Version})
-		return errTooOld
-	}
-	sel, err := resolve(ctx, c, cfg)
-	if err != nil {
-		return err
-	}
-	l.mu.Lock()
-	l.sel, l.resolved = sel, true
-	l.state.Version = about.Version
-	l.mu.Unlock()
-	return nil
-}
-
-func (l *Library) refill(ctx context.Context, c *immich.Client, cfg schema.Photos) error {
-	today := l.o.Now().Format(time.DateOnly)
-	l.mu.Lock()
-	sel, low, memories := l.sel, len(l.deck) < l.o.Keep, cfg.Memories && l.memories != today
-	l.mu.Unlock()
-
-	var fresh []entry
-	if memories {
-		found, err := c.Memories(ctx, l.o.Now())
+	if f.session == nil {
+		s, version, err := f.p.Open(ctx, cfg)
+		f.version = version
 		if err != nil {
-			return err
+			l.fail(f, err)
+			return
 		}
-		for _, m := range found {
-			for _, a := range m.Assets {
-				if a.Type == "" || a.Type == "IMAGE" {
-					fresh = append(fresh, describe(a, m.Data.Year))
-				}
-			}
-		}
+		f.session = s
 	}
-	var drawn []entry
-	if low {
-		found, err := c.Random(ctx, sel, deckSize)
-		if err != nil {
-			return err
-		}
-		for _, a := range found {
-			drawn = append(drawn, describe(a, 0))
-		}
+	l.mu.Lock()
+	low := len(f.deck) < l.o.Keep
+	l.mu.Unlock()
+	front, back, err := f.session.Draw(ctx, l.o.Now(), low)
+	if err != nil {
+		l.fail(f, err)
+		return
 	}
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if memories {
-		l.memories = today
-	}
+	f.failed = time.Time{}
 	seen := map[string]bool{}
 	for _, e := range l.ready {
-		seen[e.ID] = true
+		seen[e.Source+"/"+e.ID] = true
 	}
-	for _, e := range l.deck {
-		seen[e.ID] = true
+	for _, e := range f.deck {
+		seen[e.Source+"/"+e.ID] = true
 	}
-	keep := func(in []entry) []entry {
+	keep := func(in []Found) []entry {
 		var out []entry
-		for _, e := range in {
-			if !seen[e.ID] {
-				seen[e.ID] = true
+		for _, x := range in {
+			e := entry{
+				Source: f.p.Key(),
+				ID:     x.ID,
+				Taken:  x.Taken,
+				Place:  x.Place,
+				People: x.People,
+				Year:   x.Year,
+			}
+			if !seen[e.Source+"/"+e.ID] {
+				seen[e.Source+"/"+e.ID] = true
 				out = append(out, e)
 			}
 		}
 		return out
 	}
-	l.deck = append(append(keep(fresh), l.deck...), keep(drawn)...)
-	return nil
+	f.deck = append(append(keep(front), f.deck...), keep(back)...)
 }
 
-func (l *Library) prefetch(ctx context.Context, c *immich.Client) error {
+func (l *Library) prefetch(ctx context.Context) {
+	turn := 0
 	for {
 		l.mu.Lock()
-		if len(l.ready)-l.next >= l.o.Keep || len(l.deck) == 0 {
+		if len(l.ready)-l.next >= l.o.Keep {
 			l.mu.Unlock()
-			return nil
+			return
 		}
-		e := l.deck[0]
+		var f *feed
+		for i := range l.feeds {
+			c := l.feeds[(turn+i)%len(l.feeds)]
+			if c.session != nil && len(c.deck) > 0 && c.failed.IsZero() {
+				f = c
+				break
+			}
+		}
+		if f == nil {
+			l.mu.Unlock()
+			return
+		}
+		e := f.deck[0]
 		l.mu.Unlock()
+		turn++
 
-		data, err := c.Preview(ctx, e.ID)
+		data, err := f.session.Fetch(ctx, e.ID)
+		if err == nil && l.o.Most != nil {
+			data = shrink(data, l.o.Most())
+		}
+		if err == nil {
+			err = os.MkdirAll(l.o.Dir, 0o755)
+		}
+		if err == nil {
+			err = os.WriteFile(l.file(e), data, 0o644)
+		}
 		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(l.o.Dir, 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(l.file(e.ID), data, 0o644); err != nil {
-			return err
+			l.fail(f, err)
+			continue
 		}
 
+		e.Size = int64(len(data))
 		l.mu.Lock()
-		l.deck = l.deck[1:]
+		f.deck = f.deck[1:]
 		l.ready = append(l.ready, e)
-		first := len(l.ready) == 1
 		l.trim()
 		l.mu.Unlock()
 		l.save()
-		if first {
-			l.Changed.Emit(l.State())
-		}
 	}
+}
+
+func (l *Library) settle(f *feed) {
+	l.mu.Lock()
+	if f.session == nil || !f.failed.IsZero() {
+		l.mu.Unlock()
+		return
+	}
+	st := State{Status: Ready, Version: f.version}
+	if len(f.deck) == 0 && !slices.ContainsFunc(l.ready, func(e entry) bool {
+		return e.Source == f.p.Key()
+	}) {
+		st.Status = Empty
+	}
+	l.mu.Unlock()
+	l.set(f, st)
 }
 
 func (l *Library) trim() {
@@ -335,63 +351,99 @@ func (l *Library) trim() {
 	if l.next > len(l.ready) {
 		l.next = len(l.ready)
 	}
-	for len(l.ready) > most && l.next > 0 {
-		_ = os.Remove(l.file(l.ready[0].ID))
+	var held int64
+	for _, e := range l.ready {
+		held += e.Size
+	}
+	for (len(l.ready) > most || held > l.o.BytesMost) && l.next > 0 {
+		held -= l.ready[0].Size
+		_ = os.Remove(l.file(l.ready[0]))
 		l.ready = l.ready[1:]
 		l.next--
 	}
 }
 
-func (l *Library) reset(cfg schema.Photos) {
+func (l *Library) restart(f *feed, cfg schema.Photos) {
 	l.mu.Lock()
-	had := len(l.ready) > 0 && !same(cfg, l.applied) && l.applied.Server != ""
-	l.applied = cfg
-	l.sel, l.resolved = immich.Selection{}, false
-	l.deck, l.memories, l.failed = nil, "", time.Time{}
-	if had {
-		for _, e := range l.ready {
-			_ = os.Remove(l.file(e.ID))
-		}
-		l.ready, l.next = nil, 0
-	}
+	changed := f.known
+	f.applied, f.known = cfg, true
+	f.session, f.version, f.deck, f.failed = nil, "", nil, time.Time{}
 	l.mu.Unlock()
-	if had {
+	if changed {
+		l.drop(f.p.Key())
+	}
+}
+
+func (l *Library) close(f *feed) {
+	l.mu.Lock()
+	f.known, f.applied = false, schema.Photos{}
+	f.session, f.version, f.deck, f.failed = nil, "", nil, time.Time{}
+	l.mu.Unlock()
+	l.drop(f.p.Key())
+}
+
+func (l *Library) drop(source string) {
+	l.mu.Lock()
+	kept := l.ready[:0]
+	removed := false
+	for i, e := range l.ready {
+		if e.Source != source {
+			kept = append(kept, e)
+			continue
+		}
+		_ = os.Remove(l.file(e))
+		removed = true
+		if i < l.next {
+			l.next--
+		}
+	}
+	l.ready = kept
+	l.mu.Unlock()
+	if removed {
 		l.save()
 	}
 }
 
-func (l *Library) fail(err error) {
+func (l *Library) fail(f *feed, err error) {
 	l.mu.Lock()
-	l.failed = l.o.Now()
-	version := l.state.Version
+	f.failed = l.o.Now()
+	f.session = nil
+	version := f.version
 	l.mu.Unlock()
-	var missing *missingError
+	var (
+		old     *TooOldError
+		missing *MissingError
+		perm    *PermissionError
+	)
 	switch {
-	case errors.Is(err, errTooOld):
-		return
-	case errors.Is(err, immich.ErrKey):
-		l.set(State{Status: BadKey, Version: version})
+	case errors.As(err, &old):
+		l.set(f, State{Status: TooOld, Version: old.Version})
+	case errors.As(err, &perm):
+		l.set(f, State{Status: NoPermission, Version: version, Missing: perm.Name})
+	case errors.Is(err, ErrKey):
+		l.set(f, State{Status: BadKey, Version: version})
 	case errors.As(err, &missing):
-		l.set(State{Status: Unknown, Version: version, Missing: missing.name})
+		l.set(f, State{Status: Unknown, Version: version, Missing: missing.Name})
 	default:
-		l.set(State{Status: Unreachable, Version: version})
+		l.set(f, State{Status: Unreachable, Version: version})
 	}
-	slog.Warn("photos", "err", err)
+	slog.Warn("photos", "source", f.p.Key(), "err", err)
 }
 
-func (l *Library) set(st State) {
+func (l *Library) set(f *feed, st State) {
 	l.mu.Lock()
-	changed := l.state != st
-	l.state = st
+	changed := f.state != st
+	f.state = st
 	l.mu.Unlock()
 	if changed {
-		l.status.Set(st.Says())
-		l.Changed.Emit(st)
+		f.sensor.Set(st.Says())
 	}
 }
 
 func (st State) Says() string {
 	switch st.Status {
+	case Off:
+		return say.T("photos.status.off")
 	case Connecting:
 		return say.T("photos.status.connecting")
 	case Ready:
@@ -406,13 +458,17 @@ func (st State) Says() string {
 		return say.F("photos.status.unknown", map[string]any{"Name": st.Missing})
 	case Empty:
 		return say.T("photos.status.empty")
+	case NoPermission:
+		return say.F("photos.status.permission", map[string]any{"Name": st.Missing})
 	}
 	return say.T("photos.status.unset")
 }
 
-func (l *Library) forget(id string) {
+func (l *Library) forget(gone entry) {
 	l.mu.Lock()
-	if i := slices.IndexFunc(l.ready, func(e entry) bool { return e.ID == id }); i >= 0 {
+	if i := slices.IndexFunc(l.ready, func(e entry) bool {
+		return e.Source == gone.Source && e.ID == gone.ID
+	}); i >= 0 {
 		l.ready = slices.Delete(l.ready, i, i+1)
 		if i < l.next {
 			l.next--
@@ -422,22 +478,30 @@ func (l *Library) forget(id string) {
 	l.save()
 }
 
-func (l *Library) file(id string) string {
-	return filepath.Join(l.o.Dir, filepath.Base(id)+".jpg")
+func (l *Library) file(e entry) string {
+	return filepath.Join(l.o.Dir, filepath.Base(e.Source+"-"+e.ID)+".jpg")
 }
 
 func (l *Library) load() {
-	data, err := os.ReadFile(filepath.Join(l.o.Dir, index))
-	if err != nil {
-		return
-	}
 	var saved []entry
-	if err := json.Unmarshal(data, &saved); err != nil {
-		return
+	if data, err := os.ReadFile(filepath.Join(l.o.Dir, index)); err == nil {
+		_ = json.Unmarshal(data, &saved)
 	}
+	kept := map[string]bool{index: true}
 	for _, e := range saved {
-		if _, err := os.Stat(l.file(e.ID)); err == nil {
+		if e.Source == "" {
+			continue
+		}
+		if st, err := os.Stat(l.file(e)); err == nil {
+			e.Size = st.Size()
 			l.ready = append(l.ready, e)
+			kept[filepath.Base(l.file(e))] = true
+		}
+	}
+	files, _ := os.ReadDir(l.o.Dir)
+	for _, f := range files {
+		if !f.IsDir() && !kept[f.Name()] {
+			_ = os.Remove(filepath.Join(l.o.Dir, f.Name()))
 		}
 	}
 }
@@ -457,101 +521,4 @@ func (l *Library) save() {
 		return
 	}
 	_ = os.Rename(tmp, filepath.Join(l.o.Dir, index))
-}
-
-var errTooOld = errors.New("photos: immich is older than 3.2")
-
-type missingError struct{ name string }
-
-func (e *missingError) Error() string { return fmt.Sprintf("photos: nothing named %q", e.name) }
-
-func resolve(ctx context.Context, c *immich.Client, cfg schema.Photos) (immich.Selection, error) {
-	sel := immich.Selection{Favorites: cfg.Favorites}
-	if names := schema.Names(cfg.Albums); len(names) > 0 {
-		all, err := c.Albums(ctx)
-		if err != nil {
-			return sel, err
-		}
-		if sel.Albums, err = match(names, all, func(a immich.Album) (string, []string) {
-			return a.ID, []string{a.Name}
-		}); err != nil {
-			return sel, err
-		}
-	}
-	if names := schema.Names(cfg.Tags); len(names) > 0 {
-		all, err := c.Tags(ctx)
-		if err != nil {
-			return sel, err
-		}
-		if sel.Tags, err = match(names, all, func(t immich.Tag) (string, []string) {
-			return t.ID, []string{t.Value, t.Name}
-		}); err != nil {
-			return sel, err
-		}
-	}
-	if names := schema.Names(cfg.People); len(names) > 0 {
-		all, err := c.People(ctx)
-		if err != nil {
-			return sel, err
-		}
-		if sel.People, err = match(names, all, func(p immich.Person) (string, []string) {
-			return p.ID, []string{p.Name}
-		}); err != nil {
-			return sel, err
-		}
-	}
-	return sel, nil
-}
-
-func match[T any](wants []string, all []T, of func(T) (string, []string)) ([]string, error) {
-	var ids []string
-	for _, want := range wants {
-		found := ""
-		for _, item := range all {
-			id, names := of(item)
-			if id == want || slices.ContainsFunc(names, func(n string) bool {
-				return strings.EqualFold(n, want)
-			}) {
-				found = id
-				break
-			}
-		}
-		if found == "" {
-			return nil, &missingError{name: want}
-		}
-		ids = append(ids, found)
-	}
-	return ids, nil
-}
-
-func describe(a immich.Asset, year int) entry {
-	e := entry{ID: a.ID, Year: year, Taken: a.Local}
-	if a.Exif != nil {
-		if a.Exif.Taken != "" {
-			e.Taken = a.Exif.Taken
-		}
-		e.Place = place(a.Exif)
-	}
-	for _, p := range a.People {
-		if p.Name != "" && !p.Hidden {
-			e.People = append(e.People, p.Name)
-		}
-	}
-	return e
-}
-
-func place(x *immich.Exif) string {
-	var parts []string
-	for _, s := range []string{x.City, x.Country} {
-		if s != "" {
-			parts = append(parts, s)
-		}
-	}
-	return strings.Join(parts, ", ")
-}
-
-func same(a, b schema.Photos) bool {
-	return a.Server == b.Server && a.Key == b.Key && a.Albums == b.Albums &&
-		a.Tags == b.Tags && a.People == b.People && a.Favorites == b.Favorites &&
-		a.Memories == b.Memories
 }

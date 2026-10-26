@@ -4,7 +4,7 @@ import esphome "github.com/ygelfand/go-esphome-device"
 
 func (d *Diag) build() {
 	for _, z := range d.o.Zones {
-		d.zones[z.Zone] = &esphome.Sensor{
+		d.zones[z.ID] = &esphome.Sensor{
 			Base:        base(z.ID, z.Name, "mdi:thermometer"),
 			Unit:        "°C",
 			DeviceClass: "temperature",

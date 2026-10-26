@@ -21,6 +21,7 @@ type Shared struct {
 	Feedback  Feedback  `json:"feedback"`
 	Frontend  Frontend  `json:"frontend"`
 	Home      Home      `json:"home"`
+	HomeAlarm HomeAlarm `json:"home_alarm"`
 	Idle      Idle      `json:"idle"`
 	Lock      Lock      `json:"lock"`
 	Media     Media     `json:"media"`
@@ -57,6 +58,7 @@ func DefaultShared() Shared {
 		Doorbell:  DefaultDoorbell(),
 		Feedback:  DefaultFeedback(),
 		Home:      DefaultHome(),
+		HomeAlarm: DefaultHomeAlarm(),
 		Idle:      DefaultIdle(),
 		Media:     DefaultMedia(),
 		Network:   DefaultNetwork(),
@@ -81,6 +83,7 @@ func (s Shared) Clone() Shared {
 	s.Camera = s.Camera.Clone()
 	s.Cameras = s.Cameras.Clone()
 	s.Home = s.Home.Clone()
+	s.HomeAlarm = s.HomeAlarm.Clone()
 	s.Apps = s.Apps.Clone()
 	s.Radio = s.Radio.Clone()
 	s.Voice = s.Voice.Clone()
@@ -105,6 +108,7 @@ type Sections[C any] struct {
 	Feedback  storage.Binding[C, Feedback]
 	Frontend  storage.Binding[C, Frontend]
 	Home      storage.Binding[C, Home]
+	HomeAlarm storage.Binding[C, HomeAlarm]
 	Idle      storage.Binding[C, Idle]
 	Lock      storage.Binding[C, Lock]
 	Media     storage.Binding[C, Media]
@@ -144,6 +148,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Feedback:  bind(store, shared, func(s *Shared) *Feedback { return &s.Feedback }),
 		Frontend:  bind(store, shared, func(s *Shared) *Frontend { return &s.Frontend }),
 		Home:      bind(store, shared, func(s *Shared) *Home { return &s.Home }),
+		HomeAlarm: bind(store, shared, func(s *Shared) *HomeAlarm { return &s.HomeAlarm }),
 		Idle:      bind(store, shared, func(s *Shared) *Idle { return &s.Idle }),
 		Lock:      bind(store, shared, func(s *Shared) *Lock { return &s.Lock }),
 		Media:     bind(store, shared, func(s *Shared) *Media { return &s.Media }),

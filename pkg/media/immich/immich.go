@@ -100,6 +100,13 @@ func (c *Client) About(ctx context.Context) (About, error) {
 	return out, c.call(ctx, http.MethodGet, "/api/server/about", nil, &out)
 }
 
+func (c *Client) KeyPermissions(ctx context.Context) ([]string, error) {
+	var out struct {
+		Permissions []string `json:"permissions"`
+	}
+	return out.Permissions, c.call(ctx, http.MethodGet, "/api/api-keys/me", nil, &out)
+}
+
 func (c *Client) Albums(ctx context.Context) ([]Album, error) {
 	var out []Album
 	return out, c.call(ctx, http.MethodGet, "/api/albums", nil, &out)
@@ -161,8 +168,13 @@ func (c *Client) Memories(ctx context.Context, day time.Time) ([]Memory, error) 
 	return out, c.call(ctx, http.MethodGet, path, nil, &out)
 }
 
-func (c *Client) Preview(ctx context.Context, id string) ([]byte, error) {
-	path := "/api/assets/" + url.PathEscape(id) + "/thumbnail?size=preview"
+const (
+	Preview  = "preview"
+	Fullsize = "fullsize"
+)
+
+func (c *Client) Picture(ctx context.Context, id, size string) ([]byte, error) {
+	path := "/api/assets/" + url.PathEscape(id) + "/thumbnail?size=" + url.QueryEscape(size)
 	req, err := c.request(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -233,10 +245,20 @@ func status(resp *http.Response, method, path string) error {
 	switch resp.StatusCode {
 	case http.StatusOK, http.StatusCreated:
 		return nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusUnauthorized:
 		return ErrKey
 	}
 	msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	if resp.StatusCode == http.StatusForbidden {
+		var body struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(msg, &body)
+		if perm, ok := strings.CutPrefix(body.Message, missingPermission); ok {
+			return &PermissionError{Permission: strings.TrimSpace(perm)}
+		}
+		return ErrKey
+	}
 	return fmt.Errorf(
 		"immich: %s %s: %s %s",
 		method,
@@ -261,4 +283,12 @@ func (c *Client) request(
 	req.Header.Set("x-api-key", c.Key)
 	req.Header.Set("Accept", "application/json")
 	return req, nil
+}
+
+const missingPermission = "Missing required permission:"
+
+type PermissionError struct{ Permission string }
+
+func (e *PermissionError) Error() string {
+	return fmt.Sprintf("immich: the API key lacks %s", e.Permission)
 }

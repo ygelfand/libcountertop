@@ -10,17 +10,24 @@ import (
 )
 
 func CloseCorner(p *interaction.Presses, id string, tap func()) gogui.View {
-	st := cornerStyle()
-	pad := int(gogui.PadLarge)
-	return corner(p, id, gogui.IconClose, st, pad, tap)
+	return CloseCornerAt(p, id, int(gogui.PadLarge), tap)
+}
+
+func CloseCornerAt(p *interaction.Presses, id string, x int, tap func()) gogui.View {
+	return corner(p, id, gogui.IconClose, cornerStyle(), x, tap)
 }
 
 func SettingsCorner(p *interaction.Presses, id string, vw int, tap func()) gogui.View {
+	return SettingsCornerAt(p, id, vw-int(gogui.PadLarge)-CornerSide(), tap)
+}
+
+func SettingsCornerAt(p *interaction.Presses, id string, x int, tap func()) gogui.View {
 	st := cornerStyle()
 	st.Family = icons.Family
-	pad := int(gogui.PadLarge)
-	return corner(p, id, icons.Glyph(icons.Named("mdi:cog")), st, vw-pad-int(st.Size*2), tap)
+	return corner(p, id, icons.Glyph(icons.Named("mdi:cog")), st, x, tap)
 }
+
+func CornerSide() int { return int(cornerStyle().Size * 2) }
 
 func cornerStyle() gogui.TextStyle {
 	st := gogui.CurrentTheme().TextStyleIconMedium

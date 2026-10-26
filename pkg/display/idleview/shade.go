@@ -69,6 +69,12 @@ func (v *View) unshade(n int) {
 	}
 }
 
+func (v *View) unshadeSlot(n int) {
+	v.gmu.Lock()
+	defer v.gmu.Unlock()
+	v.unshade(n)
+}
+
 func (v *View) unshadeAll() {
 	v.gmu.Lock()
 	defer v.gmu.Unlock()
@@ -115,11 +121,11 @@ func (v *View) shade() {
 	}
 }
 
-func (v *View) painting(slots int) bool {
+func (v *View) painting(slots []config.IdleVisual) bool {
 	v.gmu.Lock()
 	defer v.gmu.Unlock()
-	for n := range slots {
-		if v.gl[n] == nil && v.broken[n] == nil {
+	for n, slot := range slots {
+		if !slot.Photos() && v.gl[n] == nil && v.broken[n] == nil {
 			return true
 		}
 	}

@@ -2,7 +2,7 @@ package schema
 
 import "testing"
 
-func TestPhotosTakeOverThePostersServer(t *testing.T) {
+func TestPhotosMigrateToImmich(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		data string
@@ -11,11 +11,25 @@ func TestPhotosTakeOverThePostersServer(t *testing.T) {
 		{
 			"old poster settings",
 			`{"poster":{"server":"http://immich","key":"k","albums":"Kitchen","tags":"cats"}}`,
-			Photos{Server: "http://immich", Key: "k", Albums: "Kitchen", Tags: "cats"},
+			Photos{Immich: Immich{
+				Enabled: true, Server: "http://immich", Key: "k", Albums: "Kitchen", Tags: "cats",
+			}},
 		},
 		{
-			"photos already set",
-			`{"photos":{"server":"http://new"},"poster":{"server":"http://old"}}`,
+			"flat photos settings",
+			`{"photos":{"server":"http://flat","key":"k","people":"Sam","favorites":true,"memories":false}}`,
+			Photos{Immich: Immich{
+				Enabled: true, Server: "http://flat", Key: "k", People: "Sam", Favorites: true,
+			}},
+		},
+		{
+			"flat photos without memories keeps the default",
+			`{"photos":{"server":"http://flat"}}`,
+			Photos{Immich: Immich{Enabled: true, Server: "http://flat", Memories: true}},
+		},
+		{
+			"already nested",
+			`{"photos":{"immich":{"server":"http://new"}},"poster":{"server":"http://old"}}`,
 			Photos{},
 		},
 		{"nothing to move", `{"poster":{"enabled":true}}`, Photos{}},

@@ -13,6 +13,7 @@ type Doorbell struct {
 	RingFor Delay                       `json:"ring_for"`
 	Style   AlertStyle                  `json:"style"`
 	Visitor AlertStyle                  `json:"visitor"`
+	Tab     bool                        `json:"tab"`
 	Doors   [DoorbellSlots]DoorbellDoor `json:"doors"`
 }
 

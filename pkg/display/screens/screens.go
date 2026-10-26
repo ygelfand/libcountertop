@@ -10,6 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/display/gpu"
+	"github.com/ygelfand/libcountertop/pkg/display/photoframe"
+
 	"github.com/ygelfand/libcountertop/pkg/display/weatherview"
 
 	"github.com/ygelfand/libcountertop/pkg/display/timerview"
@@ -141,6 +144,7 @@ type Options struct {
 	Offering func() string
 
 	Display   *panel.Driver
+	GPU       *gpu.Renderer
 	Touch     *touch.Screen
 	Turned    *hook.Hook[geometry.Orientation]
 	Shell     *shell.Shell
@@ -168,6 +172,7 @@ type Options struct {
 	Calendar        *calendar.Calendar
 	CamerasPage     func() shell.View
 	DoorbellPage    func() shell.View
+	HomeAlarmPage   func() shell.View
 	Player          playerview.Player
 	PlayerPage      func() shell.View
 	MediaVolume     volume.Channel
@@ -198,6 +203,10 @@ type App struct {
 
 	ticking atomic.Bool
 
+	wallpaper *photoframe.Stage
+	papered   atomic.Bool
+	papering  bool
+
 	mu sync.Mutex
 	w  *gogui.Window
 	r  *backend.Renderer
@@ -208,6 +217,13 @@ func New(o Options) *App {
 		o:       o,
 		ui:      o.UI,
 		preview: &widgets.LivePreview{},
+	}
+	if o.Poster != nil {
+		a.wallpaper = photoframe.NewStage(o.Poster.Frame(), photoframe.StageOptions{
+			GPU:     o.GPU,
+			Display: o.Display,
+			Visible: a.papered.Load,
+		})
 	}
 	a.alerts = alertview.View{UI: o.UI, Messages: o.Messages, Again: a.again}
 	a.timers = timerview.View{UI: o.UI, Timers: o.Timers, Again: a.again}
@@ -247,6 +263,7 @@ func New(o Options) *App {
 		Calendar:        o.Calendar,
 		Cameras:         o.CamerasPage,
 		Doorbell:        o.DoorbellPage,
+		HomeAlarm:       o.HomeAlarmPage,
 		Shell:           o.Shell,
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},

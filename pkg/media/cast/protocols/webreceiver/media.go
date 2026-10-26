@@ -154,10 +154,7 @@ func (b *bridge) handle(o order, payload []byte) {
 		return
 	}
 	if o.Op == "close" {
-		slog.Info("the cast page closed itself")
-		if end := b.r.env.End; end != nil {
-			end()
-		}
+		b.r.closed()
 		return
 	}
 	p := b.r.player

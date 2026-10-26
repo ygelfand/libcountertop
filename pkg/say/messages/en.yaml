@@ -344,6 +344,7 @@ cast.entity.youtube.lounge: YouTube lounge
 cast.entity.youtube.skip: YouTube SponsorBlock categories
 cast.group.cast: Cast
 cast.starting: Starting {{.Name}}…
+cast.refused: "{{.Name}} can't play on this device"
 cast.option.youtube.lounge.always: Always
 cast.option.youtube.lounge.demand: On demand
 cast.setting.receiver: Receiver
@@ -571,6 +572,12 @@ idle.setting.visual2.source: Idle visual 2 listens to
 idle.source1: Visual 1 audio
 idle.source2: Visual 2 audio
 idle.title: Screen saver
+idle.setting.photo_every: Next photo every
+idle.entity.photo_every: Screen saver next photo every
+idle.setting.photo_fit: Photo fit
+idle.entity.photo_fit: Screen saver photo fit
+idle.setting.photo_transition: Transition
+idle.entity.photo_transition: Screen saver photo transition
 idle.visual1: Visual 1
 idle.visual2: Visual 2
 ink.amber: Amber
@@ -634,6 +641,143 @@ onboard.add: Scan the code, then add
 onboard.hint: Scan the code, then enter this address.
 onboard.or: or enter this address
 onboard.title: Add me to Home Assistant
+homealarm.app: Home alarm
+homealarm.group.homealarm: Home alarm
+homealarm.setting.entity: Alarm panel
+homealarm.setting.look: Look
+homealarm.entity.look: Home alarm look
+homealarm.setting.tab: Dashboard tab
+homealarm.entity.tab: Home alarm dashboard tab
+homealarm.setting.triggered.show: Show when triggered
+homealarm.entity.triggered.show: Home alarm show when triggered
+homealarm.setting.triggered.sound: Triggered sound
+homealarm.entity.triggered.sound: Home alarm triggered sound
+homealarm.setting.pending.show: Show during entry delay
+homealarm.entity.pending.show: Home alarm show during entry delay
+homealarm.setting.pending.sound: Entry delay sound
+homealarm.entity.pending.sound: Home alarm entry delay sound
+homealarm.setting.arming.show: Show while arming
+homealarm.entity.arming.show: Home alarm show while arming
+homealarm.setting.arming.sound: Arming sound
+homealarm.entity.arming.sound: Home alarm arming sound
+homealarm.setting.settled.show: Show when armed or disarmed
+homealarm.entity.settled.show: Home alarm show when armed or disarmed
+homealarm.setting.settled.for: Hide after
+homealarm.entity.settled.for: Home alarm hide after
+homealarm.setting.settled.sound: Armed and disarmed sound
+homealarm.entity.settled.sound: Home alarm armed and disarmed sound
+homealarm.look.keypad: Keypad
+homealarm.look.shield: Shield
+homealarm.look.card: Card
+homealarm.look.ring: Ring
+homealarm.look.dial: Dial
+homealarm.look.neon: Neon
+homealarm.look.hardware: Hardware
+homealarm.look.flip: Flip board
+homealarm.look.terminal: Terminal
+homealarm.look.console: Console
+homealarm.look.minimal: Minimal
+homealarm.look.blueprint: Blueprint
+homealarm.look.matrix: Matrix
+homealarm.look.vault: Vault
+homealarm.blueprint.sheet: Sheet
+homealarm.blueprint.date: Date
+homealarm.blueprint.time: Time
+homealarm.blueprint.link: Link
+homealarm.blueprint.log: State log
+homealarm.status.unset: No alarm panel
+homealarm.status.waiting: Waiting for Home Assistant
+homealarm.status.unavailable: Unavailable
+homealarm.status.disarmed: Disarmed
+homealarm.status.armed_home: Armed home
+homealarm.status.armed_away: Armed away
+homealarm.status.armed_night: Armed night
+homealarm.status.armed_vacation: Armed vacation
+homealarm.status.armed_custom_bypass: Armed bypass
+homealarm.status.arming: Arming
+homealarm.status.disarming: Disarming
+homealarm.status.pending: Entry delay
+homealarm.status.triggered: Triggered
+homealarm.mode.armed_home: Home
+homealarm.mode.armed_away: Away
+homealarm.mode.armed_night: Night
+homealarm.mode.armed_vacation: Vacation
+homealarm.mode.armed_custom_bypass: Bypass
+homealarm.arm: Arm
+homealarm.disarm: Disarm
+homealarm.emergency: Emergency
+homealarm.panic: Panic
+homealarm.hold: Hold to trigger
+homealarm.code.first: Enter your code first
+homealarm.code.enter: Enter code
+homealarm.code.title: Enter code
+homealarm.sending: Sending…
+homealarm.refused: Home Assistant refused that
+homealarm.none: No alarm panels in Home Assistant
+homealarm.pick: Pick one
+homealarm.cancel: Cancel
+homealarm.ok: OK
+homealarm.recent: Recent
+homealarm.chip.ready: Ready
+homealarm.chip.armed: Armed
+homealarm.chip.delay: Delay
+homealarm.chip.alarm: Alarm
+homealarm.plate.time: Local time
+homealarm.plate.link: Link
+homealarm.plate.lost: Lost
+homealarm.plate.normal: Normal
+homealarm.plate.system: System
+homealarm.plate.mode: System mode
+homealarm.plate.idle: Idle
+homealarm.plate.exit: Exit
+homealarm.plate.entry: Entry
+homealarm.neon.state: System state
+homealarm.flip.time: Time
+homealarm.flip.state: State
+homealarm.terminal.status: System status
+homealarm.terminal.command: Command
+homealarm.console.log: Event log
+homealarm.console.by: by
+homealarm.console.prompt: Enter code or select function
+homealarm.zone.lost: Lost
+homealarm.zone.bypassed: Bypassed
+homealarm.zone.active: Active
+homealarm.zone.idle: Idle
+homealarm.zone.fault: Fault
+homealarm.zone.clear: Clear
+homealarm.zone.open: Open
+homealarm.zone.closed: Closed
+homealarm.zone.battery: Low battery
+homealarm.zone.tamper: Tamper
+homealarm.zone.trouble: Trouble
+homealarm.notready.one: "Not ready: {{.Zone}} open"
+homealarm.notready.many: "Not ready: {{.N}} zones open"
+homealarm.zones: Zones
+homealarm.faults: Faults
+homealarm.rehearsal: Rehearsal, nothing sent
+homealarm.zones.count: "{{.Secure}} secure / {{.Open}} open"
+homealarm.setting.zones: Zones shown
+homealarm.zones.shown: "{{.N}} of {{.Of}}"
+homealarm.zones.page: "Zones {{.From}}–{{.To}} / {{.Of}}"
+homealarm.blueprint.location: Location
+homealarm.blueprint.type: Type
+homealarm.class.door: Door
+homealarm.class.window: Window
+homealarm.class.garage_door: Garage door
+homealarm.class.opening: Opening
+homealarm.class.motion: Motion
+homealarm.class.occupancy: Occupancy
+homealarm.class.presence: Presence
+homealarm.class.vibration: Vibration
+homealarm.class.tamper: Tamper
+homealarm.class.smoke: Smoke
+homealarm.class.moisture: Water
+homealarm.class.gas: Gas
+homealarm.class.carbon_monoxide: CO
+homealarm.class.sound: Sound
+homealarm.class.safety: Safety
+homealarm.on: "On"
+homealarm.off: "Off"
 doorbell.entity.chime: Doorbell ring sound
 doorbell.group.doorbell: Doorbell
 doorbell.setting.chime: Ring sound
@@ -645,6 +789,8 @@ doorbell.entity.style: Doorbell notification style
 doorbell.setting.style: Notification style
 doorbell.entity.visitor: Doorbell ring style
 doorbell.setting.visitor: Ring style
+doorbell.entity.tab: Doorbell dashboard tab
+doorbell.setting.tab: Dashboard tab
 doorbell.add: Add doorbell
 doorbell.app: Doorbell
 doorbell.camera.title: Home Assistant camera
@@ -728,36 +874,85 @@ doorbell.event.people: "Person at the {{.Door}}"
 doorbell.event.package: "Package at the {{.Door}}"
 doorbell.event.vehicle: "Vehicle by the {{.Door}}"
 doorbell.event.dog_cat: "Animal at the {{.Door}}"
-photos.entity.albums: Photo albums
-photos.entity.favorites: Photos favorites only
-photos.entity.interval: Photo interval
-photos.entity.key: Immich API key
-photos.entity.memories: Photo memories first
-photos.entity.motion.app: Photos app motion
-photos.entity.motion.dashboard: Wallpaper motion
-photos.entity.motion.saver: Photo screen saver motion
-photos.entity.people: Photo people
-photos.entity.server: Immich server
-photos.entity.tags: Photo tags
+photos.entity.immich.albums: Immich albums
+photos.entity.immich.enabled: Immich photos
+photos.entity.immich.favorites: Immich favorites only
+photos.entity.immich.key: Immich API key
+photos.entity.immich.memories: Immich memories first
+photos.entity.immich.people: Immich people
+photos.entity.immich.server: Immich server
+photos.entity.immich.tags: Immich tags
+photos.entity.status: "Photos {{.Source}} status"
+photos.group.immich: Immich
+photos.google: Google Photos
+photos.group.google: Google Photos
+photos.setting.google.enabled: Enable
+photos.entity.google.enabled: Google Photos
+photos.setting.google.album1: Album 1 link
+photos.entity.google.album1: Google Photos album 1 link
+photos.example.google.album1: https://photos.app.goo.gl/…
+photos.setting.google.album1.weight: Album 1 share
+photos.entity.google.album1.weight: Google Photos album 1 share
+photos.setting.google.album2: Album 2 link
+photos.entity.google.album2: Google Photos album 2 link
+photos.example.google.album2: https://photos.app.goo.gl/…
+photos.setting.google.album2.weight: Album 2 share
+photos.entity.google.album2.weight: Google Photos album 2 share
+photos.setting.google.album3: Album 3 link
+photos.entity.google.album3: Google Photos album 3 link
+photos.example.google.album3: https://photos.app.goo.gl/…
+photos.setting.google.album3.weight: Album 3 share
+photos.entity.google.album3.weight: Google Photos album 3 share
+photos.setting.google.album4: Album 4 link
+photos.entity.google.album4: Google Photos album 4 link
+photos.example.google.album4: https://photos.app.goo.gl/…
+photos.setting.google.album4.weight: Album 4 share
+photos.entity.google.album4.weight: Google Photos album 4 share
 photos.group.photos: Photos
-photos.example.albums: Family, Summer 2026
-photos.example.people: Alex, Sam
-photos.example.server: https://photos.example.com
-photos.example.tags: kitchen, favorites
-photos.setting.albums: Albums
-photos.setting.favorites: Favorites only
-photos.setting.interval: Next photo every
-photos.setting.key: API key
-photos.setting.memories: Memories first
-photos.setting.motion.app: Motion in the Photos app
-photos.setting.motion.dashboard: Motion on the wallpaper
-photos.setting.motion.saver: Motion in the screen saver
-photos.setting.people: People
-photos.setting.server: Immich server
-photos.setting.tags: Tags
+photos.setting.app.every: Photos app next photo every
+photos.entity.app.every: Photos app next photo every
+photos.setting.app.fit: Photos app fit
+photos.entity.app.fit: Photos app fit
+photos.setting.app.transition: Photos app transition
+photos.entity.app.transition: Photos app transition
+phototransition.cut: None
+phototransition.fade: Fade
+phototransition.slide: Slide
+phototransition.zoom: Zoom
+phototransition.wipe: Wipe
+phototransition.dissolve: Dissolve
+photos.setting.immich.quality: Quality
+photos.entity.immich.quality: Immich quality
+photos.quality.preview: Preview
+photos.quality.fullsize: Full size
+photofit.auto: Auto
+photofit.cover: Fill
+photofit.contain: Fit, blurred edges
+photofit.bars: Fit, plain edges
+photofit.framed: Framed
+photofit.kenburns: Slow pan
+photos.app: Photos
+photos.example.immich.albums: Family, Summer 2026
+photos.example.immich.people: Alex, Sam
+photos.example.immich.server: https://photos.example.com
+photos.example.immich.tags: kitchen, favorites
+photos.immich: Immich
+photos.page: Photos
+photos.sources: Sources
+photos.status: Status
+photos.setting.immich.albums: Albums
+photos.setting.immich.enabled: Enable
+photos.setting.immich.favorites: Favorites only
+photos.setting.immich.key: API key
+photos.setting.immich.memories: Memories first
+photos.setting.immich.people: People
+photos.setting.immich.server: Server
+photos.setting.immich.tags: Tags
+photos.status.off: "Off"
 photos.status.connecting: Connecting…
 photos.status.empty: No photos match
 photos.status.key: Wrong API key
+photos.status.permission: "API key needs {{.Name}}"
 photos.status.old: "Immich {{.Version}}: needs 3.2 or newer"
 photos.status.ready: "Connected · Immich {{.Version}}"
 photos.status.unknown: "Nothing named {{.Name}}"
@@ -776,19 +971,18 @@ position.center: Center
 position.random: Random
 position.top: Top
 poster.daily: Daily
-poster.entity.every: Poster changes
-poster.entity.on: Poster
+poster.entity.every: Wallpaper changes
+poster.entity.on: Wallpaper
 poster.every: Change every
-poster.group.poster: Poster
+poster.group.poster: Wallpaper
 poster.hourly: Hourly
 poster.never: Never
-poster.next: Change now
 poster.off: Off
-poster.option.every.daily: Daily
-poster.option.every.hourly: Hourly
-poster.option.every.never: Never
-poster.option.every.wake: On each wake
 poster.setting.every: Change every
+poster.setting.fit: Fit
+poster.entity.fit: Wallpaper fit
+poster.setting.transition: Transition
+poster.entity.transition: Wallpaper transition
 poster.setting.on: Show wallpaper
 poster.show: Show wallpaper
 poster.wake: On each wake

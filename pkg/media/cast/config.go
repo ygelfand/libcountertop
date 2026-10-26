@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 )
 
@@ -17,6 +19,15 @@ type AppConfig struct {
 	URL  string
 	Name string
 	Icon string
+}
+
+func (c AppConfig) Page(friendlyName, postData string) string {
+	return strings.NewReplacer(
+		"${FRIENDLY_NAME}", friendlyName,
+		"${URL_ENCODED_FRIENDLY_NAME}", url.QueryEscape(friendlyName),
+		"${POST_DATA}", postData,
+		"${URL_ENCODED_POST_DATA}", url.QueryEscape(postData),
+	).Replace(c.URL)
 }
 
 var configs = struct {

@@ -55,6 +55,19 @@ func NewTable() *Table {
 			func(c *schema.Idle) *schema.Delay { return &c.NightAfter },
 		),
 	}
+	rows = append(rows, setting.Pick(
+		Setting{Name: "photo_every", Group: Group, Icon: "mdi:image-sync"},
+		schema.IdlePhotoSpans(),
+		func(c *schema.Idle) *schema.Delay { return &c.PhotoEvery },
+	), setting.Pick(
+		Setting{Name: "photo_fit", Group: Group, Icon: "mdi:fit-to-screen"},
+		schema.PhotoFits(),
+		func(c *schema.Idle) *schema.PhotoFit { return &c.PhotoFit },
+	), setting.Pick(
+		Setting{Name: "photo_transition", Group: Group, Icon: "mdi:transition"},
+		schema.PhotoTransitions(),
+		func(c *schema.Idle) *schema.PhotoTransition { return &c.PhotoChange },
+	))
 	for n, id := range []string{"1", "2"} {
 		rows = append(rows,
 			kindRow(Setting{
@@ -72,7 +85,10 @@ func NewTable() *Table {
 
 func kindRow(s Setting, n int) Setting {
 	s.Kind = setting.Choice
-	s.Options = []setting.Option{{Value: noKind, Label: say.T("idle.none")}}
+	s.Options = []setting.Option{
+		{Value: noKind, Label: KindLabel("")},
+		{Value: schema.IdlePhotos, Label: KindLabel(schema.IdlePhotos)},
+	}
 	for _, k := range visual.Built() {
 		s.Options = append(s.Options, setting.Option{Value: string(k), Label: k.Label()})
 	}

@@ -231,8 +231,11 @@ func (i *Idle) quiet() time.Duration {
 func (i *Idle) free() bool { return !i.options.Shell.Open() && i.options.Free() }
 
 func KindLabel(kind string) string {
-	if kind == "" {
+	switch kind {
+	case "":
 		return say.T("idle.none")
+	case schema.IdlePhotos:
+		return say.T("photos.page")
 	}
 	return visual.Kind(kind).Label()
 }
@@ -308,10 +311,23 @@ func slot(c *schema.Idle, n int) *schema.IdleVisual {
 }
 
 func (i *Idle) SetKind(n int, kind string) {
-	if kind != "" && !slices.Contains(visual.Built(), visual.Kind(kind)) {
+	if kind != "" && kind != schema.IdlePhotos &&
+		!slices.Contains(visual.Built(), visual.Kind(kind)) {
 		return
 	}
 	i.set("visual", func(c *schema.Idle) { slot(c, n).Kind = kind })
+}
+
+func (i *Idle) SetPhotoEvery(d schema.Delay) {
+	i.set("photo_every", func(c *schema.Idle) { c.PhotoEvery = d })
+}
+
+func (i *Idle) SetPhotoFit(f schema.PhotoFit) {
+	i.set("photo_fit", func(c *schema.Idle) { c.PhotoFit = f })
+}
+
+func (i *Idle) SetPhotoChange(t schema.PhotoTransition) {
+	i.set("photo_transition", func(c *schema.Idle) { c.PhotoChange = t })
 }
 
 func (i *Idle) SetSource(n int, s schema.Source) {

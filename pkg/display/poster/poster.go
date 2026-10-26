@@ -2,24 +2,22 @@ package poster
 
 import (
 	"context"
-	"fmt"
 	"image"
 	"log/slog"
-	"sync"
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	"github.com/ygelfand/libcountertop/pkg/display/photoframe"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/hook"
-	"github.com/ygelfand/libcountertop/pkg/media/photos"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 const (
-	check   = 30 * time.Second
+	check   = 5 * time.Second
 	awayFor = 5 * time.Minute
 )
 
@@ -27,22 +25,23 @@ type Poster struct {
 	options Dependencies
 	knobs   *Controls
 	next    *esphome.Button
+	back    *esphome.Button
 	showing *esphome.TextSensor
 
 	Changed hook.Hook[int]
 
 	kick chan struct{}
 
-	mu      sync.Mutex
-	src     image.Image
-	version int
-	shownAt time.Time
-	made    *image.RGBA
-	madeFor string
+	frame *photoframe.Frame
 }
 
 func New(o Dependencies) *Poster {
-	p := &Poster{options: o, kick: make(chan struct{}, 1)}
+	p := &Poster{
+		options: o,
+		kick:    make(chan struct{}, 1),
+		frame:   photoframe.New("wallpaper", o.Photos),
+	}
+	p.frame.Changed.Listen(func(v int) { p.Changed.Emit(v) })
 	p.build()
 	return p
 }
@@ -50,7 +49,7 @@ func New(o Dependencies) *Poster {
 func (p *Poster) Name() string { return "poster" }
 
 func (p *Poster) Entities() []esphome.Entity {
-	return append(p.knobs.Entities(), p.next, p.showing)
+	return append(p.knobs.Entities(), p.next, p.back, p.showing)
 }
 
 func (p *Poster) Settings() *Controls { return p.knobs }
@@ -89,70 +88,51 @@ func (p *Poster) step(now time.Time, kicked, woke bool) {
 		p.drop()
 		return
 	}
-	p.mu.Lock()
-	have, shownAt := p.src != nil, p.shownAt
-	p.mu.Unlock()
-
-	due := !have || kicked
-	if have && !due {
-		switch cfg.Every {
-		case config.PosterWake:
+	due := kicked || p.frame.Due(now, 0)
+	if !due {
+		switch every := cfg.Every.Period(); {
+		case cfg.Every == config.PosterWake:
 			due = woke
-		case config.PosterHourly, config.PosterDaily:
-			due = now.Sub(shownAt) >= cfg.Every.Period()
+		case every > 0:
+			due = p.frame.Due(now, every)
 		}
 	}
-	if !due {
+	if !due || !p.frame.Next(now) {
 		return
 	}
+	p.record()
+}
 
-	pic, ok := p.options.Photos.Next()
-	if !ok {
-		return
+func (p *Poster) Previous() {
+	if p.options.Settings.Read().Enabled && p.frame.Previous(time.Now()) {
+		p.record()
 	}
-	id := pic.ID
-	src, err := decode(pic.Data)
-	if err != nil {
-		slog.Warn("decoding a poster failed", "asset", id, "err", err)
-		return
-	}
-	p.mu.Lock()
-	p.src, p.shownAt = src, now
-	p.version++
-	p.made, p.madeFor = nil, ""
-	v := p.version
-	p.mu.Unlock()
-	if err := p.options.Settings.Update(func(c *config.Poster) { c.Last = id }); err != nil {
+}
+
+func (p *Poster) record() {
+	pic, _ := p.frame.Showing()
+	if err := p.options.Settings.Update(func(c *config.Poster) { c.Last = pic.ID }); err != nil {
 		slog.Error("saving a setting failed", "setting", "poster last", "err", err)
 	}
-	p.showing.Set(id)
-	slog.Info("poster changed", "asset", id)
-	p.Changed.Emit(v)
+	p.showing.Set(pic.ID)
+	slog.Info("poster changed", "asset", pic.ID)
 }
 
-func (p *Poster) drop() {
-	p.mu.Lock()
-	had := p.src != nil
-	p.src, p.made, p.madeFor = nil, nil, ""
-	p.version++
-	v := p.version
-	p.mu.Unlock()
-	if had {
-		p.Changed.Emit(v)
-	}
-}
+func (p *Poster) drop() { p.frame.Drop() }
 
-func (p *Poster) Backdrop(w, h int, box image.Rectangle, bg theme.Color) (*image.RGBA, string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.src == nil {
-		return nil, ""
+func (p *Poster) Frame() *photoframe.Frame { return p.frame }
+
+func (p *Poster) Shows() bool { return p.options.Settings.Read().Enabled }
+
+func (p *Poster) Look(box image.Rectangle, bg theme.Color) photoframe.Look {
+	cfg := p.options.Settings.Read()
+	return photoframe.Look{
+		Box:    box,
+		Back:   bg,
+		Fit:    cfg.Fit,
+		Change: cfg.Change,
+		Span:   cfg.Every.Period(),
 	}
-	key := fmt.Sprintf("v%d %dx%d %v %v", p.version, w, h, box, bg)
-	if p.madeFor != key {
-		p.made, p.madeFor = compose(p.src, w, h, box, bg), key
-	}
-	return p.made, key
 }
 
 func (p *Poster) Next() {
@@ -171,10 +151,16 @@ func (p *Poster) build() {
 	}
 
 	p.next = &esphome.Button{Base: esphome.Base{
-		ObjectID: "poster_next", Name: "Next poster", Icon: "mdi:skip-next",
+		ObjectID: "poster_next", Name: "Next wallpaper", Icon: "mdi:skip-next",
 		Category: esphome.CategoryConfig, DeviceID: p.options.DeviceID,
 	}}
 	p.next.OnPress = p.Next
+
+	p.back = &esphome.Button{Base: esphome.Base{
+		ObjectID: "poster_previous", Name: "Previous wallpaper", Icon: "mdi:skip-previous",
+		Category: esphome.CategoryConfig, DeviceID: p.options.DeviceID,
+	}}
+	p.back.OnPress = p.Previous
 
 	p.showing = &esphome.TextSensor{
 		Base: esphome.Base{ObjectID: "poster_showing", Name: "Poster showing", Icon: "mdi:image",
@@ -186,7 +172,9 @@ func (p *Poster) save(s Setting, v string) error {
 	if err := setting.Store(p.options.Settings, s, v); err != nil {
 		return err
 	}
-	if s.Name != "every" {
+	if s.Name == "fit" || s.Name == "transition" {
+		p.Changed.Emit(0)
+	} else if s.Name != "every" {
 		p.Next()
 	}
 	return nil
@@ -202,15 +190,15 @@ func (p *Poster) SetEnabled(on bool) { p.change("on", setting.OnOff(on)) }
 
 func (p *Poster) SetEvery(v config.PosterEvery) { p.change("every", string(v)) }
 
-type Touch interface{ Since() time.Duration }
+func (p *Poster) SetFit(v config.PhotoFit) { p.change("fit", string(v)) }
 
-type Photos interface {
-	Next() (photos.Picture, bool)
-}
+func (p *Poster) SetChange(v config.PhotoTransition) { p.change("transition", string(v)) }
+
+type Touch interface{ Since() time.Duration }
 
 type Dependencies struct {
 	Settings storage.Section[config.Poster]
 	Touch    Touch
-	Photos   Photos
+	Photos   photoframe.Source
 	DeviceID uint32
 }

@@ -8,18 +8,20 @@ type Apps struct {
 }
 
 const (
-	AppPlayer   = "player"
-	AppCalls    = "calls"
-	AppMirror   = "mirror"
-	AppShopping = "shopping"
-	AppCalendar = "calendar"
-	AppRadio    = "radio"
-	AppRadar    = "radar"
-	AppAlarms   = "alarms"
-	AppCameras  = "cameras"
-	AppLights   = "lights"
-	AppSwitches = "switches"
-	AppDoorbell = "doorbell"
+	AppPlayer    = "player"
+	AppCalls     = "calls"
+	AppMirror    = "mirror"
+	AppShopping  = "shopping"
+	AppCalendar  = "calendar"
+	AppRadio     = "radio"
+	AppRadar     = "radar"
+	AppAlarms    = "alarms"
+	AppCameras   = "cameras"
+	AppLights    = "lights"
+	AppSwitches  = "switches"
+	AppDoorbell  = "doorbell"
+	AppHomeAlarm = "homealarm"
+	AppPhotos    = "photos"
 )
 
 func DefaultApps() Apps { return Apps{Dock: []string{AppPlayer, AppCalls}} }

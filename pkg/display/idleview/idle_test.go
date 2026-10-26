@@ -100,10 +100,11 @@ func TestOnlyChosenVisualsAreDrawn(t *testing.T) {
 	}
 }
 
-func TestNoneIsOfferedFirst(t *testing.T) {
+func TestNoneThenPhotosAreOfferedFirst(t *testing.T) {
 	row := NewTable().MustRow("visual1")
 	labels := row.Labels()
-	if labels[0] != KindLabel("") || len(labels) != len(visual.Built())+1 {
+	if labels[0] != KindLabel("") || labels[1] != KindLabel(schema.IdlePhotos) ||
+		len(labels) != len(visual.Built())+2 {
 		t.Errorf("labels %v", labels)
 	}
 	if k := row.ValueOf(KindLabel("orb")); k != "orb" {

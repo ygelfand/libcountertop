@@ -21,9 +21,30 @@ import (
 const Group setting.Group = "Diagnostics"
 
 type Zone struct {
-	ID   string
-	Name string
-	Zone string
+	ID        string
+	Name      string
+	Zones     []string
+	PerDegree float64
+}
+
+const (
+	Millidegrees = 1000
+	Decidegrees  = 10
+)
+
+func (z Zone) degrees(thermal map[string]float64) (float64, bool) {
+	var hottest float64
+	var found bool
+	for _, name := range z.Zones {
+		raw, ok := thermal[name]
+		if !ok || z.PerDegree <= 0 {
+			continue
+		}
+		if c := raw / z.PerDegree; !found || c > hottest {
+			hottest, found = c, true
+		}
+	}
+	return hottest, found
 }
 
 type Options struct {
@@ -33,6 +54,7 @@ type Options struct {
 	Zones    []Zone
 	Cache    *wake.CacheEntities
 	Network  func() string
+	Signal   func() metrics.Reading
 	Cores    int
 	Hold     func(cores int) error
 	Sample   func()
@@ -125,7 +147,7 @@ func (d *Diag) Entities() []esphome.Entity {
 		out = append(out, d.o.Cache.Entities()...)
 	}
 	for _, z := range d.o.Zones {
-		out = append(out, d.zones[z.Zone])
+		out = append(out, d.zones[z.ID])
 	}
 	out = append(out,
 		d.cores, d.coresOnline, d.usage, d.load, d.memory, d.free, d.uptime,
@@ -206,10 +228,10 @@ func (d *Diag) store(s setting.Setting[schema.Diag], v string) error {
 
 func (d *Diag) board() {
 	r := metrics.Reader{}
-	temps := r.Temperatures()
-	for zone, s := range d.zones {
-		if v, ok := temps[zone]; ok {
-			s.Set(float32(v))
+	thermal := r.Thermal()
+	for _, z := range d.o.Zones {
+		if v, ok := z.degrees(thermal); ok {
+			d.zones[z.ID].Set(float32(v))
 		}
 	}
 	present, online := r.Cores()
@@ -243,6 +265,11 @@ func (d *Diag) busy(r metrics.Reader) {
 
 func (d *Diag) wireless() {
 	signal, rx, tx := metrics.Reader{}.Wifi()
+	if d.o.Signal != nil {
+		if polled := d.o.Signal(); polled.Known {
+			signal = polled
+		}
+	}
 	set(d.signal, signal)
 	now := time.Now()
 	was := d.last

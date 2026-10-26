@@ -6,8 +6,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/system/metrics"
 )
 
 type Control struct{ conn net.Conn }
@@ -66,6 +69,35 @@ func (c *Control) Status() (map[string]string, error) {
 		}
 	}
 	return status, nil
+}
+
+func (r *Radio) Signal() metrics.Reading {
+	c, err := r.Dial()
+	if err != nil {
+		return metrics.Reading{}
+	}
+	defer c.Close()
+	out, err := c.Cmd("SIGNAL_POLL")
+	if err != nil {
+		return metrics.Reading{}
+	}
+	return parseSignal(out)
+}
+
+// SIGNAL_POLL answers FAIL while not associated.
+func parseSignal(out string) metrics.Reading {
+	for line := range strings.SplitSeq(out, "\n") {
+		v, ok := strings.CutPrefix(strings.TrimSpace(line), "RSSI=")
+		if !ok {
+			continue
+		}
+		dbm, err := strconv.Atoi(v)
+		if err != nil || dbm >= 0 {
+			return metrics.Reading{}
+		}
+		return metrics.Reading{Value: float64(dbm), Known: true}
+	}
+	return metrics.Reading{}
 }
 
 type eventSocket struct{ *Control }

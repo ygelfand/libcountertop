@@ -61,11 +61,12 @@ func fake(t *testing.T, seen *map[string]any) *Client {
 	mux.HandleFunc(
 		"GET /api/assets/{id}/thumbnail",
 		auth(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Query().Get("size") != "preview" {
+			size := r.URL.Query().Get("size")
+			if size != Preview && size != Fullsize {
 				http.Error(w, "size", http.StatusBadRequest)
 				return
 			}
-			_, _ = w.Write([]byte("picture of " + r.PathValue("id")))
+			_, _ = w.Write([]byte(size + " of " + r.PathValue("id")))
 		}),
 	)
 	srv := httptest.NewServer(mux)
@@ -148,9 +149,11 @@ func TestListsAndPages(t *testing.T) {
 	if err != nil || !Supported(about.Version) {
 		t.Errorf("about %+v %v", about, err)
 	}
-	b, err := c.Preview(ctx, "i1")
-	if err != nil || string(b) != "picture of i1" {
-		t.Errorf("preview %q %v", b, err)
+	for _, size := range []string{Preview, Fullsize} {
+		b, err := c.Picture(ctx, "i1", size)
+		if err != nil || string(b) != size+" of i1" {
+			t.Errorf("%s %q %v", size, b, err)
+		}
 	}
 }
 
@@ -173,7 +176,7 @@ func TestFailuresSayWhat(t *testing.T) {
 	if _, err := c.Albums(ctx); !errors.Is(err, ErrKey) {
 		t.Errorf("a wrong key gave %v", err)
 	}
-	if _, err := c.Preview(ctx, "i1"); !errors.Is(err, ErrKey) {
+	if _, err := c.Picture(ctx, "i1", Preview); !errors.Is(err, ErrKey) {
 		t.Errorf("a wrong key on a preview gave %v", err)
 	}
 	if _, err := New("", "k").Albums(ctx); !errors.Is(err, ErrNoServer) {

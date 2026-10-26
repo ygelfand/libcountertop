@@ -31,7 +31,14 @@ func fresh(t *testing.T, o Options) *Diag {
 
 func TestObjectIDsAreDistinct(t *testing.T) {
 	d := fresh(t, Options{
-		Zones:   []Zone{{ID: "cpu_temperature", Name: "CPU temperature", Zone: "cpu"}},
+		Zones: []Zone{
+			{
+				ID:        "cpu_temperature",
+				Name:      "CPU temperature",
+				Zones:     []string{"cpu"},
+				PerDegree: Millidegrees,
+			},
+		},
 		Network: func() string { return "home" },
 		Cores:   4,
 		Hold:    func(int) error { return nil },
@@ -51,6 +58,27 @@ func TestObjectIDsAreDistinct(t *testing.T) {
 	for _, want := range []string{"metrics_interval", "min_cores", "cpu_temperature", "wifi_network"} {
 		if !seen[want] {
 			t.Errorf("no %q entity", want)
+		}
+	}
+}
+
+func TestAZoneReadsTheHottestOfItsSourcesInItsUnit(t *testing.T) {
+	thermal := map[string]float64{"core0": 389, "core1": 510, "gpu": 441, "other": 99000}
+	for _, c := range []struct {
+		zone  Zone
+		want  float64
+		found bool
+	}{
+		{Zone{Zones: []string{"core0", "core1"}, PerDegree: Decidegrees}, 51, true},
+		{Zone{Zones: []string{"gpu"}, PerDegree: Decidegrees}, 44.1, true},
+		{Zone{Zones: []string{"other"}, PerDegree: Millidegrees}, 99, true},
+		{Zone{Zones: []string{"missing"}, PerDegree: Millidegrees}, 0, false},
+		{Zone{Zones: []string{"gpu"}}, 0, false},
+	} {
+		got, found := c.zone.degrees(thermal)
+		if got != c.want || found != c.found {
+			t.Errorf("%v per %v = %v, %v; want %v, %v",
+				c.zone.Zones, c.zone.PerDegree, got, found, c.want, c.found)
 		}
 	}
 }

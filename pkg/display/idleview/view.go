@@ -10,6 +10,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/gpu"
+	"github.com/ygelfand/libcountertop/pkg/display/photoframe"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -39,6 +40,9 @@ type View struct {
 	gmu    sync.Mutex
 	gl     [2]*shading
 	broken [2]visual.Visual
+
+	frames [2]*photoframe.Frame
+	stages [2]*photoframe.Stage
 }
 
 func New(options Dependencies) *View { return &View{options: options} }
@@ -96,20 +100,105 @@ func (v *View) Keep(w, h int) []config.IdleVisual {
 		v.stop, v.done = cancel, make(chan struct{})
 		go v.run(ctx)
 	}
-	var vis []visual.Visual
+	vis := make([]visual.Visual, len(slots))
 	for n, slot := range slots {
+		if slot.Photos() {
+			v.vis[n], v.kinds[n] = nil, slot.Kind
+			continue
+		}
 		if v.vis[n] == nil || v.kinds[n] != slot.Kind {
 			v.vis[n], v.kinds[n] = visual.New(visual.Kind(slot.Kind)), slot.Kind
 		}
-		vis = append(vis, v.vis[n])
+		vis[n] = v.vis[n]
 	}
 	v.shown = key(cfg, time.Now())
 	v.mu.Unlock()
 
+	for n := len(slots); n < len(v.stages); n++ {
+		v.unstage(n)
+	}
 	for n, area := range Areas(w, h, len(slots)) {
+		if slots[n].Photos() {
+			v.unshadeSlot(n)
+			continue
+		}
+		v.unstage(n)
 		v.shaded(n, vis[n], area, slots[n].Source)
 	}
 	return slots
+}
+
+func (v *View) Photo(n int, area ui.Rect, look photoframe.Look) bool {
+	f := v.Frame(n)
+	if f == nil {
+		return false
+	}
+	v.mu.Lock()
+	s := v.stages[n]
+	if s == nil {
+		s = photoframe.NewStage(f, photoframe.StageOptions{
+			GPU:     v.options.GPU,
+			Display: v.options.Display,
+			Visible: func() bool { return v.options.Shell.Visible(v) },
+		})
+		v.stages[n] = s
+	}
+	v.mu.Unlock()
+	return s.Keep(area, look)
+}
+
+func (v *View) unstage(n int) {
+	v.mu.Lock()
+	s := v.stages[n]
+	v.mu.Unlock()
+	if s != nil {
+		s.Close()
+	}
+}
+
+func (v *View) Frame(n int) *photoframe.Frame {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.frames[n] == nil && v.options.Photos != nil {
+		f := photoframe.New(fmt.Sprintf("saver%d", n+1), v.options.Photos)
+		f.Changed.Listen(func(int) { v.options.Shell.Redraw() })
+		v.frames[n] = f
+	}
+	return v.frames[n]
+}
+
+func (v *View) Page(n int, forward bool) {
+	f := v.Frame(n)
+	if f == nil {
+		return
+	}
+	if forward {
+		f.Next(time.Now())
+		return
+	}
+	f.Previous(time.Now())
+}
+
+func (v *View) turnPhotos(cfg Settings, now time.Time) {
+	every := cfg.Idle.PhotoEvery.After()
+	for n, slot := range Chosen(cfg.Idle) {
+		if !slot.Photos() {
+			continue
+		}
+		if f := v.Frame(n); f != nil && f.Due(now, every) {
+			f.Next(now)
+		}
+	}
+}
+
+func visuals(slots []config.IdleVisual) int {
+	n := 0
+	for _, s := range slots {
+		if !s.Photos() {
+			n++
+		}
+	}
+	return n
 }
 
 func Chosen(c config.Idle) []config.IdleVisual {
@@ -221,11 +310,12 @@ func (v *View) run(ctx context.Context) {
 		next = now.Add(frameEvery)
 
 		cfg := v.read()
-		if slots := Chosen(cfg.Idle); len(slots) > 0 {
+		v.turnPhotos(cfg, now)
+		if slots := Chosen(cfg.Idle); visuals(slots) > 0 {
 			if release == nil {
 				release = v.options.Visuals.Hold()
 			}
-			if v.painting(len(slots)) {
+			if v.painting(slots) {
 				v.options.Shell.Redraw()
 				continue
 			}
@@ -302,6 +392,7 @@ type Dependencies struct {
 	GPU     *gpu.Renderer
 	Display Display
 	Shell   *shell.Shell
+	Photos  photoframe.Source
 }
 
 func (v *View) Close() {
@@ -311,5 +402,8 @@ func (v *View) Close() {
 	if stop != nil {
 		stop()
 		<-done
+	}
+	for n := range v.stages {
+		v.unstage(n)
 	}
 }

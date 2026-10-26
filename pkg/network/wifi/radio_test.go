@@ -1,6 +1,23 @@
 package wifi
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/ygelfand/libcountertop/pkg/system/metrics"
+)
+
+func TestSignalPollReadsTheRSSILine(t *testing.T) {
+	for out, want := range map[string]metrics.Reading{
+		"RSSI=-52\nLINKSPEED=72\nNOISE=9999\nFREQUENCY=5180": {Value: -52, Known: true},
+		"FAIL":     {},
+		"RSSI=0":   {},
+		"RSSI=bad": {},
+	} {
+		if got := parseSignal(out); got != want {
+			t.Errorf("parseSignal(%q) = %+v, want %+v", out, got, want)
+		}
+	}
+}
 
 func TestRepeatedConnectedDoesNotQuerySupplicant(t *testing.T) {
 	r := &Radio{up: true, ssid: "home", ctl: &Control{}}

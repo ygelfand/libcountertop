@@ -24,6 +24,9 @@ type IdleState struct {
 type IdleSlots interface {
 	SetKind(int, string)
 	SetSource(int, config.Source)
+	SetPhotoEvery(config.Delay)
+	SetPhotoFit(config.PhotoFit)
+	SetPhotoChange(config.PhotoTransition)
 }
 type IdleClock interface {
 	SetAfter(config.Delay)
@@ -104,12 +107,7 @@ func (p *IdlePages) visualPicker(
 ) *shell.Page {
 	return VisualPicker(title, empty, none, chosen, pick, p.options.Thumbnail, p.options.Previews)
 }
-func IdleKindLabel(kind string) string {
-	if kind == "" {
-		return say.T("idle.none")
-	}
-	return visual.Kind(kind).Label()
-}
+func IdleKindLabel(kind string) string { return idleview.KindLabel(kind) }
 func (p *IdlePages) Page() *shell.Page {
 	return &shell.Page{
 		Title: say.T("idle.title"),
@@ -169,6 +167,44 @@ func (p *IdlePages) Page() *shell.Page {
 				Preview: p.Placed,
 			}.Rows(p.options.Shell)
 			rows, taps = append(rows, placed...), append(taps, placing...)
+			if c.First.Photos() || c.Second.Photos() {
+				spans := config.IdlePhotoSpans()
+				steps := menu.Steps(len(spans))
+				rows = append(rows, menu.Row{
+					Label: say.T("idle.setting.photo_every"),
+					Kind:  menu.Slider,
+					Level: steps.Level(max(slices.Index(spans, c.PhotoEvery), 0)),
+					Snap:  steps.Snap,
+					Value: c.PhotoEvery.Label(),
+				})
+				taps = append(taps, func(level int) { i.SetPhotoEvery(spans[steps.Index(level)]) })
+				rows = append(rows, menu.Row{
+					Label: say.T("idle.setting.photo_fit"),
+					Kind:  menu.Chevron,
+					Value: c.PhotoFit.Label(),
+				})
+				taps = append(taps, p.open(Choose(
+					say.T("idle.setting.photo_fit"),
+					config.PhotoFits(),
+					func() config.PhotoFit { return p.options.Preferences.IdleState().Idle.PhotoFit },
+					i.SetPhotoFit,
+					nil,
+				)))
+				rows = append(rows, menu.Row{
+					Label: say.T("idle.setting.photo_transition"),
+					Kind:  menu.Chevron,
+					Value: c.PhotoChange.Label(),
+				})
+				taps = append(taps, p.open(Choose(
+					say.T("idle.setting.photo_transition"),
+					config.PhotoTransitions(),
+					func() config.PhotoTransition {
+						return p.options.Preferences.IdleState().Idle.PhotoChange
+					},
+					i.SetPhotoChange,
+					nil,
+				)))
+			}
 			w := p.options.Preferences.IdleState().Weather
 			rows = append(rows,
 				menu.Row{
@@ -266,10 +302,22 @@ func (p *IdlePages) Visual(slot int) *shell.Page {
 	if slot == 1 {
 		title = say.T("idle.visual2")
 	}
-	return p.visualPicker(title, say.T("idle.none"),
+	page := p.visualPicker(title, say.T("idle.none"),
 		func() { p.options.Idle.SetKind(slot, "") },
 		func() string { return p.SlotVisual(slot).Kind },
 		func(k visual.Kind) { p.options.Idle.SetKind(slot, string(k)) })
+	tiles := page.Tiles
+	page.Tiles = func() ([]menu.Cell, []func(int)) {
+		cells, acts := tiles()
+		photo := menu.Cell{
+			Label:   say.T("photos.page"),
+			Chosen:  p.SlotVisual(slot).Photos(),
+			Preview: p.options.Previews.Painted("photos", PhotosTile),
+		}
+		pick := func(int) { p.options.Idle.SetKind(slot, config.IdlePhotos) }
+		return slices.Insert(cells, 1, photo), slices.Insert(acts, 1, pick)
+	}
+	return page
 }
 
 func (p *IdlePages) Source(slot int) *shell.Page {

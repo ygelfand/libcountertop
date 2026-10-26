@@ -81,6 +81,7 @@ type View struct {
 	presses  *interaction.Presses
 	shots    pictures
 	spinning atomic.Bool
+	boarded  atomic.Int64
 
 	mu   sync.Mutex
 	live *session

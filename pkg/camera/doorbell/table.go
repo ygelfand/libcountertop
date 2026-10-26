@@ -49,6 +49,10 @@ func NewTable(chimes func() []setting.Option) *Table {
 			schema.VisitorStyles(),
 			func(c *schema.Doorbell) *schema.AlertStyle { return &c.Visitor },
 		),
+		setting.Flag(
+			Setting{Name: "tab", Group: Group, Icon: "mdi:tab"},
+			func(c *schema.Doorbell) *bool { return &c.Tab },
+		),
 	}
 	for i := range schema.DoorbellSlots {
 		rows = append(rows, slotRows(i)...)

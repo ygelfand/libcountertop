@@ -20,16 +20,9 @@ func (p *BasicPages) LocalRows() ([]menu.Row, []func(int)) {
 			Kind:  menu.Chevron,
 			Value: cfg.Clock.Face.Label(),
 		},
-		{
-			Glyph: gogui.IconPicture,
-			Label: say.T("display.poster"),
-			Kind:  menu.Chevron,
-			Value: cfg.PosterLabel,
-		},
 	}
 	acts := []func(int){
 		p.open(func() shell.View { return p.options.Clocks.Page() }),
-		p.open(func() shell.View { return p.Poster() }),
 	}
 	return rows, acts
 }

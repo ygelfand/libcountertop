@@ -43,6 +43,7 @@ type Config struct {
 	Bundle          func() string
 	Synced          func(do func()) (stop func())
 	Credentials     func(*cast.Credentials)
+	Notice          func(title, body string)
 
 	Volume   Volume
 	Video    func() playback.Target
@@ -63,7 +64,8 @@ type Server struct {
 	advert   *cast.Advertiser
 	stop     context.CancelFunc
 
-	loud *loudness
+	loud    *loudness
+	refused *refused
 
 	keys      *keys
 	protocols []cast.Protocol
@@ -71,7 +73,7 @@ type Server struct {
 }
 
 func New(c Config) *Server {
-	return &Server{config: c, loud: newLoudness(c.Volume)}
+	return &Server{config: c, loud: newLoudness(c.Volume), refused: newRefused()}
 }
 
 func (s *Server) current() *cast.Service {
@@ -186,6 +188,8 @@ func (s *Server) Up() error {
 	service.Receiver.Credentials = s.keys.Current
 	service.Receiver.CRL = s.keys.CRL
 	service.Receiver.Identity = func() cast.Device { return device }
+	service.Receiver.Available = s.refused.allows
+	service.Receiver.Refused = s.tellRefused
 	if s.protocols == nil {
 		env := s.env(name, device)
 		s.protocols = cast.Protocols(env, s.config.Apps)
@@ -311,6 +315,10 @@ func (s *Server) env(name string, device cast.Device) cast.Env {
 			if svc := s.current(); svc != nil {
 				svc.End()
 			}
+		},
+		Refuse: func(app string) {
+			s.refused.add(app)
+			s.tellRefused(app)
 		},
 		Keep: store(s.config.AppDir),
 		Send: func(m cast.Message) {

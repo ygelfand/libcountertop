@@ -50,7 +50,7 @@ func (v *View) Page() *shell.Page {
 			rows = append(rows, menu.Row{Label: say.T("doorbell.add"), Kind: menu.Chevron})
 			taps = append(taps, func(int) { v.o.Shell.Push(v.addPage()) })
 		}
-		for _, name := range []string{"visitor", "chime", "ring_for", "style", "notify"} {
+		for _, name := range []string{"visitor", "chime", "ring_for", "style", "notify", "tab"} {
 			r, t := v.settingRow(name)
 			rows, taps = append(rows, r), append(taps, t)
 		}
@@ -107,6 +107,10 @@ func (v *View) settingRow(name string) (menu.Row, func(int)) {
 	case setting.Secret, setting.Credential:
 		row.Kind, row.Value, row.Save = menu.Password, s.Read(&at), save
 		return row, nil
+	case setting.Toggle:
+		on, _ := setting.Boolean(s.Read(&at))
+		row.Kind, row.On = menu.Toggle, on
+		return row, func(int) { save(setting.OnOff(!on)) }
 	}
 	values, labels := s.Values(), s.Labels()
 	current := s.Read(&at)

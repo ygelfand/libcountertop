@@ -135,7 +135,7 @@ func (w *View) run(ctx context.Context) {
 			return
 		case now = <-t.C:
 		}
-		if !w.options.Shell.Visible(w) {
+		if !w.options.Shell.Visible(w.owner()) {
 			return
 		}
 		if fps := w.options.Settings.Read().MaxFPS; fps > 0 &&
@@ -201,7 +201,24 @@ type Dependencies struct {
 	Display  Display
 	Shell    *shell.Shell
 	Settings storage.Section[schema.Visual]
+	Owner    shell.View
 }
+
+func (w *View) owner() shell.View {
+	if w.options.Owner != nil {
+		return w.options.Owner
+	}
+	return w
+}
+
+type fixed struct {
+	Source
+	kind visual.Kind
+}
+
+func (f fixed) Kind() visual.Kind { return f.kind }
+
+func Fixed(s Source, kind visual.Kind) Source { return fixed{Source: s, kind: kind} }
 
 func (w *View) Close() {
 	w.mu.Lock()

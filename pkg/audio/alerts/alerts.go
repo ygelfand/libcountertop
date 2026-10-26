@@ -33,9 +33,23 @@ type Alerts struct {
 	sounds Sounds
 	play   func(tone.Sound, float64)
 
-	mu         sync.Mutex
+	mu    sync.Mutex
+	tones repeater
+	rings repeater
+}
+
+type repeater struct {
 	generation int
 	timer      *time.Timer
+}
+
+func (r *repeater) stop() int {
+	r.generation++
+	if r.timer != nil {
+		r.timer.Stop()
+		r.timer = nil
+	}
+	return r.generation
 }
 
 func New(
@@ -70,37 +84,53 @@ func (a *Alerts) Start(t schema.Tone) {
 	current := a.Read()
 	snd := a.sound(current.Chime(t), schema.DefaultAlerts().Chime(t))
 	a.mu.Lock()
-	a.stopLocked()
-	generation := a.generation
+	generation := a.tones.stop()
 	a.mu.Unlock()
 	if snd.Empty() {
 		return
 	}
 	a.play(snd, Level)
 	if t == schema.ToneAlert {
-		a.again(generation, snd, time.Now().Add(current.RingFor.After()))
+		a.again(&a.tones, generation, snd, until(time.Now().Add(current.RingFor.After())))
 	}
 }
 
 func (a *Alerts) Chime(c schema.Chime, repeat time.Duration) {
 	snd := a.sound(c, schema.ChimeNone)
 	a.mu.Lock()
-	a.stopLocked()
-	generation := a.generation
+	generation := a.tones.stop()
 	a.mu.Unlock()
 	if snd.Empty() {
 		return
 	}
 	a.play(snd, Level)
 	if repeat > 0 {
-		a.again(generation, snd, time.Now().Add(repeat))
+		a.again(&a.tones, generation, snd, until(time.Now().Add(repeat)))
 	}
 }
 
 func (a *Alerts) Stop() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.stopLocked()
+	a.tones.stop()
+}
+
+func (a *Alerts) Ring(c schema.Chime) {
+	snd := a.sound(c, schema.ChimeNone)
+	a.mu.Lock()
+	generation := a.rings.stop()
+	a.mu.Unlock()
+	if snd.Empty() {
+		return
+	}
+	a.play(snd, Level)
+	a.again(&a.rings, generation, snd, func() bool { return true })
+}
+
+func (a *Alerts) Quiet() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.rings.stop()
 }
 
 func (a *Alerts) Preview(c schema.Chime) {
@@ -140,30 +170,26 @@ func (a *Alerts) sound(c, fallback schema.Chime) tone.Sound {
 	return a.sounds.Sound(c, fallback)
 }
 
-func (a *Alerts) again(generation int, snd tone.Sound, until time.Time) {
+func until(end time.Time) func() bool {
+	return func() bool { return time.Now().Add(repeatEvery).Before(end) }
+}
+
+func (a *Alerts) again(r *repeater, generation int, snd tone.Sound, more func() bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.generation != generation || !time.Now().Add(repeatEvery).Before(until) {
+	if r.generation != generation || !more() {
 		return
 	}
-	a.timer = time.AfterFunc(repeatEvery, func() {
+	r.timer = time.AfterFunc(repeatEvery, func() {
 		a.mu.Lock()
-		live := a.generation == generation
+		live := r.generation == generation
 		a.mu.Unlock()
 		if !live {
 			return
 		}
 		a.play(snd, Level)
-		a.again(generation, snd, until)
+		a.again(r, generation, snd, more)
 	})
-}
-
-func (a *Alerts) stopLocked() {
-	a.generation++
-	if a.timer != nil {
-		a.timer.Stop()
-		a.timer = nil
-	}
 }
 
 func NewTable(more func() []setting.Option) *Table {

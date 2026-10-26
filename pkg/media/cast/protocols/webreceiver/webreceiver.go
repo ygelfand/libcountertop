@@ -68,6 +68,7 @@ type Receiver struct {
 	asked        cast.App
 	app          cast.Application
 	title        string
+	began        time.Time
 	pending      []frame
 	lastStatus   json.RawMessage
 	state        string
@@ -262,7 +263,7 @@ func (r *Receiver) Ended(cast.App) {
 	if r.window != nil {
 		r.window.Resume()
 	}
-	r.title, r.state, r.url = "", "", ""
+	r.title, r.state, r.url, r.began = "", "", "", time.Time{}
 	r.mu.Unlock()
 	if page != nil {
 		_ = page.Close()
@@ -302,21 +303,22 @@ func (r *Receiver) launch(a cast.App) {
 	}
 	title, logo := firstOf(page.Name, a.Name), firstOf(page.Icon, a.Icon)
 	r.mu.Lock()
-	r.title = title
+	r.title, r.began = title, time.Now()
 	r.mu.Unlock()
 	if r.env.Output != nil {
 		r.env.Output.Attend(
 			&playback.Session{Label: title, Logo: logo, Pictured: r.env.Video != nil},
 		)
 	}
-	slog.Info("a cast app runs in the web receiver", "app", title, "url", page.URL)
+	target := page.Page(r.env.Name, "")
+	slog.Info("a cast app runs in the web receiver", "app", title, "url", target)
 	if r.env.Video != nil {
 		if t := r.env.Video(); t.Width > 0 && t.Height > 0 {
 			_ = tools.size(t.Width, t.Height)
 		}
 	}
 	_ = tools.navigate(idle)
-	if err := tools.navigate(page.URL); err != nil {
+	if err := tools.navigate(target); err != nil {
 		slog.Warn("the cast web receiver could not open a page", "err", err)
 	}
 }

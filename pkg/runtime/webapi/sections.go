@@ -15,11 +15,11 @@ var sections = []section{
 	{"settings.network", []string{"network", "certs", "access"}},
 	{"settings.features", []string{
 		"cast", "media", "bluetooth", "rtsp", "call",
-		"photos", "calendar", "todo",
+		"calendar", "todo",
 	}},
 	{"settings.display", []string{
-		"screen", "clock", "idle", "visual", "poster", "weather", "apps", "cameras",
-		"doorbell", "presence",
+		"screen", "clock", "idle", "visual", "poster", "photos", "weather", "apps", "cameras",
+		"doorbell", "homealarm", "presence",
 	}},
 	{"home.title", []string{"home"}},
 	{"settings.volume", []string{"feedback", "microphone", "speaker"}},

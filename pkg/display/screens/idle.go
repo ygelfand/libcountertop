@@ -9,6 +9,8 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	"github.com/ygelfand/libcountertop/pkg/display/idleview"
+	"github.com/ygelfand/libcountertop/pkg/display/photoframe"
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/display/visualview"
@@ -67,35 +69,25 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 	spot := v.Spot(idle, time.Now())
 	box := dashboard.Place(spot.At, spot.Align, idle.Size, vw, vh)
 
+	whole := ui.Rect{W: vw, H: vh}
 	var layers []gogui.View
-	if len(slots) == 0 {
-		layers = append(
-			layers,
-			widgets.Placed(
-				ui.Rect{W: vw, H: vh},
-				gogui.Column(
-					gogui.ContainerCfg{
-						Sizing:  gogui.FillFill,
-						Padding: gogui.NoPadding,
-						Color:   widgets.Color(pal.Background),
-					},
-				),
-			),
-		)
-		if backdrop, behind := a.o.Poster.
-			Backdrop(
-				vw,
-				vh,
-				image.Rect(box.X, box.Y, box.X+box.W, box.Y+box.H),
-				pal.Background,
-			); backdrop != nil && !night.Quiet() {
-			layers = append(
-				layers,
-				widgets.Placed(
-					ui.Rect{W: vw, H: vh},
-					widgets.Picture(widgets.ImageSource("poster/"+behind, backdrop), vw, vh),
-				),
-			)
+	if len(slots) == 0 && (night.Quiet() || !a.paper(whole, box, pal.Background)) {
+		layers = append(layers, widgets.Placed(whole, a.ground(pal.Background)))
+	}
+	for n, slot := range slots {
+		if !slot.Photos() {
+			continue
+		}
+		area := areas[n]
+		look := photoframe.Look{
+			Box:    image.Rect(box.X-area.X, box.Y-area.Y, box.X-area.X+box.W, box.Y-area.Y+box.H),
+			Back:   pal.Background,
+			Fit:    idle.PhotoFit,
+			Change: idle.PhotoChange,
+			Span:   idle.PhotoEvery.After(),
+		}
+		if !v.Photo(n, area, look) {
+			layers = append(layers, widgets.Placed(area, a.ground(pal.Background)))
 		}
 	}
 	if face, ok := clockview.Of(idle.Face); ok {
@@ -125,6 +117,13 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 	if r, ok := a.o.Forecast.Now(); (ok || a.weather.Alerting()) && cfg.Weather.Idle &&
 		!night.Quiet() {
 		layers = append(layers, a.weather.Layer(w, r, cfg.Weather.SaverLayout(), vw, vh, 0, pal))
+	}
+	for n, slot := range slots {
+		if slot.Photos() {
+			layers = append(
+				layers,
+				photoframe.Taps(areas[n], func(forward bool) { v.Page(n, forward) })...)
+		}
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		ID:      "idle",
@@ -156,6 +155,27 @@ func (a *App) visualScreen(v *visualview.View) *Screen {
 			})
 		},
 	}
+}
+
+func (a *App) paper(area, box ui.Rect, bg theme.Color) bool {
+	if a.wallpaper == nil || !a.o.Poster.Shows() {
+		return false
+	}
+	look := a.o.Poster.Look(image.Rect(box.X, box.Y, box.X+box.W, box.Y+box.H), bg)
+	if !a.wallpaper.Keep(area, look) {
+		return false
+	}
+	a.papering = true
+	a.papered.Store(true)
+	return true
+}
+
+func (a *App) ground(bg theme.Color) gogui.View {
+	return gogui.Column(gogui.ContainerCfg{
+		Sizing:  gogui.FillFill,
+		Padding: gogui.NoPadding,
+		Color:   widgets.Color(bg),
+	})
 }
 
 func (a *App) seeThrough(on bool) {

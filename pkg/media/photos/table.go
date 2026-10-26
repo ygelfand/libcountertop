@@ -1,12 +1,18 @@
 package photos
 
 import (
+	"fmt"
+
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-const Group setting.Group = "Photos"
+const (
+	Group       setting.Group = "Photos"
+	ImmichGroup setting.Group = "Immich"
+	GoogleGroup setting.Group = "Google"
+)
 
 const (
 	textMost = 1024
@@ -21,57 +27,85 @@ type (
 
 func NewTable() *Table {
 	key := setting.Words(
-		Setting{Name: "key", Group: Group, Icon: "mdi:key"},
+		Setting{Name: "immich.key", Group: ImmichGroup, Icon: "mdi:key"},
 		textMost,
-		func(c *schema.Photos) *string { return &c.Key },
+		func(c *schema.Photos) *string { return &c.Immich.Key },
 	)
 	key.Kind = setting.Secret
-	return setting.NewTable("photos", []setting.Group{Group}, []Setting{
+	rows := []Setting{
+		setting.Pick(
+			Setting{Name: "app.every", Group: Group, Icon: "mdi:image-sync"},
+			schema.PhotoAppSpans(),
+			func(c *schema.Photos) *schema.Delay { return &c.AppEvery },
+		),
+		setting.Pick(
+			Setting{Name: "app.fit", Group: Group, Icon: "mdi:fit-to-screen"},
+			schema.PhotoFits(),
+			func(c *schema.Photos) *schema.PhotoFit { return &c.AppFit },
+		),
+		setting.Pick(
+			Setting{Name: "app.transition", Group: Group, Icon: "mdi:transition"},
+			schema.PhotoTransitions(),
+			func(c *schema.Photos) *schema.PhotoTransition { return &c.AppChange },
+		),
+		setting.Flag(
+			Setting{Name: "immich.enabled", Group: ImmichGroup, Icon: "mdi:image-multiple"},
+			func(c *schema.Photos) *bool { return &c.Immich.Enabled },
+		),
 		setting.Words(
-			Setting{Name: "server", Group: Group, Icon: "mdi:server"},
+			Setting{Name: "immich.server", Group: ImmichGroup, Icon: "mdi:server"},
 			textMost,
-			func(c *schema.Photos) *string { return &c.Server },
+			func(c *schema.Photos) *string { return &c.Immich.Server },
 		),
 		key,
 		setting.Words(
-			Setting{Name: "albums", Group: Group, Icon: "mdi:image-album"},
+			Setting{Name: "immich.albums", Group: ImmichGroup, Icon: "mdi:image-album"},
 			listMost,
-			func(c *schema.Photos) *string { return &c.Albums },
+			func(c *schema.Photos) *string { return &c.Immich.Albums },
 		),
 		setting.Words(
-			Setting{Name: "tags", Group: Group, Icon: "mdi:tag-multiple"},
+			Setting{Name: "immich.tags", Group: ImmichGroup, Icon: "mdi:tag-multiple"},
 			listMost,
-			func(c *schema.Photos) *string { return &c.Tags },
+			func(c *schema.Photos) *string { return &c.Immich.Tags },
 		),
 		setting.Words(
-			Setting{Name: "people", Group: Group, Icon: "mdi:account-group"},
+			Setting{Name: "immich.people", Group: ImmichGroup, Icon: "mdi:account-group"},
 			listMost,
-			func(c *schema.Photos) *string { return &c.People },
+			func(c *schema.Photos) *string { return &c.Immich.People },
 		),
 		setting.Flag(
-			Setting{Name: "favorites", Group: Group, Icon: "mdi:heart"},
-			func(c *schema.Photos) *bool { return &c.Favorites },
+			Setting{Name: "immich.favorites", Group: ImmichGroup, Icon: "mdi:heart"},
+			func(c *schema.Photos) *bool { return &c.Immich.Favorites },
 		),
 		setting.Flag(
-			Setting{Name: "memories", Group: Group, Icon: "mdi:calendar-heart"},
-			func(c *schema.Photos) *bool { return &c.Memories },
+			Setting{Name: "immich.memories", Group: ImmichGroup, Icon: "mdi:calendar-heart"},
+			func(c *schema.Photos) *bool { return &c.Immich.Memories },
 		),
 		setting.Pick(
-			Setting{Name: "interval", Group: Group, Icon: "mdi:timer-outline"},
-			schema.PhotoIntervals(),
-			func(c *schema.Photos) *schema.Delay { return &c.Interval },
+			Setting{Name: "immich.quality", Group: ImmichGroup, Icon: "mdi:quality-high"},
+			schema.ImmichQualities(),
+			func(c *schema.Photos) *schema.ImmichQuality { return &c.Immich.Quality },
 		),
 		setting.Flag(
-			Setting{Name: "motion.dashboard", Group: Group, Icon: "mdi:pan"},
-			func(c *schema.Photos) *bool { return &c.Motion.Dashboard },
+			Setting{Name: "google.enabled", Group: GoogleGroup, Icon: "mdi:google-photos"},
+			func(c *schema.Photos) *bool { return &c.Google.Enabled },
 		),
-		setting.Flag(
-			Setting{Name: "motion.saver", Group: Group, Icon: "mdi:pan"},
-			func(c *schema.Photos) *bool { return &c.Motion.Saver },
-		),
-		setting.Flag(
-			Setting{Name: "motion.app", Group: Group, Icon: "mdi:pan"},
-			func(c *schema.Photos) *bool { return &c.Motion.App },
-		),
-	}, setting.Messages{Text: say.T, Missing: say.Missing})
+	}
+	for i := range schema.GoogleAlbums {
+		album := func(c *schema.Photos) *schema.GoogleAlbum { return &c.Google.Albums[i] }
+		name := fmt.Sprintf("google.album%d", i+1)
+		rows = append(rows,
+			setting.Words(
+				Setting{Name: name, Group: GoogleGroup, Icon: "mdi:link-variant"},
+				textMost,
+				func(c *schema.Photos) *string { return &album(c).URL },
+			),
+			setting.Count(Setting{
+				Name: name + ".weight", Group: GoogleGroup, Icon: "mdi:scale-balance",
+				Min: 0, Max: schema.GoogleWeightMost, Slider: true,
+			}, func(c *schema.Photos) *int { return &album(c).Weight }),
+		)
+	}
+	return setting.NewTable("photos", []setting.Group{Group, ImmichGroup, GoogleGroup}, rows,
+		setting.Messages{Text: say.T, Missing: say.Missing})
 }

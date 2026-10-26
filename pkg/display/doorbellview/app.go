@@ -27,7 +27,6 @@ const (
 
 func (v *View) buildApp(w *gogui.Window) gogui.View {
 	vw, vh := w.WindowSize()
-	doors := v.o.Bell.Doors()
 	content := []gogui.View{
 		widgets.CloseCorner(v.presses, "doorbell-app-close", func() { v.o.Shell.Remove(v.app) }),
 		widgets.SettingsCorner(
@@ -37,11 +36,19 @@ func (v *View) buildApp(w *gogui.Window) gogui.View {
 			func() { v.o.Shell.Push(v.Page()) },
 		),
 	}
-	if len(doors) == 0 {
-		return v.page(append(content, v.note(vw, vh, say.T("doorbell.none"))))
-	}
-	gap := int(float32(min(vw, vh)) * gapShare)
 	top := int(gogui.PadLarge)*2 + int(style.Reach()*1.2)
+	content = append(content, v.doors(ui.Rect{W: vw, H: vh}, top)...)
+	return v.page(content)
+}
+
+func (v *View) doors(whole ui.Rect, top int) []gogui.View {
+	doors := v.o.Bell.Doors()
+	if len(doors) == 0 {
+		return []gogui.View{v.note(whole.W, whole.H, say.T("doorbell.none"))}
+	}
+	vw, vh := whole.W, whole.H
+	gap := int(float32(min(vw, vh)) * gapShare)
+	top = max(top, gap)
 	area := ui.Rect{X: gap, Y: top, W: vw - 2*gap, H: vh - top - gap}
 	recent := v.o.Bell.Recent()
 	var list ui.Rect
@@ -56,11 +63,11 @@ func (v *View) buildApp(w *gogui.Window) gogui.View {
 			area.H = doorsH
 		}
 	}
+	var out []gogui.View
 	for i, at := range grid(area, len(doors), gap) {
-		content = append(content, widgets.Placed(at, v.doorTile(doors[i], at)))
+		out = append(out, widgets.Placed(at, v.doorTile(doors[i], at)))
 	}
-	content = append(content, v.history(recent, list, gap)...)
-	return v.page(content)
+	return append(out, v.history(recent, list, gap)...)
 }
 
 func grid(area ui.Rect, n, gap int) []ui.Rect {

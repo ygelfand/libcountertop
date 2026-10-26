@@ -36,8 +36,9 @@ type ScreenControl interface {
 }
 type PosterControl interface {
 	SetEnabled(bool)
-	Next()
 	SetEvery(config.PosterEvery)
+	SetFit(config.PhotoFit)
+	SetChange(config.PhotoTransition)
 }
 type VisualControl interface {
 	SetMaxFPS(int)
@@ -64,6 +65,7 @@ type BasicDependencies struct {
 	Shell                 *shell.Shell
 	Screen                ScreenControl
 	Poster                PosterControl
+	Photos                PhotoSources
 	Visuals               VisualControl
 	Engine                EngineControl
 	Privacy               PrivacyControl

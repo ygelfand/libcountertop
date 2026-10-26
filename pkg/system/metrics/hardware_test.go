@@ -35,21 +35,41 @@ func board(t *testing.T) Reader {
 	return Reader{Root: root}
 }
 
-func TestTemperaturesComeBackByZoneNameInDegrees(t *testing.T) {
-	temps := board(t).Temperatures()
+func TestThermalComesBackByZoneNameAsTheKernelReportsIt(t *testing.T) {
+	temps := board(t).Thermal()
 
-	for zone, want := range map[string]float64{"mtktscpu": 45.5, "mtktswmt": 46, "mtkts1": 43.4} {
+	for zone, want := range map[string]float64{"mtktscpu": 45500, "mtktswmt": 46000, "mtkts1": 43400} {
 		got, ok := temps[zone]
 		if !ok {
 			t.Errorf("%s missing", zone)
 			continue
 		}
 		if got != want {
-			t.Errorf("%s = %v°C, want %v", zone, got, want)
+			t.Errorf("%s = %v, want %v", zone, got, want)
 		}
 	}
 	if len(temps) != 3 {
 		t.Errorf("found %d zones, want 3", len(temps))
+	}
+}
+
+func TestWifiSignalLeftAtZeroIsUnknown(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "proc/net/wireless")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for body, want := range map[string]Reading{
+		" wlan0: 0000   59.  -37.  -96.       0      0      0      0      0        0\n": known(-37),
+		" wlan0: 0000   59.  219.  160.       0      0      0      0      0        0\n": known(-37),
+		" wlan0: 0000    0     0     0        0      0      0      0      0        0\n": {},
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got, _, _ := (Reader{Root: root}).Wifi(); got != want {
+			t.Errorf("Wifi() from %q = %+v, want %+v", body, got, want)
+		}
 	}
 }
 
@@ -113,7 +133,7 @@ func TestUptimeIsTheFirstField(t *testing.T) {
 func TestMissingFilesAreUnknownNotZero(t *testing.T) {
 	r := Reader{Root: t.TempDir()}
 
-	if temps := r.Temperatures(); len(temps) != 0 {
+	if temps := r.Thermal(); len(temps) != 0 {
 		t.Errorf("found %d zones on an empty root", len(temps))
 	}
 	present, online := r.Cores()

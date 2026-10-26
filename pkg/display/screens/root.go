@@ -1,7 +1,6 @@
 package screens
 
 import (
-	"image"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
@@ -17,6 +16,13 @@ import (
 )
 
 func (a *App) root(w *gogui.Window) gogui.View {
+	a.papering = false
+	v := a.compose(w)
+	a.papered.Store(a.papering)
+	return v
+}
+
+func (a *App) compose(w *gogui.Window) gogui.View {
 	covering, above := a.nav.Showing(a.o.Shell.Views())
 	overlays := a.nav.Overlays()
 	if top := navigation.Covering(overlays); top >= 0 {
@@ -33,8 +39,8 @@ func (a *App) root(w *gogui.Window) gogui.View {
 		a.seeThrough(true)
 		return stack(overlaid(w, []gogui.View{blank()}, overlays))
 	}
-	a.seeThrough(covering != nil && covering.Clear)
 	layers := []gogui.View{a.base(w, covering)}
+	a.seeThrough(covering != nil && covering.Clear || a.papering)
 	if shown, _ := a.o.Shell.Dock(); shown && a.o.Shell.Docked() && a.o.Offering() == "" {
 		layers = append(layers, widgets.Floating(0, a.rail(w, covering)))
 	}
@@ -159,11 +165,15 @@ func (a *App) dashboard(w *gogui.Window) gogui.View {
 		Padding: gogui.NoPadding,
 		Content: layers,
 	})
+	back := widgets.Color(pal.Background)
+	if a.papering {
+		back = gogui.ColorTransparent
+	}
 	return gogui.Column(
 		gogui.ContainerCfg{
 			Sizing:  gogui.FillFill,
 			Padding: gogui.NoPadding,
-			Color:   widgets.Color(pal.Background),
+			Color:   back,
 			Content: []gogui.View{dash},
 		},
 	)
@@ -196,21 +206,7 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 	showing, tabbed := a.o.Tabs.Showing()
 
 	var layers []gogui.View
-	if backdrop, behind := a.o.Poster.
-		Backdrop(
-			vw,
-			vh,
-			image.Rect(box.X, box.Y, box.X+box.W, box.Y+box.H),
-			pal.Background,
-		); backdrop != nil {
-		layers = append(
-			layers,
-			widgets.Placed(
-				ui.Rect{W: vw, H: vh},
-				widgets.Picture(widgets.ImageSource("poster/"+behind, backdrop), vw, vh),
-			),
-		)
-	}
+	a.paper(ui.Rect{W: vw, H: vh}, box, pal.Background)
 	if kind, drawn := a.boards[showing.Kind]; tabbed && drawn {
 		below := top + margin
 		return append(layers, kind.Draw(

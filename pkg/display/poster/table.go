@@ -1,8 +1,6 @@
 package poster
 
 import (
-	"slices"
-
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -42,27 +40,20 @@ func rows(table func() *Table) []Setting {
 				return nil
 			},
 		},
-		{
-			Name: "every", Group: Group, Icon: "mdi:image-sync",
-			Kind: setting.Choice, Options: everies(),
-			Read: func(c *config.Poster) string { return string(c.Every) },
-			Write: func(c *config.Poster, v string) error {
-				e := config.PosterEvery(v)
-				if !slices.Contains(config.PosterEveries(), e) {
-					return table().MustRow("every").Bad(v, "")
-				}
-				c.Every = e
-				return nil
-			},
-		},
+		setting.Pick(
+			Setting{Name: "every", Group: Group, Icon: "mdi:image-sync"},
+			config.PosterEveries(),
+			func(c *config.Poster) *config.PosterEvery { return &c.Every },
+		),
+		setting.Pick(
+			Setting{Name: "fit", Group: Group, Icon: "mdi:fit-to-screen"},
+			config.PhotoFits(),
+			func(c *config.Poster) *config.PhotoFit { return &c.Fit },
+		),
+		setting.Pick(
+			Setting{Name: "transition", Group: Group, Icon: "mdi:transition"},
+			config.PhotoTransitions(),
+			func(c *config.Poster) *config.PhotoTransition { return &c.Change },
+		),
 	}
-}
-
-func everies() []setting.Option {
-	all := config.PosterEveries()
-	out := make([]setting.Option, len(all))
-	for i, e := range all {
-		out[i] = setting.Option{Value: string(e), Key: string(e)}
-	}
-	return out
 }

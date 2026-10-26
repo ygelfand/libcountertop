@@ -16,6 +16,7 @@
 #define logi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
 #define ES3_BIT 0x40
+#define UI_SAMPLES 4
 
 static const char es_header[] = "#version 300 es\nprecision highp float;\nprecision highp int;\n";
 
@@ -165,10 +166,17 @@ static void *render(void *arg) {
 	EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	eglInitialize(dpy, NULL, NULL);
 	EGLint attrs[] = {EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_RENDERABLE_TYPE, ES3_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
-		EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE};
+		EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_SAMPLE_BUFFERS, 1, EGL_SAMPLES, UI_SAMPLES, EGL_NONE};
 	EGLConfig cfg;
 	EGLint n = 0;
 	eglChooseConfig(dpy, attrs, &cfg, 1, &n);
+	if (n <= 0) {
+		attrs[12] = EGL_NONE;
+		eglChooseConfig(dpy, attrs, &cfg, 1, &n);
+	}
+	EGLint samples = 0;
+	if (n > 0) eglGetConfigAttrib(dpy, cfg, EGL_SAMPLES, &samples);
+	logi("ui: %d samples", samples);
 	EGLSurface surf = n > 0 ? eglCreateWindowSurface(dpy, cfg, u->win, NULL) : EGL_NO_SURFACE;
 	EGLint ctxattrs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
 	EGLContext ctx = n > 0 ? eglCreateContext(dpy, cfg, EGL_NO_CONTEXT, ctxattrs) : EGL_NO_CONTEXT;

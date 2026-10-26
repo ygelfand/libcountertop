@@ -11,6 +11,10 @@ type Idle struct {
 	Second IdleVisual `json:"second"`
 	Saver  SaverMode  `json:"saver"`
 
+	PhotoEvery  Delay           `json:"photo_every"`
+	PhotoFit    PhotoFit        `json:"photo_fit"`
+	PhotoChange PhotoTransition `json:"photo_transition"`
+
 	Night      Night `json:"night"`
 	NightLux   int   `json:"night_lux"`
 	NightAfter Delay `json:"night_after"`
@@ -23,7 +27,15 @@ type IdleVisual struct {
 	Source Source `json:"source"`
 }
 
+const IdlePhotos = "photos"
+
 func (v IdleVisual) On() bool { return v.Kind != "" }
+
+func (v IdleVisual) Photos() bool { return v.Kind == IdlePhotos }
+
+func IdlePhotoSpans() []Delay {
+	return []Delay{Delay10s, Delay15s, Delay30s, Delay1m, Delay2m, Delay5m}
+}
 
 func IdlePositions() []Position { return append(Positions(), PositionRandom) }
 
@@ -78,15 +90,18 @@ func Sources() []Source { return []Source{SourceBoth, SourceMic, SourceSpeaker} 
 
 func DefaultIdle() Idle {
 	return Idle{
-		After:      DefaultDelay,
-		Media:      Delay5m,
-		Face:       DefaultFace,
-		Placement:  Placement{Position: PositionRandom, Align: AlignRandom, Size: DefaultSize},
-		First:      IdleVisual{Source: SourceBoth},
-		Second:     IdleVisual{Source: SourceBoth},
-		Saver:      SaverNative,
-		Night:      NightClock,
-		NightLux:   DefaultNightLux,
-		NightAfter: DefaultNightAfter,
+		After:       DefaultDelay,
+		Media:       Delay5m,
+		Face:        DefaultFace,
+		Placement:   Placement{Position: PositionRandom, Align: AlignRandom, Size: DefaultSize},
+		First:       IdleVisual{Source: SourceBoth},
+		Second:      IdleVisual{Source: SourceBoth},
+		Saver:       SaverNative,
+		Night:       NightClock,
+		NightLux:    DefaultNightLux,
+		NightAfter:  DefaultNightAfter,
+		PhotoEvery:  Delay30s,
+		PhotoFit:    FitKenBurns,
+		PhotoChange: TransitionFade,
 	}
 }

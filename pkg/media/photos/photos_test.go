@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -18,8 +20,11 @@ type server struct {
 	key     string
 	assets  int
 	memory  string
+	perms   []string
+	deny    string
 
 	mu       sync.Mutex
+	down     bool
 	searches []map[string]any
 	previews int
 }
@@ -36,6 +41,13 @@ func (s *server) start(t *testing.T) string {
 			h(w, r)
 		}
 	}
+	mux.HandleFunc("GET /api/api-keys/me", auth(func(w http.ResponseWriter, r *http.Request) {
+		if s.perms == nil {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"permissions": s.perms})
+	}))
 	mux.HandleFunc("GET /api/server/about", auth(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintf(w, `{"version":%q}`, s.version)
 	}))
@@ -43,6 +55,15 @@ func (s *server) start(t *testing.T) string {
 		_, _ = w.Write([]byte(`[{"id":"album-1","albumName":"Kitchen","assetCount":3}]`))
 	}))
 	mux.HandleFunc("GET /api/memories", auth(func(w http.ResponseWriter, _ *http.Request) {
+		if s.deny != "" {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprintf(
+				w,
+				`{"message":"Missing required permission: %s","statusCode":403}`,
+				s.deny,
+			)
+			return
+		}
 		if s.memory == "" {
 			_, _ = w.Write([]byte(`[]`))
 			return
@@ -80,7 +101,15 @@ func (s *server) start(t *testing.T) string {
 			_, _ = w.Write([]byte("jpeg " + r.PathValue("id")))
 		}),
 	)
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		down := s.down
+		s.mu.Unlock()
+		if down {
+			panic(http.ErrAbortHandler)
+		}
+		mux.ServeHTTP(w, r)
+	}))
 	t.Cleanup(srv.Close)
 	return srv.URL
 }
@@ -98,23 +127,60 @@ func library(t *testing.T, cfg schema.Photos, dir string) (*Library, *settings) 
 	return New(Options{Settings: s, Dir: dir, Keep: 4, Now: func() time.Time { return now }}), s
 }
 
-func TestNothingHappensWithoutAServer(t *testing.T) {
-	l, _ := library(t, schema.Photos{}, t.TempDir())
-	l.step(context.Background())
-	if got := l.State().Status; got != Unset {
-		t.Errorf("status %v, want Unset", got)
+func on(i schema.Immich) schema.Photos {
+	i.Enabled = true
+	return schema.Photos{Immich: i}
+}
+
+func TestNothingHappensUntilImmichIsEnabledWithAServer(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		cfg  schema.Photos
+		want Status
+	}{
+		{"off", schema.Photos{}, Off},
+		{"no server", on(schema.Immich{}), Unset},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			l, _ := library(t, c.cfg, t.TempDir())
+			l.step(context.Background())
+			if got := l.State("immich").Status; got != c.want {
+				t.Errorf("status %v, want %v", got, c.want)
+			}
+			if _, ok := l.Next(); ok {
+				t.Error("a picture without a source")
+			}
+		})
 	}
-	if _, ok := l.Next(); ok {
-		t.Error("a picture without a server")
+}
+
+func TestTurningImmichOffDropsItsPictures(t *testing.T) {
+	srv := &server{version: "v3.3.1", key: "k", assets: 5}
+	l, s := library(t, on(schema.Immich{Server: srv.start(t), Key: "k"}), t.TempDir())
+	l.step(context.Background())
+	if _, ok := l.Next(); !ok {
+		t.Fatal("no picture while on")
+	}
+	s.Immich.Enabled = false
+	l.step(context.Background())
+	if p, ok := l.Next(); ok {
+		t.Errorf("still showing %+v after turning Immich off", p)
+	}
+	if got := l.State("immich").Status; got != Off {
+		t.Errorf("status %v, want Off", got)
 	}
 }
 
 func TestItKeepsPicturesAheadWithMemoriesFirst(t *testing.T) {
 	srv := &server{version: "v3.3.1", key: "k", assets: 10, memory: "mem"}
-	l, _ := library(t, schema.Photos{Server: srv.start(t), Key: "k", Memories: true}, t.TempDir())
+	l, _ := library(
+		t,
+		on(schema.Immich{Server: srv.start(t), Key: "k", Memories: true}),
+		t.TempDir(),
+	)
 
 	l.step(context.Background())
-	if st := l.State(); st.Status != Ready || st.Version != "v3.3.1" {
+	if st := l.State("immich"); st.Status != Ready || st.Version != "v3.3.1" {
 		t.Fatalf("state %+v", st)
 	}
 	if srv.previews != 4 {
@@ -145,7 +211,7 @@ func TestItKeepsPicturesAheadWithMemoriesFirst(t *testing.T) {
 
 func TestNoPictureRepeatsUntilTheDeckRunsOut(t *testing.T) {
 	srv := &server{version: "v3.3.1", key: "k", assets: 3}
-	l, _ := library(t, schema.Photos{Server: srv.start(t), Key: "k"}, t.TempDir())
+	l, _ := library(t, on(schema.Immich{Server: srv.start(t), Key: "k"}), t.TempDir())
 	l.step(context.Background())
 	l.step(context.Background())
 	seen := map[string]bool{}
@@ -164,7 +230,7 @@ func TestNoPictureRepeatsUntilTheDeckRunsOut(t *testing.T) {
 func TestNamesResolveAndUnknownNamesSaySo(t *testing.T) {
 	srv := &server{version: "v3.3.1", key: "k", assets: 1}
 	url := srv.start(t)
-	l, s := library(t, schema.Photos{Server: url, Key: "k", Albums: "kitchen"}, t.TempDir())
+	l, s := library(t, on(schema.Immich{Server: url, Key: "k", Albums: "kitchen"}), t.TempDir())
 	l.step(context.Background())
 	filter, _ := srv.searches[0]["filter"].(map[string]any)
 	albums, _ := filter["albumIds"].(map[string]any)
@@ -172,9 +238,9 @@ func TestNamesResolveAndUnknownNamesSaySo(t *testing.T) {
 		t.Errorf("albums %v", albums)
 	}
 
-	s.Albums = "Trips"
+	s.Immich.Albums = "Trips"
 	l.step(context.Background())
-	if st := l.State(); st.Status != Unknown || st.Missing != "Trips" {
+	if st := l.State("immich"); st.Status != Unknown || st.Missing != "Trips" {
 		t.Errorf("state %+v", st)
 	}
 }
@@ -191,27 +257,49 @@ func TestProblemsShowAsStatus(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			srv := &server{version: c.version, key: "k", assets: 1}
-			l, _ := library(t, schema.Photos{Server: srv.start(t), Key: c.key}, t.TempDir())
+			l, _ := library(t, on(schema.Immich{Server: srv.start(t), Key: c.key}), t.TempDir())
 			l.step(context.Background())
-			if got := l.State().Status; got != c.want {
+			if got := l.State("immich").Status; got != c.want {
 				t.Errorf("status %v, want %v", got, c.want)
 			}
 		})
 	}
-	l, _ := library(t, schema.Photos{Server: "http://127.0.0.1:1", Key: "k"}, t.TempDir())
+	l, _ := library(t, on(schema.Immich{Server: "http://127.0.0.1:1", Key: "k"}), t.TempDir())
 	l.step(context.Background())
-	if got := l.State().Status; got != Unreachable {
+	if got := l.State("immich").Status; got != Unreachable {
 		t.Errorf("status %v, want Unreachable", got)
+	}
+}
+
+func TestASourceRecoversAfterTheServerComesBack(t *testing.T) {
+	srv := &server{version: "v3.3.1", key: "k", assets: 5, down: true}
+	s := &settings{on(schema.Immich{Server: srv.start(t), Key: "k"})}
+	now := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	l := New(Options{Settings: s, Dir: t.TempDir(), Keep: 4, Now: func() time.Time { return now }})
+	l.step(context.Background())
+	if got := l.State("immich").Status; got != Unreachable {
+		t.Fatalf("while down: %v, want Unreachable", got)
+	}
+	srv.mu.Lock()
+	srv.down = false
+	srv.mu.Unlock()
+	now = now.Add(retryAfter)
+	l.step(context.Background())
+	if got := l.State("immich").Status; got != Ready {
+		t.Errorf("after the server came back: %v, want Ready", got)
+	}
+	if _, ok := l.Next(); !ok {
+		t.Error("no photo fetched after the server came back")
 	}
 }
 
 func TestCachedPicturesSurviveARestartWithoutTheServer(t *testing.T) {
 	dir := t.TempDir()
 	srv := &server{version: "v3.3.1", key: "k", assets: 5}
-	l, _ := library(t, schema.Photos{Server: srv.start(t), Key: "k"}, dir)
+	l, _ := library(t, on(schema.Immich{Server: srv.start(t), Key: "k"}), dir)
 	l.step(context.Background())
 
-	again, _ := library(t, schema.Photos{Server: "http://127.0.0.1:1", Key: "k"}, dir)
+	again, _ := library(t, on(schema.Immich{Server: "http://127.0.0.1:1", Key: "k"}), dir)
 	p, ok := again.Next()
 	if !ok || string(p.Data) != "jpeg "+p.ID || p.Place != "Lisbon, Portugal" {
 		t.Errorf("after a restart got %+v %v", p, ok)
@@ -220,9 +308,9 @@ func TestCachedPicturesSurviveARestartWithoutTheServer(t *testing.T) {
 
 func TestChangingTheSelectionStartsOver(t *testing.T) {
 	srv := &server{version: "v3.3.1", key: "k", assets: 5}
-	l, s := library(t, schema.Photos{Server: srv.start(t), Key: "k"}, t.TempDir())
+	l, s := library(t, on(schema.Immich{Server: srv.start(t), Key: "k"}), t.TempDir())
 	l.step(context.Background())
-	s.Favorites = true
+	s.Immich.Favorites = true
 	l.step(context.Background())
 	if len(srv.searches) != 2 {
 		t.Fatalf("searched %d times, want 2", len(srv.searches))
@@ -230,5 +318,67 @@ func TestChangingTheSelectionStartsOver(t *testing.T) {
 	filter, _ := srv.searches[1]["filter"].(map[string]any)
 	if filter["isFavorite"] == nil {
 		t.Errorf("second search %v", filter)
+	}
+}
+
+func TestStrayFilesInThePhotoFolderAreRemoved(t *testing.T) {
+	dir := t.TempDir()
+	stray := filepath.Join(dir, "old-name.jpg")
+	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	library(t, schema.Photos{}, dir)
+	if _, err := os.Stat(stray); !os.IsNotExist(err) {
+		t.Errorf("stray file still there: %v", err)
+	}
+}
+
+func TestMissingPermissionsAreNamed(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		perms []string
+		deny  string
+		cfg   schema.Immich
+		want  Status
+		says  string
+	}{
+		{
+			name:  "every gap at once",
+			perms: []string{"server.about", "asset.read", "asset.view"},
+			cfg:   schema.Immich{Memories: true, Albums: "Kitchen"},
+			want:  NoPermission,
+			says:  "memory.read, album.read",
+		},
+		{
+			name:  "all covers everything",
+			perms: []string{"all"},
+			cfg:   schema.Immich{Memories: true, Albums: "Kitchen"},
+			want:  Ready,
+		},
+		{
+			name: "a refused call names its permission",
+			deny: "memory.read",
+			cfg:  schema.Immich{Memories: true},
+			want: NoPermission,
+			says: "memory.read",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			srv := &server{
+				version: "v3.3.1",
+				key:     "k",
+				assets:  2,
+				memory:  "mem",
+				perms:   c.perms,
+				deny:    c.deny,
+			}
+			c.cfg.Server, c.cfg.Key = srv.start(t), "k"
+			l, _ := library(t, on(c.cfg), t.TempDir())
+			l.step(context.Background())
+			st := l.State("immich")
+			if st.Status != c.want || st.Missing != c.says {
+				t.Errorf("state %+v, want %v %q", st, c.want, c.says)
+			}
+		})
 	}
 }

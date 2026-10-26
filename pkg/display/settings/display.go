@@ -72,6 +72,12 @@ func (p *BasicPages) Display() *shell.Page {
 					Kind:  menu.Toggle,
 					On:    cfg.Screen.Marks,
 				},
+				{
+					Glyph: gogui.IconPicture,
+					Label: say.T("photos.page"),
+					Kind:  menu.Chevron,
+					Value: PosterSays(p.options.Preferences.Poster.Read()),
+				},
 			}
 			acts := []func(int){
 				p.options.Screen.SetBacklight,
@@ -84,6 +90,7 @@ func (p *BasicPages) Display() *shell.Page {
 				func(level int) { p.options.Screen.SetDockHide(hides[dock.Index(level)]) },
 				SegmentPick(config.Sides(), p.setVolumeEdge),
 				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
+				p.open(func() shell.View { return p.Photos() }),
 			}
 			return rows, acts
 		},

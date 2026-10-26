@@ -17,8 +17,8 @@ type Reading struct {
 
 func known(v float64) Reading { return Reading{Value: v, Known: true} }
 
-// The kernel reports millidegrees.
-func (r Reader) Temperatures() map[string]float64 {
+// Each driver picks its own unit: millidegrees, tenths of a degree or whole degrees.
+func (r Reader) Thermal() map[string]float64 {
 	out := map[string]float64{}
 	for i := range zones {
 		zone := r.path("sys/class/thermal/thermal_zone" + strconv.Itoa(i))
@@ -27,11 +27,11 @@ func (r Reader) Temperatures() map[string]float64 {
 		if err != nil {
 			continue
 		}
-		milli, err := number(zone + "/temp")
+		raw, err := number(zone + "/temp")
 		if err != nil {
 			continue
 		}
-		out[name] = milli / 1000
+		out[name] = raw
 	}
 	return out
 }
@@ -120,7 +120,10 @@ func (r Reader) Wifi() (signal, rx, tx Reading) {
 				continue
 			}
 			if fields := strings.Fields(rest); len(fields) >= 3 {
-				if level := parse(strings.TrimSuffix(fields[2], ".")); level.Known {
+				if level := parse(
+					strings.TrimSuffix(fields[2], "."),
+				); level.Known &&
+					level.Value != 0 {
 					if level.Value > 127 {
 						level.Value -= 256
 					}

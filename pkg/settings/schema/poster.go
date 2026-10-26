@@ -7,12 +7,14 @@ import (
 )
 
 type Poster struct {
-	Enabled bool        `json:"enabled"`
-	Every   PosterEvery `json:"every"`
-	Last    string      `json:"last"`
+	Enabled bool            `json:"enabled"`
+	Every   PosterEvery     `json:"every"`
+	Fit     PhotoFit        `json:"fit"`
+	Change  PhotoTransition `json:"transition"`
+	Last    string          `json:"last"`
 }
 
-func DefaultPoster() Poster { return Poster{Every: PosterHourly} }
+func DefaultPoster() Poster { return Poster{Every: PosterHourly, Fit: FitAuto, Change: TransitionFade} }
 
 type PosterEvery string
 
@@ -23,8 +25,14 @@ const (
 	PosterDaily  PosterEvery = "daily"
 )
 
+var posterSpans = []Delay{Delay10s, Delay15s, Delay30s, Delay1m, Delay2m, Delay5m, Delay15m}
+
 func PosterEveries() []PosterEvery {
-	return []PosterEvery{PosterNever, PosterWake, PosterHourly, PosterDaily}
+	out := []PosterEvery{PosterWake}
+	for _, d := range posterSpans {
+		out = append(out, PosterEvery(d))
+	}
+	return append(out, PosterHourly, PosterDaily, PosterNever)
 }
 
 func (p PosterEvery) Label() string {
@@ -33,10 +41,12 @@ func (p PosterEvery) Label() string {
 		return say.T("poster.never")
 	case PosterWake:
 		return say.T("poster.wake")
+	case PosterHourly:
+		return say.T("poster.hourly")
 	case PosterDaily:
 		return say.T("poster.daily")
 	}
-	return say.T("poster.hourly")
+	return Delay(p).Label()
 }
 
 func (p PosterEvery) Period() time.Duration {
@@ -46,5 +56,5 @@ func (p PosterEvery) Period() time.Duration {
 	case PosterDaily:
 		return 24 * time.Hour
 	}
-	return 0
+	return Delay(p).After()
 }

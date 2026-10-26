@@ -19,6 +19,8 @@ const (
 	mono = "Go Mono"
 )
 
+const MonoFamily = mono
+
 type Style struct {
 	Name    string
 	Family  string

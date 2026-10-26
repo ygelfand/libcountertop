@@ -66,6 +66,11 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 			menu.Row{Label: say.T("doorbell.app"), Kind: menu.Chevron},
 			func(int) { view.options.Shell.Push(page()) }, false))
 	}
+	if page := view.options.HomeAlarm; page != nil {
+		views = append(views, view.options.UI.Row("homealarm", "home",
+			menu.Row{Label: say.T("homealarm.app"), Kind: menu.Chevron},
+			func(int) { view.options.Shell.Push(page()) }, false))
+	}
 	return Column(views)
 }
 
@@ -509,6 +514,7 @@ type Dependencies struct {
 	Calendar        *calendar.Calendar
 	Cameras         func() shell.View
 	Doorbell        func() shell.View
+	HomeAlarm       func() shell.View
 	Shell           *shell.Shell
 	Logo            string
 	Marks           settings.ModeMarks
