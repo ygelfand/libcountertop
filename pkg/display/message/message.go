@@ -168,6 +168,13 @@ func (m *Messages) Info(title, body string, hold time.Duration) {
 	m.Show(Message{Title: title, Body: body, Tone: schema.ToneInfo}, hold)
 }
 
+func (m *Messages) Quiet(title, body string, hold time.Duration) {
+	m.Show(
+		Message{Title: title, Body: body, Tone: schema.ToneInfo, Chime: schema.ChimeNone},
+		hold,
+	)
+}
+
 func (m *Messages) Hide() { m.end(End{Why: EndCleared}) }
 
 func (m *Messages) end(why End) {

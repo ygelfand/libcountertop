@@ -344,7 +344,7 @@ cast.entity.youtube.lounge: YouTube lounge
 cast.entity.youtube.skip: YouTube SponsorBlock categories
 cast.group.cast: Cast
 cast.starting: Starting {{.Name}}…
-cast.refused: "{{.Name}} can't play on this device"
+cast.refused: "Chromecast: {{.Name}} can't play on this device"
 cast.option.youtube.lounge.always: Always
 cast.option.youtube.lounge.demand: On demand
 cast.setting.receiver: Receiver
