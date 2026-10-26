@@ -2,6 +2,7 @@ package gogui
 
 import (
 	"context"
+	"math"
 
 	"testing"
 	"time"
@@ -244,5 +245,59 @@ func TestAStillViewStopsDrawing(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	if n := len(s.frames); n > 3 {
 		t.Errorf("%d frames in half a second of a still view", n)
+	}
+}
+
+func glyphBounds(t *testing.T, angle float32) (w, h float32) {
+	t.Helper()
+	s := &sink{}
+	win := gui.SimpleWindow("turn", 400, 400, &app{}, func(w *gui.Window) {
+		w.SetView(func(*gui.Window) gui.View {
+			return gui.DrawCanvas(gui.DrawCanvasCfg{
+				ID: "turn", Width: 400, Height: 400,
+				OnDraw: func(dc *gui.DrawContext) {
+					st := gui.CurrentTheme().Cfg.TextStyleDef
+					st.Size, st.RotationRadians = 40, angle
+					dc.Text(200, 200, "WWWWWW", st)
+				},
+			})
+		})
+	})
+	r, err := New(s, win)
+	if err != nil {
+		t.Fatal(err)
+	}
+	win.Config.OnInit(win)
+	if _, err := r.Render(win); err != nil {
+		t.Fatal(err)
+	}
+	f := s.frames[len(s.frames)-1]
+	minX, minY, maxX, maxY := float32(1e9), float32(1e9), float32(-1e9), float32(-1e9)
+	for i := 0; i < len(f.runs); i += runWords {
+		if f.runs[i] != slotGlyph {
+			continue
+		}
+		first, count := int(f.runs[i+6]), int(f.runs[i+7])
+		for q := first; q < first+count; q++ {
+			for v := range 4 {
+				x, y := f.quads[q*quadFloats+v*9], f.quads[q*quadFloats+v*9+1]
+				minX, minY, maxX, maxY = min(minX, x), min(minY, y), max(maxX, x), max(maxY, y)
+			}
+		}
+	}
+	if maxX < minX {
+		t.Fatal("no glyphs drawn")
+	}
+	return maxX - minX, maxY - minY
+}
+
+func TestRotatedCanvasTextTurnsItsGlyphs(t *testing.T) {
+	w, h := glyphBounds(t, 0)
+	if w <= h {
+		t.Fatalf("upright text is %.0f wide and %.0f tall", w, h)
+	}
+	w, h = glyphBounds(t, math.Pi/2)
+	if h <= w {
+		t.Errorf("text turned a quarter is %.0f wide and %.0f tall", w, h)
 	}
 }

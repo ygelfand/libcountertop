@@ -19,7 +19,7 @@ var sections = []section{
 	}},
 	{"settings.display", []string{
 		"screen", "clock", "idle", "visual", "poster", "weather", "apps", "cameras",
-		"presence",
+		"doorbell", "presence",
 	}},
 	{"home.title", []string{"home"}},
 	{"settings.volume", []string{"feedback", "microphone", "speaker"}},

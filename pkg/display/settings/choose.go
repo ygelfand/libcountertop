@@ -5,14 +5,12 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func Choose[T interface {
 	comparable
 	Label() string
-}](title string, values []T, read func() T, save func(T), preview func(T) func(ui.Surface, ui.Rect, theme.Theme)) *shell.Page {
+}](title string, values []T, read func() T, save func(T), preview func(T) menu.Preview) *shell.Page {
 	values = slices.Clone(values)
 	return &shell.Page{Title: title, Build: func() ([]menu.Row, []func(int)) {
 		selected := read()

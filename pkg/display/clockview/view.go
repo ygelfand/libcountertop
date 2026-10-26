@@ -4,18 +4,16 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
-	"strings"
 
 	"github.com/go-gui-org/go-glyph"
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 )
 
-type View func(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View
+type View func(w *gogui.Window, box ui.Rect, r Reading, ink theme.Theme) gogui.View
 
 func Lettering(weight glyph.Typeface, size float32, c theme.Color) gogui.TextStyle {
 	st := gogui.CurrentTheme().Cfg.TextStyleDef
@@ -36,14 +34,6 @@ func Fitted(w *gogui.Window, text string, st gogui.TextStyle, maxW, maxH float32
 	return size
 }
 
-func split(r face.Reading) (hour, minute string, ok bool) {
-	hour, minute, ok = strings.Cut(r.Time, ":")
-	if ok && len(hour) == 1 {
-		hour = "0" + hour
-	}
-	return hour, minute, ok
-}
-
 func centred(content ...gogui.View) gogui.ContainerCfg {
 	return gogui.ContainerCfg{
 		Sizing:  gogui.FillFill,
@@ -54,14 +44,14 @@ func centred(content ...gogui.View) gogui.ContainerCfg {
 	}
 }
 
-func dateLine(r face.Reading, size float32, ink theme.Theme) []gogui.View {
+func dateLine(r Reading, size float32, ink theme.Theme) []gogui.View {
 	if !r.Dated() {
 		return nil
 	}
 	return []gogui.View{gogui.Label(r.Date, Lettering(glyph.TypefaceRegular, size, ink.Muted))}
 }
 
-func Plain(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
+func Plain(w *gogui.Window, box ui.Rect, r Reading, ink theme.Theme) gogui.View {
 	big := Lettering(glyph.TypefaceBold, 0, ink.Text)
 	size := Fitted(w, r.Time+r.Suffix, big, float32(box.W)*0.86, float32(box.H)*0.34)
 	big.Size = size
@@ -86,7 +76,7 @@ func Plain(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.
 	return gogui.Column(cfg)
 }
 
-func Stack(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
+func Stack(w *gogui.Window, box ui.Rect, r Reading, ink theme.Theme) gogui.View {
 	hour, minute, ok := split(r)
 	if !ok {
 		return Plain(w, box, r, ink)
@@ -129,7 +119,7 @@ func Stack(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.
 	)
 }
 
-func Cards(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
+func Cards(w *gogui.Window, box ui.Rect, r Reading, ink theme.Theme) gogui.View {
 	hour, minute, ok := split(r)
 	if !ok {
 		return Plain(w, box, r, ink)
@@ -197,97 +187,17 @@ func Cards(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.
 	return gogui.Column(cfg)
 }
 
-func Analog(seconds bool) View {
-	return func(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
-		hour, minute, ok := clockHands(r)
-		if !ok {
-			return Plain(w, box, r, ink)
-		}
-		bw, bh := float32(box.W), float32(box.H)
-		dial := min(bw, bh) * 0.78
-		return gogui.DrawCanvas(gogui.DrawCanvasCfg{
-			ID:      "analog",
-			Width:   bw,
-			Height:  bh,
-			Version: canvasVersion(box, r, ink, seconds),
-			OnDraw: func(dc *gogui.DrawContext) {
-				dateSize := dial * 0.075
-				dateH, under := float32(0), float32(0)
-				date := Lettering(glyph.TypefaceRegular, dateSize, ink.Muted)
-				if r.Dated() {
-					dateH, under = dc.FontHeight(date), dial*0.10
-				}
-				cx := bw / 2
-				cy := (bh-(dial+under+dateH))/2 + dial/2
-
-				num := Lettering(glyph.TypefaceBold, dial*0.25, ink.Text)
-				nh := dc.FontHeight(num)
-				for i, text := range []string{"12", "3", "6", "9"} {
-					dx, dy := heading(float64(i) * 90)
-					x := cx + dial*0.36*dx
-					y := cy + dial*0.36*dy
-					dc.Text(x-dc.TextWidth(text, num)/2, y-nh/2, text, num)
-				}
-
-				width := dial * 0.058
-				dc.FilledPolygon(
-					hand(cx, cy, dial*0.28, width, float64(hour%12)*30+float64(minute)*0.5),
-					widgets.Color(ink.Text),
-				)
-				dc.FilledPolygon(
-					hand(cx, cy, dial*0.44, width*0.70, float64(minute)*6),
-					widgets.Color(ink.Text),
-				)
-				if seconds {
-					dc.FilledPolygon(
-						hand(cx, cy, dial*0.47, width*0.28, float64(r.Second)*6),
-						widgets.Color(ink.Accent),
-					)
-				}
-				dc.FilledCircle(cx, cy, dial*0.0375, widgets.Color(ink.Text))
-
-				if r.Dated() {
-					dc.Text(cx-dc.TextWidth(r.Date, date)/2, cy+dial/2+under, r.Date, date)
-				}
-			},
-		})
-	}
-}
-
-func clockHands(r face.Reading) (hour, minute int, ok bool) {
-	if _, err := fmt.Sscanf(r.Time, "%d:%d", &hour, &minute); err != nil {
-		return 0, 0, false
-	}
-	return hour, minute, true
-}
-
 func heading(deg float64) (dx, dy float32) {
 	rad := deg * math.Pi / 180
 	return float32(math.Sin(rad)), float32(-math.Cos(rad))
 }
 
-func hand(cx, cy, length, width float32, deg float64) []float32 {
-	dx, dy := heading(deg)
-	px, py := -dy, dx
-	tipX, tipY := cx+dx*length, cy+dy*length
-	tail := length * 0.16
-	tailX, tailY := cx-dx*tail, cy-dy*tail
-	half := width / 2
-	tip := half * 0.55
-	return []float32{
-		tailX + px*half, tailY + py*half,
-		tipX + px*tip, tipY + py*tip,
-		tipX - px*tip, tipY - py*tip,
-		tailX - px*half, tailY - py*half,
-	}
-}
-
-func Words(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
+func Words(w *gogui.Window, box ui.Rect, r Reading, ink theme.Theme) gogui.View {
 	hour, minute, ok := clockHands(r)
 	if !ok {
 		return Plain(w, box, r, ink)
 	}
-	said := face.Say(hour, minute)
+	said := Say(hour, minute)
 	big := Lettering(glyph.TypefaceBold, 0, ink.Text)
 	longest := ""
 	for _, line := range said {
@@ -314,7 +224,7 @@ func Words(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.
 	return gogui.Column(cfg)
 }
 
-func Overlap(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
+func Overlap(w *gogui.Window, box ui.Rect, r Reading, ink theme.Theme) gogui.View {
 	hour, minute, ok := split(r)
 	if !ok {
 		return Plain(w, box, r, ink)
@@ -349,88 +259,7 @@ func Overlap(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogu
 	return gogui.Column(cfg)
 }
 
-func Segments(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {
-	hour, minute, ok := split(r)
-	if !ok {
-		return Plain(w, box, r, ink)
-	}
-	rows := []string{hour + ":" + minute}
-	if box.H > box.W {
-		rows = []string{hour, minute}
-	}
-	unit := func(row string) float32 {
-		var wide float32
-		for i, c := range row {
-			if i > 0 {
-				wide += 0.16
-			}
-			if c == ':' {
-				wide += 0.30
-			} else {
-				wide += 0.56
-			}
-		}
-		return wide
-	}
-	widest := float32(0)
-	for _, row := range rows {
-		widest = max(widest, unit(row))
-	}
-	bw, bh := float32(box.W), float32(box.H)
-	height := min(bw*0.88/widest, bh*0.34*1.5/float32(len(rows)))
-	gap := height * 0.22
-	tall := height*float32(len(rows)) + gap*float32(len(rows)-1)
-
-	on := widgets.Color(ink.Text)
-	off := widgets.Color(ink.Text.Blend(ink.Background, 0.91))
-	digits := gogui.DrawCanvas(gogui.DrawCanvasCfg{
-		ID: "segments", Width: bw, Height: tall,
-		Version: canvasVersion(box, r, ink, false),
-		OnDraw: func(dc *gogui.DrawContext) {
-			y := float32(0)
-			for _, row := range rows {
-				x := (bw - unit(row)*height) / 2
-				for i, c := range row {
-					if i > 0 {
-						x += height * 0.16
-					}
-					if c == ':' {
-						dot := max(height*0.15, 2)
-						span := height * 0.30
-						for _, cy := range []float32{y + height/3, y + height*2/3} {
-							dc.FilledCircle(x+span/2, cy, dot/2, on)
-						}
-						x += span
-						continue
-					}
-					cell := ui.Rect{X: int(x), Y: int(y), W: int(height * 0.56), H: int(height)}
-					lit := face.Lit(c)
-					for k, bar := range face.Bars(cell) {
-						paint := off
-						if lit[k] {
-							paint = on
-						}
-						dc.FilledRoundedRect(
-							float32(bar.X),
-							float32(bar.Y),
-							float32(bar.W),
-							float32(bar.H),
-							float32(min(bar.W, bar.H))/2,
-							paint,
-						)
-					}
-					x += height * 0.56
-				}
-				y += height + gap
-			}
-		},
-	})
-	cfg := centred(append([]gogui.View{digits}, dateLine(r, height*0.13, ink)...)...)
-	cfg.Spacing = gogui.SpacingPx(height * 0.34)
-	return gogui.Column(cfg)
-}
-
-func canvasVersion(box ui.Rect, r face.Reading, ink theme.Theme, seconds bool) uint64 {
+func canvasVersion(box ui.Rect, r Reading, ink theme.Theme, seconds bool) uint64 {
 	second := 0
 	if seconds {
 		second = r.Second

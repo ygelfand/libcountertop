@@ -2,12 +2,11 @@ package dashboard
 
 import (
 	"path/filepath"
-	"slices"
 	"testing"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
-	"github.com/ygelfand/libcountertop/pkg/display/clockface"
+	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -52,7 +51,7 @@ func TestEverySelectReachesBothSides(t *testing.T) {
 	d := dash(t)
 
 	t.Run("face", func(t *testing.T) {
-		for _, want := range schema.Faces() {
+		for _, want := range clockview.Names() {
 			d.SetFace(want)
 
 			if got := d.clock().Face; got != want {
@@ -135,7 +134,7 @@ func TestEverySwitchReachesBothSides(t *testing.T) {
 func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 	d := dash(t)
 
-	for _, want := range schema.Faces() {
+	for _, want := range clockview.Names() {
 		d.sel("face").OnCommand(want.Label())
 
 		if got := d.clock().Face; got != want {
@@ -163,10 +162,10 @@ func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 func TestAnUnknownLabelChangesNothing(t *testing.T) {
 	d := dash(t)
 
-	d.SetFace(schema.FaceAnalog)
+	d.SetFace(schema.Face("analog"))
 	d.sel("face").OnCommand("Sundial")
 
-	if got := d.clock().Face; got != schema.FaceAnalog {
+	if got := d.clock().Face; got != schema.Face("analog") {
 		t.Errorf("an unknown face left the setting on %q", got)
 	}
 }
@@ -175,7 +174,7 @@ func TestRestorePutsEveryEntityBack(t *testing.T) {
 	d := dash(t)
 
 	s, c := schema.DefaultScreen(), schema.DefaultClock()
-	c.Face = schema.FaceWords
+	c.Face = schema.Face("words")
 	c.Position = schema.PositionTop
 	c.Size = schema.SizeSmall
 	c.Ink = schema.InkAmber
@@ -221,22 +220,5 @@ func TestEveryEntityTakesACommand(t *testing.T) {
 		default:
 			t.Errorf("%T is neither a select nor a switch", e)
 		}
-	}
-}
-
-func TestConfiguredFacesMatchTheRenderers(t *testing.T) {
-	offered := schema.Faces()
-	for _, name := range offered {
-		if !slices.Contains(clockface.Kinds(), clockface.Kind(name)) {
-			t.Errorf("configured face %q has no renderer", name)
-		}
-	}
-	for _, kind := range clockface.Kinds() {
-		if !slices.Contains(offered, schema.Face(kind)) {
-			t.Errorf("face %q is not offered", kind)
-		}
-	}
-	if clockface.Kind(schema.DefaultFace) != clockface.Default {
-		t.Error("the configured and rendered default faces differ")
 	}
 }

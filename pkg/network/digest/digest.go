@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -54,6 +55,37 @@ func (c Challenge) Allows(authorization, method string, creds Credentials) bool 
 		want = sum(ha1 + ":" + c.Nonce + ":" + p["nc"] + ":" + p["cnonce"] + ":" + qop + ":" + ha2)
 	}
 	return subtle.ConstantTimeCompare([]byte(p["response"]), []byte(want)) == 1
+}
+
+func Answer(challenge, method, uri, user, password string) string {
+	scheme, rest, _ := strings.Cut(strings.TrimSpace(challenge), " ")
+	if strings.EqualFold(scheme, "Basic") {
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+password))
+	}
+	p := params(rest)
+	realm, nonce := p["realm"], p["nonce"]
+	ha1 := sum(user + ":" + realm + ":" + password)
+	ha2 := sum(method + ":" + uri)
+	header := fmt.Sprintf(
+		`Digest username="%s", realm="%s", nonce="%s", uri="%s"`,
+		user,
+		realm,
+		nonce,
+		uri,
+	)
+	if qop := p["qop"]; qop != "" {
+		b := make([]byte, 8)
+		_, _ = rand.Read(b)
+		cnonce, nc := hex.EncodeToString(b), "00000001"
+		response := sum(ha1 + ":" + nonce + ":" + nc + ":" + cnonce + ":auth:" + ha2)
+		header += fmt.Sprintf(`, qop=auth, nc=%s, cnonce="%s", response="%s"`, nc, cnonce, response)
+	} else {
+		header += fmt.Sprintf(`, response="%s"`, sum(ha1+":"+nonce+":"+ha2))
+	}
+	if opaque := p["opaque"]; opaque != "" {
+		header += fmt.Sprintf(`, opaque="%s"`, opaque)
+	}
+	return header
 }
 
 func params(s string) map[string]string {

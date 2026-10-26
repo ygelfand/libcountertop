@@ -82,6 +82,21 @@ func (a *Alerts) Start(t schema.Tone) {
 	}
 }
 
+func (a *Alerts) Chime(c schema.Chime, repeat time.Duration) {
+	snd := a.sound(c, schema.ChimeNone)
+	a.mu.Lock()
+	a.stopLocked()
+	generation := a.generation
+	a.mu.Unlock()
+	if snd.Empty() {
+		return
+	}
+	a.play(snd, Level)
+	if repeat > 0 {
+		a.again(generation, snd, time.Now().Add(repeat))
+	}
+}
+
 func (a *Alerts) Stop() {
 	a.mu.Lock()
 	defer a.mu.Unlock()

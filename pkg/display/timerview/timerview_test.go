@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/display/clockkind"
+	"github.com/ygelfand/libcountertop/pkg/display/clockview"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 func TestTheRingEmptiesClockwiseFromTwelve(t *testing.T) {
@@ -69,18 +70,18 @@ func TestTheCornerStaysInsideARoundScreen(t *testing.T) {
 func TestTheFaceReadsTheTimeLeft(t *testing.T) {
 	for _, tc := range []struct {
 		left   time.Duration
-		kind   clockkind.Kind
+		kind   schema.Face
 		want   string
 		second int
 	}{
-		{4*time.Minute + 59*time.Second, clockkind.Plain, "4:59", 59},
-		{4*time.Minute + 58500*time.Millisecond, clockkind.Segments, "4:59", 59},
-		{90 * time.Minute, clockkind.Plain, "1:30", 0},
-		{4*time.Minute + 59*time.Second, clockkind.AnalogSeconds, "0:04", 59},
-		{0, clockkind.Cards, "0:00", 0},
-		{-time.Second, clockkind.Plain, "0:00", 0},
+		{4*time.Minute + 59*time.Second, "plain", "4:59", 59},
+		{4*time.Minute + 58500*time.Millisecond, "segments", "4:59", 59},
+		{90 * time.Minute, "plain", "1:30", 0},
+		{4*time.Minute + 59*time.Second, "analog-seconds", "0:04", 59},
+		{0, "cards", "0:00", 0},
+		{-time.Second, "plain", "0:00", 0},
 	} {
-		r := timerReading(tc.left, tc.kind, "pasta")
+		r := timerReading(tc.left, timerFace(tc.kind), "pasta")
 		if r.Time != tc.want || r.Second != tc.second || r.Date != "pasta" {
 			t.Errorf(
 				"%v on %s reads %+v, want %s and second %d",
@@ -95,9 +96,9 @@ func TestTheFaceReadsTheTimeLeft(t *testing.T) {
 }
 
 func TestEveryFaceHasATimerReading(t *testing.T) {
-	for _, k := range append(clockkind.Kinds(), clockkind.None) {
-		switch got := timerFaceKind(k); got {
-		case clockkind.None, clockkind.Words, clockkind.Analog:
+	for _, k := range append(clockview.Names(), schema.FaceNone) {
+		switch got := timerFace(k).Name; got {
+		case schema.FaceNone, "words", "analog", "roman":
 			t.Errorf("%s counts down on %s", k, got)
 		}
 	}

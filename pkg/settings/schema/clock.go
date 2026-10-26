@@ -3,7 +3,6 @@ package schema
 import (
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/display/clockkind"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -33,6 +32,7 @@ const (
 	Delay10s   Delay = "10s"
 	Delay15s   Delay = "15s"
 	Delay30s   Delay = "30s"
+	Delay45s   Delay = "45s"
 	Delay1m    Delay = "1m"
 	Delay2m    Delay = "2m"
 	Delay3m    Delay = "3m"
@@ -56,6 +56,8 @@ func (d Delay) Label() string {
 		return say.T("delay.15s")
 	case Delay30s:
 		return say.T("delay.30s")
+	case Delay45s:
+		return say.T("delay.45s")
 	case Delay1m:
 		return say.T("delay.1m")
 	case Delay2m:
@@ -84,6 +86,8 @@ func (d Delay) After() time.Duration {
 		return 15 * time.Second
 	case Delay30s:
 		return 30 * time.Second
+	case Delay45s:
+		return 45 * time.Second
 	case Delay1m:
 		return time.Minute
 	case Delay2m:
@@ -190,7 +194,7 @@ func Sizes() []Size {
 	return []Size{SizeNano, SizeMicro, SizeMini, SizeSmall, SizeMedium, SizeLarge}
 }
 
-const DefaultFace = FacePlain
+const DefaultFace Face = "plain"
 
 const DefaultDate = true
 
@@ -203,18 +207,8 @@ func DefaultClock() Clock {
 	}
 }
 
-type Face = clockkind.Kind
+type Face string
 
-const (
-	FaceNone          Face = Face(clockkind.None)
-	FacePlain         Face = Face(clockkind.Plain)
-	FaceStack         Face = Face(clockkind.Stack)
-	FaceCards         Face = Face(clockkind.Cards)
-	FaceAnalog        Face = Face(clockkind.Analog)
-	FaceAnalogSeconds Face = Face(clockkind.AnalogSeconds)
-	FaceSegments      Face = Face(clockkind.Segments)
-	FaceWords         Face = Face(clockkind.Words)
-	FaceOverlap       Face = Face(clockkind.Overlap)
-)
+const FaceNone Face = "none"
 
-var Faces = clockkind.Kinds
+func (f Face) Label() string { return say.T("face." + string(f)) }

@@ -59,6 +59,7 @@ var esphomeLogo string
 const (
 	layerID    = 60
 	layerZ     = 5
+	busyZ      = 1000
 	helperWait = 200 * time.Millisecond
 )
 
@@ -166,6 +167,7 @@ type Options struct {
 	Todo            *todo.Todo
 	Calendar        *calendar.Calendar
 	CamerasPage     func() shell.View
+	DoorbellPage    func() shell.View
 	Player          playerview.Player
 	PlayerPage      func() shell.View
 	MediaVolume     volume.Channel
@@ -244,6 +246,7 @@ func New(o Options) *App {
 		Todo:            o.Todo,
 		Calendar:        o.Calendar,
 		Cameras:         o.CamerasPage,
+		Doorbell:        o.DoorbellPage,
 		Shell:           o.Shell,
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},
@@ -368,9 +371,16 @@ func (a *App) Run(ctx context.Context) error {
 
 	stopTouch := a.o.Touch.Contacts.Listen(func(t touch.Contact) {
 		sh.Touch()
-		if t.Phase == touch.Down {
-			a.o.Messages.Dismiss(t.ID, image.Pt(t.X, t.Y))
+		at := image.Pt(t.X, t.Y)
+		switch t.Phase {
+		case touch.Down:
+			a.o.Messages.Dismiss(t.ID, at)
+			a.o.Messages.Grab(t.ID, at)
 			a.o.Assistant.Cancel(t.ID)
+		case touch.Move:
+			a.o.Messages.Drag(t.ID, at)
+		case touch.Up:
+			a.o.Messages.Release(t.ID, at)
 		}
 		if a.o.Messages.Took(t.ID) || a.o.Assistant.Took(t.ID) {
 			return

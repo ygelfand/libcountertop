@@ -10,8 +10,6 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
-	"github.com/ygelfand/libcountertop/pkg/display/clockkind"
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -365,11 +363,7 @@ func (v *View) face(w *gogui.Window, c timer.Card, clock schema.Clock) gogui.Vie
 	ink := clock.Ink.Over(pal)
 	ink.Text = v.tint(w, c, ink.Surface)
 
-	kind := timerFaceKind(clock.Face)
-	build, ok := clockview.Of(kind)
-	if !ok {
-		build = clockview.Plain
-	}
+	face := timerFace(clock.Face)
 	left, name := c.Left, c.Name
 	if c.Ringing {
 		left, name = 0, ""
@@ -386,7 +380,7 @@ func (v *View) face(w *gogui.Window, c timer.Card, clock schema.Clock) gogui.Vie
 			Sizing:  gogui.FixedFixed,
 			Padding: gogui.NoPadding,
 			Clip:    true,
-			Content: []gogui.View{build(w, box, timerReading(left, kind, name), ink)},
+			Content: []gogui.View{face.Draw(w, box, timerReading(left, face, name), ink)},
 		})),
 		v.tap(c),
 	)
@@ -588,21 +582,22 @@ func timerGlyph(c timer.Card) string {
 	return gogui.IconClock
 }
 
-func timerFaceKind(k clockkind.Kind) clockkind.Kind {
-	switch k {
-	case clockkind.Analog:
-		return clockkind.AnalogSeconds
-	case clockkind.None, clockkind.Words:
-		return clockkind.Plain
+func timerFace(name schema.Face) clockview.Face {
+	f, ok := clockview.Of(name)
+	if ok && f.Countdown != "" {
+		f, ok = clockview.Of(f.Countdown)
 	}
-	return k
+	if !ok {
+		f, _ = clockview.Of(schema.DefaultFace)
+	}
+	return f
 }
 
-func timerReading(left time.Duration, kind clockkind.Kind, name string) face.Reading {
+func timerReading(left time.Duration, f clockview.Face, name string) clockview.Reading {
 	whole := int((max(left, 0) + time.Second - 1) / time.Second)
 	h, m, s := whole/3600, whole/60%60, whole%60
-	r := face.Reading{Date: name, Second: s}
-	if h > 0 || kind == clockkind.AnalogSeconds {
+	r := clockview.Reading{Date: name, Second: s}
+	if h > 0 || f.Ticks {
 		r.Time = fmt.Sprintf("%d:%02d", h, m)
 		return r
 	}

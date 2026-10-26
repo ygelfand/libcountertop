@@ -30,6 +30,7 @@ type Messages struct {
 	generation uint64
 	took       *int
 	catch      image.Rectangle
+	swipe      swipe
 }
 
 func (m *Messages) Took(id int) bool {
@@ -68,6 +69,15 @@ func (m *Messages) Dismiss(id int, at image.Point) {
 	}
 	slog.Info("message dismissed")
 	m.end(End{Why: EndTapped})
+}
+
+func (m *Messages) Discard() {
+	m.mu.Lock()
+	up := m.up
+	m.mu.Unlock()
+	if up {
+		m.end(End{Why: EndClosed})
+	}
 }
 
 func (m *Messages) Press(key int) {
@@ -136,16 +146,21 @@ func (m *Messages) Show(msg Message, hold time.Duration) {
 
 type Sounder interface {
 	Start(schema.Tone)
+	Chime(c schema.Chime, repeat time.Duration)
 	Stop()
 }
 
 func (m *Messages) SoundWith(s Sounder) {
 	m.Changed.Listen(func(up bool) {
-		if current, ok := m.Current(); up && ok {
+		current, ok := m.Current()
+		switch {
+		case !up || !ok:
+			s.Stop()
+		case current.Chime != "":
+			s.Chime(current.Chime, current.Repeat)
+		default:
 			s.Start(current.Tone)
-			return
 		}
-		s.Stop()
 	})
 }
 
@@ -168,6 +183,7 @@ func (m *Messages) endLocked(why End) {
 	ended := m.current.Ended
 	m.up = false
 	m.generation++
+	m.swipe = swipe{}
 	if m.timer != nil {
 		m.timer.Stop()
 		m.timer = nil

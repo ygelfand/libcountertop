@@ -5,6 +5,9 @@ import "github.com/ygelfand/libcountertop/pkg/say"
 type AlertStyle string
 
 const (
+	AlertScreen AlertStyle = ""
+	AlertNone   AlertStyle = "none"
+	AlertAnswer AlertStyle = "answer"
 	AlertBanner AlertStyle = "banner"
 	AlertCard   AlertStyle = "card"
 	AlertFull   AlertStyle = "full"
@@ -15,6 +18,12 @@ const DefaultAlertStyle = AlertBanner
 
 func (s AlertStyle) Label() string {
 	switch s {
+	case AlertScreen:
+		return say.T("alertstyle.screen")
+	case AlertNone:
+		return say.T("alertstyle.none")
+	case AlertAnswer:
+		return say.T("alertstyle.answer")
 	case AlertBanner:
 		return say.T("alertstyle.banner")
 	case AlertCard:

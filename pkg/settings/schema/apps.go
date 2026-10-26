@@ -19,6 +19,7 @@ const (
 	AppCameras  = "cameras"
 	AppLights   = "lights"
 	AppSwitches = "switches"
+	AppDoorbell = "doorbell"
 )
 
 func DefaultApps() Apps { return Apps{Dock: []string{AppPlayer, AppCalls}} }

@@ -57,6 +57,9 @@ alerts.setting.timer: Timer sound
 alerts.setting.wake: Wake light
 alerts.setting.warning: Warning chime
 alertstyle.banner: Banner
+alertstyle.screen: Same as screen
+alertstyle.none: None
+alertstyle.answer: Auto answer
 alertstyle.card: Card
 alertstyle.full: Full screen
 alertstyle.toast: Toast
@@ -110,6 +113,8 @@ ring.setting.trouble: Failure light
 speaker.group.speaker: Speaker
 speaker.setting.eq: Speaker EQ
 speaker.setting.resampling: Voice resampling
+speaker.setting.speaker_output: Speaker
+speaker.setting.headphone_output: Headphone jack
 bluetooth.setting.proxy: Bluetooth proxy
 bluetooth.setting.scan: Bluetooth scanning
 bluetooth.setting.speaker: Bluetooth speaker
@@ -395,6 +400,7 @@ delay.1m: 1 minute
 delay.2m: 2 minutes
 delay.30m: 30 minutes
 delay.30s: 30 seconds
+delay.45s: 45 seconds
 delay.3m: 3 minutes
 delay.5m: 5 minutes
 delay.5s: 5 seconds
@@ -423,6 +429,19 @@ face.analog-seconds: Analog seconds
 face.cards: Cards
 face.none: None
 face.overlap: Overlap
+face.roman: Roman
+face.railway: Railway
+face.flip: Flip
+face.nixie: Nixie
+face.octagon: Octagon
+face.atomic: Atomic
+face.spoken: Spoken
+face.math: Math
+face.smiley: Smiley
+face.neon: Neon
+face.bars: Bars
+face.reel: Reel
+face.binary: Binary
 face.plain: Plain
 face.segments: Segments
 face.stack: Stack
@@ -563,6 +582,7 @@ ink.red: Red
 ink.theme: Theme
 ink.violet: Violet
 keyboard.cancel: Cancel
+message.close: Close
 keyboard.compact: Compact
 keyboard.large: Large
 keyboard.save: Save
@@ -614,6 +634,100 @@ onboard.add: Scan the code, then add
 onboard.hint: Scan the code, then enter this address.
 onboard.or: or enter this address
 onboard.title: Add me to Home Assistant
+doorbell.entity.chime: Doorbell ring sound
+doorbell.group.doorbell: Doorbell
+doorbell.setting.chime: Ring sound
+doorbell.entity.notify: Doorbell notification sound
+doorbell.setting.notify: Notification sound
+doorbell.entity.ring_for: Doorbell ring for
+doorbell.setting.ring_for: Ring for
+doorbell.entity.style: Doorbell notification style
+doorbell.setting.style: Notification style
+doorbell.entity.visitor: Doorbell ring style
+doorbell.setting.visitor: Ring style
+doorbell.add: Add doorbell
+doorbell.app: Doorbell
+doorbell.camera.title: Home Assistant camera
+doorbell.cancel: Cancel
+doorbell.field.host: IP address or hostname
+doorbell.field.name: Name
+doorbell.field.password: Password
+doorbell.field.uid: UID
+doorbell.field.user: User
+doorbell.forget: Remove
+doorbell.added: Added
+doorbell.entity.door.events: "Doorbell {{.N}} event source"
+doorbell.entity.door.name: "Doorbell {{.N}} name"
+doorbell.entity.door.talk: "Doorbell {{.N}} talkback source"
+doorbell.entity.door.video: "Doorbell {{.N}} video source"
+doorbell.field.stream: Stream
+doorbell.setting.door.events: Events
+doorbell.setting.door.name: Name
+doorbell.setting.door.talk: Talkback
+doorbell.setting.door.video: Video
+doorbell.autosetup: Auto setup
+doorbell.cameras: "{{.N}} cameras"
+doorbell.channel: "Channel {{.N}}"
+doorbell.connect: Connect
+doorbell.connecting: Connecting…
+doorbell.events.via: "{{.State}} via {{.Source}}"
+doorbell.offline: Offline
+doorbell.sensor.animal: Animal sensor
+doorbell.sensor.none: None
+doorbell.sensor.package: Package sensor
+doorbell.sensor.person: Person sensor
+doorbell.sensor.vehicle: Vehicle sensor
+doorbell.sensor.visitor: Ring sensor
+doorbell.source.ha_reolink: Home Assistant (Reolink integration)
+doorbell.source.nvr: Reolink NVR
+doorbell.status.events: Events
+doorbell.status.video: Video
+doorbell.video.connecting: "Connecting via {{.Source}}"
+doorbell.video.failed: "{{.Why}} ({{.Source}})"
+doorbell.tried: "{{.Source}} failed: {{.Why}}"
+doorbell.video.working: "Working via {{.Source}}"
+doorbell.looking: Looking in Home Assistant…
+doorbell.manual: Manual
+doorbell.needs: Enter a UID or an IP address or hostname
+doorbell.none: No doorbells set up
+doorbell.save: Save
+doorbell.checking: Checking…
+doorbell.notsaved: Not saved
+doorbell.saved: Saved
+doorbell.ok: OK
+doorbell.fellback: "{{.Line}} (Reolink failed)"
+doorbell.slot: "Doorbell {{.N}}"
+doorbell.watch: Watch
+doorbell.why.camera: No live video for this doorbell
+doorbell.why.lost: Lost the doorbell, retrying
+doorbell.why.talk: "Can't talk: {{.Why}}"
+doorbell.why.fallback: Showing Home Assistant video, no talkback
+doorbell.why.toobig: The main stream is too large for this screen, showing the sub stream
+doorbell.why.decoder: This screen can't play this doorbell's video
+doorbell.why.nopassword: Enter the doorbell's password
+doorbell.why.refused: "Login refused (code {{.Code}})"
+doorbell.why.other: A different doorbell answers at that address
+doorbell.why.unreachable: Can't reach the doorbell
+doorbell.stream.main: Main
+doorbell.stream.sub: Sub
+doorbell.source.auto: Automatic
+doorbell.source.ha: Home Assistant
+doorbell.source.onvif: ONVIF
+doorbell.source.reolink: Reolink
+doorbell.source.rtsp: RTSP
+doorbell.status.connected: Connected
+doorbell.status.connecting: Connecting…
+doorbell.status.login: Wrong user or password
+doorbell.status.none: No doorbells in Home Assistant
+doorbell.status.ready: "{{.Count}} connected"
+doorbell.status.unreachable: Can't reach the doorbells
+doorbell.status.unset: Not set up
+doorbell.status.unsupported: Not available from this source
+doorbell.event.visitor: "Someone's at the {{.Door}}"
+doorbell.event.people: "Person at the {{.Door}}"
+doorbell.event.package: "Package at the {{.Door}}"
+doorbell.event.vehicle: "Vehicle by the {{.Door}}"
+doorbell.event.dog_cat: "Animal at the {{.Door}}"
 photos.entity.albums: Photo albums
 photos.entity.favorites: Photos favorites only
 photos.entity.interval: Photo interval

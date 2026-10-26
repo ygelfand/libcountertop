@@ -21,7 +21,25 @@ type Page struct {
 	Side func(*gogui.Window) gogui.View
 
 	Actions []Action
+
+	Busy func() (Busy, bool)
 }
+
+type Busy struct {
+	Text    string
+	Detail  string
+	Outcome Outcome
+	Close   string
+	Dismiss func()
+}
+
+type Outcome int
+
+const (
+	Working Outcome = iota
+	Succeeded
+	Failed
+)
 
 type Feed struct {
 	Live  bool
@@ -30,11 +48,19 @@ type Feed struct {
 }
 
 type Action struct {
-	Label  string
-	Glyph  string
-	Danger bool
-	Do     func()
+	Label string
+	Glyph string
+	Role  Role
+	Do    func()
 }
+
+type Role int
+
+const (
+	Primary Role = iota
+	Plain
+	Danger
+)
 
 func (p *Page) Covers() bool { return true }
 

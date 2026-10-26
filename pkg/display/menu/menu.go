@@ -4,9 +4,6 @@ import (
 	"image"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
-
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 type Mark struct {
@@ -45,7 +42,7 @@ type Row struct {
 	Chosen bool
 	Dim    bool
 
-	Preview func(s ui.Surface, at ui.Rect, palette theme.Theme)
+	Preview Preview
 
 	Save func(string)
 }

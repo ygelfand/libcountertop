@@ -397,7 +397,15 @@ func (c *Cameras) collage(w *gogui.Window, at ui.Rect, full bool) gogui.View {
 	vw, vh := at.W, at.H
 	cams := c.picked()
 	if len(cams) == 0 {
-		return c.note(c.emptyNote())
+		if !full {
+			return c.note(c.emptyNote())
+		}
+		return gogui.Column(gogui.ContainerCfg{
+			Sizing:  gogui.FillFill,
+			Padding: gogui.NoPadding,
+			Color:   gogui.RGB(0, 0, 0),
+			Content: append(c.corners(vw), c.note(c.emptyNote())),
+		})
 	}
 	target := RowHeight(c.o.Settings.Read().Scale, float64(vw))
 
@@ -465,7 +473,7 @@ func (c *Cameras) collage(w *gogui.Window, at ui.Rect, full bool) gogui.View {
 		OnGesture: c.swipe,
 	}
 	if full {
-		views = append(views, c.closer("cameras-close", func() { c.o.Shell.Remove(c.grid) }))
+		views = append(views, c.corners(vw)...)
 		cfg.Color = gogui.RGB(0, 0, 0)
 	}
 	cfg.Content = views
@@ -552,6 +560,28 @@ func (c *Cameras) tileView(cam homeassistant.Camera, f frame, tw, th float32) go
 		VAlign:  gogui.VAlignMiddle,
 		Content: content,
 	}, func(gogui.EventCtx) { c.watch(cam.ID) })
+}
+
+func (c *Cameras) Picture(ctx context.Context, entity string, w, h int) (*image.RGBA, error) {
+	if _, ok := c.camera(entity); !ok {
+		c.refreshList(ctx)
+	}
+	cam, ok := c.camera(entity)
+	if !ok || cam.Picture == "" {
+		return nil, errNoPicture
+	}
+	return snapshot(ctx, c.o.Client, c.o.Site.URL(), cam.Picture, w, h)
+}
+
+func (c *Cameras) Watch(entity string) bool {
+	if _, ok := c.camera(entity); !ok {
+		c.refreshList(context.Background())
+	}
+	if _, ok := c.camera(entity); !ok {
+		return false
+	}
+	c.watch(entity)
+	return true
 }
 
 func (c *Cameras) watch(id string) {
@@ -738,20 +768,21 @@ func (c *Cameras) buildLive(w *gogui.Window) gogui.View {
 		}))
 	case thumb.src != "":
 		sw, sh := enlarge(thumb.w, thumb.h, vw, vh)
-		content = append(content,
+		content = append(
+			content,
 			gogui.Image(gogui.ImageCfg{Src: thumb.src, Width: sw, Height: sh}),
-			widgets.Placed(ui.Rect{W: vw, H: vh}, widgets.Spinner(vw, vh, time.Since(began))),
 		)
-		c.spinAgain(w)
 	default:
 		if cam, ok := c.camera(id); ok {
 			content = append(content, gogui.Label(cam.Name, widgets.Secondary()))
 		}
+	}
+	if video == nil && f.src == "" && why == "" {
 		content = append(content,
 			widgets.Placed(ui.Rect{W: vw, H: vh}, widgets.Spinner(vw, vh, time.Since(began))))
 		c.spinAgain(w)
 	}
-	content = append(content, c.closer("camera-live-close", c.closeLive))
+	content = append(content, widgets.CloseCorner(c.presses, "camera-live-close", c.closeLive))
 	if video != nil || f.src != "" {
 		content = append(content, mode(vw, video != nil))
 	}
@@ -784,24 +815,6 @@ func (c *Cameras) closeLive() {
 	}
 	c.liveShot = frame{}
 	c.mu.Unlock()
-}
-
-func (c *Cameras) closer(id string, close func()) gogui.View {
-	st := gogui.CurrentTheme().TextStyleIconMedium
-	st.Size = style.Reach() * 0.6
-	st.Color = gogui.RGB(0xff, 0xff, 0xff)
-	side := int(st.Size * 2)
-	pad := int(gogui.PadLarge)
-	return widgets.Placed(
-		ui.Rect{X: pad, Y: pad, W: side, H: side},
-		c.presses.Button(
-			id,
-			gogui.IconClose,
-			st,
-			gogui.RGBA(0, 0, 0, 0x99),
-			func(gogui.EventCtx) { close() },
-		),
-	)
 }
 
 func mode(vw int, live bool) gogui.View {
@@ -915,6 +928,18 @@ func (c *Cameras) emptyNote() string {
 		return say.T("cameras.loading")
 	}
 	return say.T("cameras.none")
+}
+
+func (c *Cameras) corners(vw int) []gogui.View {
+	return []gogui.View{
+		widgets.CloseCorner(c.presses, "cameras-close", func() { c.o.Shell.Remove(c.grid) }),
+		widgets.SettingsCorner(
+			c.presses,
+			"cameras-settings",
+			vw,
+			func() { c.o.Shell.Push(c.Page()) },
+		),
+	}
 }
 
 func (c *Cameras) note(text string) gogui.View {

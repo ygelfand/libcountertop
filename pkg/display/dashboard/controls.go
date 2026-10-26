@@ -3,6 +3,7 @@ package dashboard
 import (
 	"log/slog"
 
+	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -29,7 +30,7 @@ func NewTable() *Table {
 			func(s *Setup) *schema.HourFormat { return &s.Hours },
 		),
 		setting.Pick(Setting{Name: "face", Group: Group, Icon: "mdi:clock-digital"},
-			schema.Faces(), func(s *Setup) *schema.Face { return &s.Clock.Face }),
+			clockview.Names(), func(s *Setup) *schema.Face { return &s.Clock.Face }),
 		setting.Pick(Setting{Name: "position", Group: Group, Icon: "mdi:align-vertical-center"},
 			schema.Positions(), func(s *Setup) *schema.Position { return &s.Clock.Position }),
 		setting.Pick(Setting{Name: "align", Group: Group, Icon: "mdi:align-horizontal-center"},

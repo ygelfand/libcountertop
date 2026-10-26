@@ -17,6 +17,7 @@ type Shared struct {
 	Cast      Cast      `json:"cast"`
 	Clock     Clock     `json:"clock"`
 	Diag      Diag      `json:"diag"`
+	Doorbell  Doorbell  `json:"doorbell"`
 	Feedback  Feedback  `json:"feedback"`
 	Frontend  Frontend  `json:"frontend"`
 	Home      Home      `json:"home"`
@@ -53,6 +54,7 @@ func DefaultShared() Shared {
 		Cast:      DefaultCast(),
 		Clock:     DefaultClock(),
 		Diag:      DefaultDiag(),
+		Doorbell:  DefaultDoorbell(),
 		Feedback:  DefaultFeedback(),
 		Home:      DefaultHome(),
 		Idle:      DefaultIdle(),
@@ -99,6 +101,7 @@ type Sections[C any] struct {
 	Cast      storage.Binding[C, Cast]
 	Clock     storage.Binding[C, Clock]
 	Diag      storage.Binding[C, Diag]
+	Doorbell  storage.Binding[C, Doorbell]
 	Feedback  storage.Binding[C, Feedback]
 	Frontend  storage.Binding[C, Frontend]
 	Home      storage.Binding[C, Home]
@@ -137,6 +140,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Cast:      bind(store, shared, func(s *Shared) *Cast { return &s.Cast }),
 		Clock:     bind(store, shared, func(s *Shared) *Clock { return &s.Clock }),
 		Diag:      bind(store, shared, func(s *Shared) *Diag { return &s.Diag }),
+		Doorbell:  bind(store, shared, func(s *Shared) *Doorbell { return &s.Doorbell }),
 		Feedback:  bind(store, shared, func(s *Shared) *Feedback { return &s.Feedback }),
 		Frontend:  bind(store, shared, func(s *Shared) *Frontend { return &s.Frontend }),
 		Home:      bind(store, shared, func(s *Shared) *Home { return &s.Home }),

@@ -6,10 +6,10 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
+	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -42,6 +42,9 @@ func (a *App) root(w *gogui.Window) gogui.View {
 		layers = append(layers, widgets.Floating(0, s.Build(w)))
 	}
 	layers = overlaid(w, layers, overlays)
+	if v := a.busy(w, covering); v != nil {
+		layers = append(layers, widgets.Floating(busyZ, v))
+	}
 	if a.ui.Editor.Typing(w) {
 		if v := a.keyboard(w); v != nil {
 			layers = append(
@@ -59,6 +62,21 @@ func (a *App) root(w *gogui.Window) gogui.View {
 		}
 	}
 	return stack(layers)
+}
+
+func (a *App) busy(w *gogui.Window, covering *Screen) gogui.View {
+	if covering == nil {
+		return nil
+	}
+	p, ok := covering.View.(*shell.Page)
+	if !ok || p.Busy == nil {
+		return nil
+	}
+	b, shown := p.Busy()
+	if !shown {
+		return nil
+	}
+	return a.ui.Toolkit.Busy(w, b, a.ui.Palette())
 }
 
 func (a *App) base(w *gogui.Window, covering *Screen) gogui.View {
@@ -165,7 +183,7 @@ func (a *App) tesseraDash(w *gogui.Window, vw, vh, top, margin int) []gogui.View
 func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.Theme) []gogui.View {
 	cfg := a.o.Settings()
 	ink := cfg.Clock.Ink.Over(pal)
-	r := face.Read(time.Now(), cfg.Screen.Hours == schema.TwentyFourHour)
+	r := clockview.Read(time.Now(), cfg.Screen.Hours == schema.TwentyFourHour)
 	if !cfg.Clock.Date {
 		r = r.Undated()
 	}
@@ -202,8 +220,8 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 			pal,
 		))
 	}
-	if build, ok := clockview.Of(cfg.Clock.Face); ok {
-		layers = append(layers, widgets.Placed(box, build(w, box, r, ink)))
+	if face, ok := clockview.Of(cfg.Clock.Face); ok {
+		layers = append(layers, widgets.Placed(box, face.Draw(w, box, r, ink)))
 	}
 	if r, ok := a.o.Forecast.Now(); (ok || a.weather.Alerting()) && cfg.Weather.Dashboard {
 		layers = append(
@@ -218,13 +236,14 @@ func (a *App) page(w *gogui.Window, p *Screen) gogui.View {
 	return a.ui.Toolkit.PageFrame(
 		w,
 		widgets.FrameOptions{
-			Title:   p.Title,
-			Fixed:   p.Fixed,
-			Build:   p.Build,
-			Foot:    p.Foot,
-			Back:    func() { a.o.Shell.Pop() },
-			Gesture: a.ui.HoldStill,
-			Room:    a.ui.Editor.Room(w),
+			Title:    p.Title,
+			Fixed:    p.Fixed,
+			Build:    p.Build,
+			Foot:     p.Foot,
+			Settings: p.Settings,
+			Back:     func() { a.o.Shell.Pop() },
+			Gesture:  a.ui.HoldStill,
+			Room:     a.ui.Editor.Room(w),
 		},
 	)
 }

@@ -39,6 +39,7 @@ func TestSharedFlattensIntoTheEmbeddingStruct(t *testing.T) {
 		"certs",
 		"clock",
 		"diag",
+		"doorbell",
 		"feedback",
 		"frontend",
 		"home",

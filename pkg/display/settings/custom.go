@@ -11,7 +11,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -141,8 +141,15 @@ func hslaColor(v gogui.HSLA) theme.Color {
 	return theme.Color{R: c.R, G: c.G, B: c.B}
 }
 
-func swatch(c theme.Color) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, at ui.Rect, _ theme.Theme) {
-		ui.FillRounded(s, at, at.H/4, c)
-	}
+type swatch theme.Color
+
+func (c swatch) View(_ *gogui.Window, width, height float32) gogui.View {
+	return gogui.Column(gogui.ContainerCfg{
+		Width:   width,
+		Height:  height,
+		Sizing:  gogui.FixedFixed,
+		Color:   widgets.Color(theme.Color(c)),
+		Radius:  gogui.RadiusPx(height / 4),
+		Padding: gogui.NoPadding,
+	})
 }

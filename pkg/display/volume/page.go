@@ -34,7 +34,22 @@ type PageOptions struct {
 	Chimes    Chimes
 	Feedback  *tone.Feedback
 	Media     *setting.Controls[schema.Media]
+	Outputs   Rows
 	Push      func(shell.View)
+}
+
+type Rows func() ([]menu.Row, []func(int))
+
+func Segments[T any](c *setting.Controls[T]) Rows {
+	return func() ([]menu.Row, []func(int)) {
+		var rows []menu.Row
+		var actions []func(int)
+		for _, field := range c.Table.Rows() {
+			row, act := segments(c, field)
+			rows, actions = append(rows, row), append(actions, act)
+		}
+		return rows, actions
+	}
 }
 
 func NewPage(o PageOptions) *shell.Page {
@@ -63,6 +78,10 @@ func NewPage(o PageOptions) *shell.Page {
 				row, act := segments(o.Media, field)
 				rows, actions = append(rows, row), append(actions, act)
 			}
+		}
+		if o.Outputs != nil {
+			more, act := o.Outputs()
+			rows, actions = append(rows, more...), append(actions, act...)
 		}
 		if o.Feedback != nil && o.Push != nil {
 			at := o.Feedback.Read()

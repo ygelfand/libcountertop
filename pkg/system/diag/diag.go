@@ -36,6 +36,7 @@ type Options struct {
 	Cores    int
 	Hold     func(cores int) error
 	Sample   func()
+	LogTag   string
 }
 
 type Diag struct {

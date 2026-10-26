@@ -81,9 +81,10 @@ func (app *App) tileList(width float32, s homecontrol.Selection, pal theme.Theme
 
 func (app *App) fullScreen(f *homecontrol.Full) *Screen {
 	return &Screen{
-		Title: f.Sel.Name(),
-		View:  f,
-		Fixed: true,
+		Title:    f.Sel.Name(),
+		View:     f,
+		Fixed:    true,
+		Settings: func() { app.o.Shell.Push(app.o.Home.NewPicker(f.Sel)) },
 		Build: func(w *gogui.Window) gogui.View {
 			vw, _ := w.WindowSize()
 			s, ok := app.o.Home.Dash().Find(f.Sel.Key)

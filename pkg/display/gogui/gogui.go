@@ -156,6 +156,7 @@ type Renderer struct {
 	clip  [4]uint32
 	open  bool
 	rot   int
+	spin  glyph.AffineTransform
 
 	clear  *gui.Color
 	events chan gui.Event
@@ -541,6 +542,22 @@ func (r *Renderer) push(v *[4]vertex) {
 	r.runs[len(r.runs)-runWords+7]++
 }
 
+func (r *Renderer) text(c *gui.RenderCmd) {
+	if len(c.Text) == 0 {
+		return
+	}
+	cfg := textConfigFromRender(c)
+	if r.spin == (glyph.AffineTransform{}) {
+		_ = r.textSys.DrawText(c.X, c.Y, c.Text, cfg)
+		return
+	}
+	l, err := r.textSys.LayoutTextCached(c.Text, cfg)
+	if err != nil {
+		return
+	}
+	r.textSys.DrawLayoutTransformed(l, 0, 0, r.spin.Multiply(glyph.AffineTranslation(c.X, c.Y)))
+}
+
 func (r *Renderer) quad(x, y, w, h float32, c gui.Color, radius, thickness float32) {
 	r.run(slotSolid, 0)
 	v := buildQuad(x, y, w, h, c, radius, thickness)
@@ -635,7 +652,7 @@ func (r *Renderer) draw(w *gui.Window) (Stats, error) {
 	t1 := time.Now()
 
 	r.quads, r.runs = r.quads[:0], r.runs[:0]
-	r.clip, r.open = [4]uint32{}, false
+	r.clip, r.open, r.spin = [4]uint32{}, false, glyph.AffineTransform{}
 	r.frame++
 
 	for i := range cmds {
@@ -663,10 +680,12 @@ func (r *Renderer) draw(w *gui.Window) (Stats, error) {
 			r.image(c)
 		case gui.RenderSvg:
 			r.triangles(c)
+		case gui.RenderRotateBegin:
+			r.spin = glyph.AffineRotationAround(c.RotAngle*math.Pi/180, c.RotCX, c.RotCY)
+		case gui.RenderRotateEnd:
+			r.spin = glyph.AffineTransform{}
 		case gui.RenderText:
-			if len(c.Text) > 0 {
-				_ = r.textSys.DrawText(c.X, c.Y, c.Text, textConfigFromRender(c))
-			}
+			r.text(c)
 		case gui.RenderLayout, gui.RenderLayoutPlaced:
 			if c.LayoutPtr != nil {
 				r.textSys.DrawLayout(*c.LayoutPtr, c.X, c.Y)
@@ -743,6 +762,19 @@ func (b *glyphBack) UpdateTextureRect(id glyph.TextureID, data []byte, srcStride
 func (b *glyphBack) DeleteTexture(id glyph.TextureID) { delete(b.textures, id) }
 
 func (b *glyphBack) DrawTexturedQuad(id glyph.TextureID, src, dst glyph.Rect, c glyph.Color) {
+	b.DrawTexturedQuadTransformed(id, src, dst, c, glyph.AffineTransform{XX: 1, YY: 1})
+}
+
+func (b *glyphBack) DrawFilledRect(dst glyph.Rect, c glyph.Color) {
+	b.r.quad(dst.X, dst.Y, dst.Width, dst.Height, gui.Color{R: c.R, G: c.G, B: c.B, A: c.A}, 0, 0)
+}
+
+func (b *glyphBack) DrawTexturedQuadTransformed(
+	id glyph.TextureID,
+	src, dst glyph.Rect,
+	c glyph.Color,
+	t glyph.AffineTransform,
+) {
 	p := b.textures[id]
 	if p == nil {
 		return
@@ -759,20 +791,10 @@ func (b *glyphBack) DrawTexturedQuad(id glyph.TextureID, src, dst glyph.Rect, c 
 		{X: x1, Y: y1, U: u1, V: v1, R: cr, G: cg, B: cb, A: ca},
 		{X: x0, Y: y1, U: u0, V: v1, R: cr, G: cg, B: cb, A: ca},
 	}
+	for i := range v {
+		v[i].X, v[i].Y = t.Apply(v[i].X, v[i].Y)
+	}
 	b.r.push(&v)
-}
-
-func (b *glyphBack) DrawFilledRect(dst glyph.Rect, c glyph.Color) {
-	b.r.quad(dst.X, dst.Y, dst.Width, dst.Height, gui.Color{R: c.R, G: c.G, B: c.B, A: c.A}, 0, 0)
-}
-
-func (b *glyphBack) DrawTexturedQuadTransformed(
-	id glyph.TextureID,
-	src, dst glyph.Rect,
-	c glyph.Color,
-	_ glyph.AffineTransform,
-) {
-	b.DrawTexturedQuad(id, src, dst, c)
 }
 
 func (b *glyphBack) DPIScale() float32 { return 1 }

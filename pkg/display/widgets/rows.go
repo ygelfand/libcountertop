@@ -14,7 +14,7 @@ import (
 
 type RowRenderer struct {
 	Field   func(string, menu.Row) gogui.View
-	Preview func(string, menu.Row) gogui.View
+	Preview func(menu.Row) gogui.View
 	Grip    func(gogui.View) gogui.View
 }
 
@@ -109,7 +109,7 @@ func (kit *Toolkit) Row(
 			content = append(content, gogui.Label(r.Value, Secondary()))
 		}
 		if r.Preview != nil {
-			content = append(content, render.Preview(page, r))
+			content = append(content, render.Preview(r))
 		}
 		if r.Chosen {
 			content = append(content, icon(gogui.IconCheck, gogui.CurrentTheme().Cfg.ColorAccent))
@@ -152,7 +152,13 @@ func (kit *Toolkit) Tile(
 	if selected {
 		cfg.ColorBorder = t.ColorAccent
 	}
+	rest := cfg
+	kit.controls().Tile(&rest, Chosen(false))
 	kit.controls().Tile(&cfg, Chosen(selected))
+	if grow := cfg.SizeBorder.Or(0) - rest.SizeBorder.Or(0); grow > 0 {
+		p := cfg.Padding
+		cfg.Padding = gogui.NewPadding(p.Top-grow, p.Right-grow, p.Bottom-grow, p.Left-grow)
+	}
 	return kit.Pressable(gogui.Column, cfg, interaction.Tapped(tap, 0))
 }
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h265"
 
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/media/call"
@@ -12,8 +13,8 @@ import (
 
 type Stream struct{ l *layer }
 
-func NewStream(d Display, id uint32, z int) *Stream {
-	return &Stream{l: &layer{display: d, id: id, z: z, box: fullScreen}}
+func NewStream(d Display, codec, id uint32, z int) *Stream {
+	return &Stream{l: &layer{display: d, codec: codec, id: id, z: z, box: fullScreen}}
 }
 
 func (s *Stream) Show(f rtc.Frame) {
@@ -21,7 +22,7 @@ func (s *Stream) Show(f rtc.Frame) {
 		return
 	}
 	if f.Key {
-		if sz, ok := sized(f.Data); ok {
+		if sz, ok := sized(s.l.codec, f.Data); ok {
 			s.l.mu.Lock()
 			moved := sz != s.l.size
 			s.l.mu.Unlock()
@@ -44,7 +45,10 @@ func (s *Stream) Stats() call.LayerStats { return s.l.stats() }
 
 func (s *Stream) Close() { s.l.close() }
 
-func sized(annexB []byte) (Size, bool) {
+func sized(codec uint32, annexB []byte) (Size, bool) {
+	if codec == surface.HEVC {
+		return sizedHEVC(annexB)
+	}
 	var au h264.AnnexB
 	if err := au.Unmarshal(annexB); err != nil {
 		return Size{}, false
@@ -54,6 +58,24 @@ func sized(annexB []byte) (Size, bool) {
 			continue
 		}
 		var sps h264.SPS
+		if err := sps.Unmarshal(n); err != nil {
+			return Size{}, false
+		}
+		return Size{Width: sps.Width(), Height: sps.Height()}, true
+	}
+	return Size{}, false
+}
+
+func sizedHEVC(annexB []byte) (Size, bool) {
+	var au h264.AnnexB
+	if err := au.Unmarshal(annexB); err != nil {
+		return Size{}, false
+	}
+	for _, n := range au {
+		if len(n) < 2 || h265.NALUType((n[0]>>1)&0x3f) != h265.NALUType_SPS_NUT {
+			continue
+		}
+		var sps h265.SPS
 		if err := sps.Unmarshal(n); err != nil {
 			return Size{}, false
 		}

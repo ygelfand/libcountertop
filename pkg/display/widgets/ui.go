@@ -56,7 +56,7 @@ func (u *UI) Field(id string, r menu.Row) gogui.View { return u.Editor.Row(u.Kit
 func (u *UI) Row(id, page string, r menu.Row, tap func(int), glyphs bool) gogui.View {
 	return u.Toolkit.Row(id, page, r, tap, glyphs, RowRenderer{
 		Field:   func(id string, r menu.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) },
-		Preview: func(page string, r menu.Row) gogui.View { return RowPreview(page, r, u.Palette()) },
+		Preview: RowPreview,
 		Grip:    u.Grip,
 	})
 }

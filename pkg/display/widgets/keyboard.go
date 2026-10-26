@@ -175,6 +175,7 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 		OnClick: func(e gogui.EventCtx) { e.Consume() },
 	}
 	opts.Kit.Panel(&tray)
+	tray.Color = gogui.RGB(tray.Color.R, tray.Color.G, tray.Color.B)
 	return at, gogui.Column(tray)
 }
 

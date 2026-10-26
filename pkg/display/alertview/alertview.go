@@ -2,6 +2,7 @@ package alertview
 
 import (
 	"image"
+	"slices"
 	"strconv"
 	"time"
 
@@ -11,15 +12,24 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/message"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-const bannerLines = 3
+const (
+	bannerLines  = 3
+	pictureShare = 2.5
+	closeKey     = -1
+	slideFrame   = 16 * time.Millisecond
+)
 
 type Messages interface {
 	Press(key int)
+	Discard()
 	Catch(area image.Rectangle)
+	Offset() (int, bool)
 }
 
 type View struct {
@@ -31,6 +41,19 @@ type View struct {
 func Covers(s schema.AlertStyle) bool { return s == schema.AlertFull }
 
 func (v *View) Build(w *gogui.Window, m message.Message, s schema.AlertStyle) gogui.View {
+	view := v.styled(w, m, s)
+	dx, moving := v.Messages.Offset()
+	if moving && v.Again != nil {
+		v.Again(w, slideFrame)
+	}
+	if dx == 0 {
+		return view
+	}
+	vw, vh := w.WindowSize()
+	return widgets.Placed(ui.Rect{X: dx, W: vw, H: vh}, view)
+}
+
+func (v *View) styled(w *gogui.Window, m message.Message, s schema.AlertStyle) gogui.View {
 	switch s {
 	case schema.AlertCard:
 		return v.card(w, m)
@@ -308,6 +331,14 @@ func lineHeight(w *gogui.Window, st gogui.TextStyle) float32 {
 }
 
 func messageIcon(m message.Message, ink gogui.Color, size float32) []gogui.View {
+	if p := m.Picture; p.Src != "" && p.Width > 0 && p.Height > 0 {
+		tall := size * pictureShare
+		return []gogui.View{gogui.Image(gogui.ImageCfg{
+			Src:    p.Src,
+			Width:  tall * float32(p.Width) / float32(p.Height),
+			Height: tall,
+		})}
+	}
 	if m.Icon == "" {
 		return nil
 	}
@@ -342,8 +373,9 @@ func (v *View) keys(
 	if len(m.Keys) == 0 {
 		return nil
 	}
-	keys := make([]gogui.View, 0, len(m.Keys))
-	for i, k := range m.Keys {
+	keys := make([]gogui.View, 0, len(m.Keys)+1)
+	all := append(slices.Clone(m.Keys), message.Key{Text: say.T("message.close")})
+	for i, k := range all {
 		cfg := gogui.ContainerCfg{
 			ID:      "message-key-" + strconv.Itoa(i),
 			Width:   widgets.KeyWidth(w, k.Text, st, tall),
@@ -357,6 +389,9 @@ func (v *View) keys(
 		}
 		if fill {
 			cfg.Width, cfg.Sizing = 0, gogui.FillFixed
+		}
+		if i == len(m.Keys) {
+			i = closeKey
 		}
 		keys = append(keys, v.key(i, k, pal, cfg, st))
 	}
@@ -375,6 +410,9 @@ func (v *View) key(
 	st gogui.TextStyle,
 ) gogui.View {
 	press := func(gogui.EventCtx) { v.Messages.Press(i) }
+	if i == closeKey {
+		press = func(gogui.EventCtx) { v.Messages.Discard() }
+	}
 	c, ok := message.Swatch(k.Swatch, pal)
 	if !ok {
 		return v.UI.Toolkit.Keyed(cfg, k.Text, st, style.Rest, press)

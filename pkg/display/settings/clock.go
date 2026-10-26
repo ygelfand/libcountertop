@@ -1,15 +1,10 @@
 package settings
 
 import (
-	"time"
-
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
-	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
+	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -53,9 +48,11 @@ func (p *ClockPages) Page() *shell.Page {
 				},
 			}
 			taps := []func(int){
-				p.open(p.Faces(say.T("clock.face"),
+				p.open(Tiles(say.T("clock.face"),
+					clockview.Names(),
 					func() config.Face { return p.options.Preferences.ClockState().Clock.Face },
-					p.options.Controller.SetFace)),
+					p.options.Controller.SetFace,
+					p.options.Previews.ClockFace)),
 			}
 			placed, placing := Placing{
 				Positions: config.Positions(),
@@ -81,36 +78,6 @@ func (p *ClockPages) Page() *shell.Page {
 			return rows, taps
 		},
 	}
-}
-
-func (p *ClockPages) Faces(
-	title string,
-	now func() config.Face,
-	use func(config.Face),
-) *shell.Page {
-	return &shell.Page{
-		Title: title,
-		Tiles: func() ([]menu.Cell, []func(int)) {
-			chosen := now()
-
-			cells := make([]menu.Cell, 0, len(config.Faces()))
-			acts := make([]func(int), 0, len(config.Faces()))
-
-			for _, f := range config.Faces() {
-				cells = append(cells, menu.Cell{
-					Label:   f.Label(),
-					Chosen:  f == chosen,
-					Preview: p.options.Previews.ClockFace(f),
-				})
-				acts = append(acts, picks(use, f))
-			}
-			return cells, acts
-		},
-	}
-}
-
-func picks(use func(config.Face), f config.Face) func(int) {
-	return func(int) { use(f) }
 }
 
 func (p *ClockPages) Colors() *shell.Page {
@@ -139,24 +106,10 @@ func (p *ClockPages) useInk(ink config.Ink) func(int) {
 	return func(int) { p.options.Controller.SetInk(ink) }
 }
 
-func (p *ClockPages) placed(at config.Placement) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
-		cfg := p.options.Preferences.ClockState()
-		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-
-		within := dashboard.Place(at.Position, at.Align, at.Size, box.W, box.H)
-		within.X += box.X
-		within.Y += box.Y
-
-		face.Of(cfg.Clock.Face).Draw(s, within, reading.Undated(), cfg.Clock.Ink.Over(palette))
-	}
+func (p *ClockPages) placed(at config.Placement) menu.Preview {
+	return p.options.Previews.ClockPlaced(p.options.Preferences.ClockState().Clock.Face, at)
 }
 
-func (p *ClockPages) inking(ink config.Ink) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, at ui.Rect, palette theme.Theme) {
-		cfg := p.options.Preferences.ClockState()
-		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-
-		face.Of(cfg.Clock.Face).Draw(s, at, reading.Undated(), ink.Over(palette))
-	}
+func (p *ClockPages) inking(ink config.Ink) menu.Preview {
+	return p.options.Previews.ClockInk(p.options.Preferences.ClockState().Clock.Face, ink)
 }

@@ -6,12 +6,11 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
-	"github.com/ygelfand/libcountertop/pkg/display/clockkind"
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	kit "github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/tessera"
 )
 
@@ -21,16 +20,18 @@ const (
 	bedsideKeys   = 3
 )
 
-func faceKind(display string) clockkind.Kind {
+func faceKind(display string) clockview.Face {
+	name := schema.DefaultFace
 	switch display {
 	case "analog":
-		return clockkind.AnalogSeconds
+		name = "analog-seconds"
 	case "dial":
-		return clockkind.Analog
+		name = "analog"
 	case "flip":
-		return clockkind.Cards
+		name = "flip"
 	}
-	return clockkind.Plain
+	f, _ := clockview.Of(name)
+	return f
 }
 
 func (v *View) clockBody(
@@ -42,20 +43,19 @@ func (v *View) clockBody(
 ) func(width, height float32) gogui.View {
 	switch t.Entity {
 	case clockEntity:
-		kind := faceKind(t.Display)
+		face := faceKind(t.Display)
 		every := time.Minute
-		if face.Ticks(kind) {
+		if face.Ticks {
 			every = time.Second
 		}
 		v.tick(w, f.now, every)
-		draw, _ := clockview.Of(kind)
-		r := face.Read(f.now, l.Clock24)
+		r := clockview.Read(f.now, l.Clock24)
 		return func(width, height float32) gogui.View {
-			return draw(w, ui.Rect{W: int(width), H: int(height)}, r, f.pal)
+			return face.Draw(w, ui.Rect{W: int(width), H: int(height)}, r, f.pal)
 		}
 	case bedsideEntity:
 		v.tick(w, f.now, time.Minute)
-		r := face.Read(f.now, l.Clock24).Undated()
+		r := clockview.Read(f.now, l.Clock24).Undated()
 		keys := bedside(t, l)
 		return func(width, height float32) gogui.View {
 			reach := style.Reach()

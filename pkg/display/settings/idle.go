@@ -3,15 +3,11 @@ package settings
 import (
 	"image"
 	"slices"
-	"time"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
-	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
+	"github.com/ygelfand/libcountertop/pkg/display/idleview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	ha "github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -157,7 +153,7 @@ func (p *IdlePages) Page() *shell.Page {
 				p.makePage(func() shell.View { return p.Source(1) }),
 				p.open(Tiles(
 					say.T("idle.face"),
-					config.IdleFaces(),
+					idleview.Faces(),
 					func() config.Face { return p.options.Preferences.IdleState().Idle.Face },
 					i.SetFace,
 					p.options.Previews.ClockFace,
@@ -286,18 +282,8 @@ func (p *IdlePages) Source(slot int) *shell.Page {
 		func(s config.Source) { p.options.Idle.SetSource(slot, s) }, nil)
 }
 
-func (p *IdlePages) Placed(at config.Placement) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
-		cfg := p.options.Preferences.IdleState()
-		if cfg.Idle.Face == config.FaceNone {
-			return
-		}
-		r := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-		within := dashboard.Place(at.Position, at.Align, at.Size, box.W, box.H)
-		within.X += box.X
-		within.Y += box.Y
-		face.Of(cfg.Idle.Face).Draw(s, within, r.Undated(), cfg.Clock.Ink.Over(palette))
-	}
+func (p *IdlePages) Placed(at config.Placement) menu.Preview {
+	return p.options.Previews.ClockPlaced(p.options.Preferences.IdleState().Idle.Face, at)
 }
 
 func weatherShown(on bool, l config.WeatherLayout) string {

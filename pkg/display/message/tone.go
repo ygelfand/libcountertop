@@ -1,19 +1,31 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type Message struct {
-	Title  string
-	Body   string
-	Tone   schema.Tone
-	Icon   string
-	Swatch string
-	Keys   []Key
-	Flash  bool
-	Ended  func(End)
+	Title   string
+	Body    string
+	Tone    schema.Tone
+	Icon    string
+	Picture Picture
+	Swatch  string
+	Keys    []Key
+	Flash   bool
+	Style   schema.AlertStyle
+	Chime   schema.Chime
+	Repeat  time.Duration
+	Ended   func(End)
+}
+
+type Picture struct {
+	Src    string
+	Width  int
+	Height int
 }
 
 type Key struct {
@@ -32,6 +44,8 @@ const (
 	EndReplaced = "replaced"
 	EndCleared  = "cleared"
 	EndTapped   = "tapped"
+	EndSwiped   = "swiped"
+	EndClosed   = "closed"
 )
 
 func Swatch(name string, palette theme.Theme) (theme.Color, bool) {

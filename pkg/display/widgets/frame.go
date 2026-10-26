@@ -14,13 +14,14 @@ import (
 )
 
 type FrameOptions struct {
-	Title   string
-	Fixed   bool
-	Build   func(*gogui.Window) gogui.View
-	Foot    func(*gogui.Window) gogui.View
-	Back    func()
-	Gesture func(gogui.EventCtx)
-	Room    []gogui.View
+	Title    string
+	Fixed    bool
+	Build    func(*gogui.Window) gogui.View
+	Foot     func(*gogui.Window) gogui.View
+	Back     func()
+	Settings func()
+	Gesture  func(gogui.EventCtx)
+	Room     []gogui.View
 }
 
 func Placed(at ui.Rect, v gogui.View) gogui.View {
@@ -78,6 +79,36 @@ func (kit *Toolkit) PageFrame(w *gogui.Window, p FrameOptions) gogui.View {
 	if p.Foot != nil {
 		foot = append(foot, p.Foot(w))
 	}
+	head := []gogui.View{
+		kit.KeyButton(
+			"back",
+			gogui.IconArrowLeft,
+			back,
+			style.Rest,
+			func(e gogui.EventCtx) {
+				p.Back()
+				e.Window.InvalidateLayout()
+			},
+		),
+		gogui.Label(p.Title, t.TextStyleDisplay),
+	}
+	if p.Settings != nil {
+		gear := back
+		gear.Family = icons.Family
+		head = append(head,
+			gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding}),
+			kit.KeyButton(
+				"settings",
+				icons.Glyph(icons.Named("mdi:cog")),
+				gear,
+				style.Rest,
+				func(e gogui.EventCtx) {
+					p.Settings()
+					e.Window.InvalidateLayout()
+				},
+			),
+		)
+	}
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFill,
 		Padding: gogui.PaddingLarge,
@@ -87,19 +118,7 @@ func (kit *Toolkit) PageFrame(w *gogui.Window, p FrameOptions) gogui.View {
 				Sizing:  gogui.FillFit,
 				VAlign:  gogui.VAlignMiddle,
 				Spacing: gogui.SpacingMedium,
-				Content: []gogui.View{
-					kit.KeyButton(
-						"back",
-						gogui.IconArrowLeft,
-						back,
-						style.Rest,
-						func(e gogui.EventCtx) {
-							p.Back()
-							e.Window.InvalidateLayout()
-						},
-					),
-					gogui.Label(p.Title, t.TextStyleDisplay),
-				},
+				Content: head,
 			}),
 			gogui.Column(
 				gogui.ContainerCfg{
@@ -138,7 +157,10 @@ func (kit *Toolkit) ActionBar(w *gogui.Window, actions []shell.Action, pal theme
 			Spacing: gogui.SpacingSmall,
 		}
 		fill := pal.Accent
-		if a.Danger {
+		switch a.Role {
+		case shell.Plain:
+			fill = pal.Background.Blend(pal.Text, 0.18)
+		case shell.Danger:
 			fill = pal.Danger
 		}
 		cfg.Color, st.Color = Color(fill), Color(pal.Contrast(fill))

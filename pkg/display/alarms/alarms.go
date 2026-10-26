@@ -149,7 +149,7 @@ func (a *Alarms) Edit(start alarm.Alarm) *shell.Page {
 	}
 	if saved {
 		page.Actions = append(page.Actions, shell.Action{
-			Label: say.T("alarm.delete"), Glyph: "mdi:delete-outline", Danger: true,
+			Label: say.T("alarm.delete"), Glyph: "mdi:delete-outline", Role: shell.Danger,
 			Do: func() {
 				if err := a.o.Alarms.Delete(d.ID); err != nil {
 					slog.Error("deleting an alarm failed", "err", err)

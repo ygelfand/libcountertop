@@ -3,14 +3,13 @@ package clockview
 import (
 	"testing"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func TestCanvasVersionTracksDrawnChanges(t *testing.T) {
 	box := ui.Rect{W: 960, H: 480}
-	r := face.Reading{Time: "10:01", Date: "Monday", Second: 1}
+	r := Reading{Time: "10:01", Date: "Monday", Second: 1}
 	ink := theme.Default()
 	base := canvasVersion(box, r, ink, false)
 	r.Second = 2

@@ -6,7 +6,6 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -92,7 +91,12 @@ func (v *View) saverClock(
 	if line != "" {
 		band = int(reach * 2)
 	}
-	face := clockview.Plain(w, ui.Rect{W: at.W, H: at.H - band}, face.Read(now, l.Clock24), pal)
+	face := clockview.Plain(
+		w,
+		ui.Rect{W: at.W, H: at.H - band},
+		clockview.Read(now, l.Clock24),
+		pal,
+	)
 	content := []gogui.View{face}
 	if line != "" {
 		st := gogui.CurrentTheme().Cfg.TextStyleDef

@@ -73,11 +73,11 @@ func TestTheIdleFaceIsItsOwnSetting(t *testing.T) {
 	if err := idle.Face(FaceNone); err != nil {
 		t.Fatal(err)
 	}
-	if err := clock.Face(FaceAnalogSeconds); err != nil {
+	if err := clock.Face(Face("analog-seconds")); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := s.Get(); got.Clock.Face != FaceAnalogSeconds || got.Idle.Face != FaceNone {
+	if got := s.Get(); got.Clock.Face != Face("analog-seconds") || got.Idle.Face != FaceNone {
 		t.Errorf(
 			"clock is %v and idle is %v, want analog-seconds and none",
 			got.Clock.Face,

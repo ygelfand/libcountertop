@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
+	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/gpu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
@@ -134,8 +134,8 @@ func Areas(w, h, n int) []ui.Rect {
 	return []ui.Rect{{W: w, H: h / 2}, {Y: h / 2, W: w, H: h - h/2}}
 }
 
-func Reading(cfg Settings, at time.Time) face.Reading {
-	r := face.Read(at, cfg.Screen.Hours == config.TwentyFourHour)
+func Reading(cfg Settings, at time.Time) clockview.Reading {
+	r := clockview.Read(at, cfg.Screen.Hours == config.TwentyFourHour)
 	if !cfg.Clock.Date {
 		r = r.Undated()
 	}
@@ -145,7 +145,7 @@ func Reading(cfg Settings, at time.Time) face.Reading {
 func key(cfg Settings, at time.Time) string {
 	r := Reading(cfg, at)
 	k := fmt.Sprintf("%v %+v ink=%s", r, cfg.Idle, cfg.Clock.Ink)
-	if face.Ticks(cfg.Idle.Face) {
+	if clockview.Ticks(cfg.Idle.Face) {
 		k = fmt.Sprintf("%s second=%d", k, r.Second)
 	}
 	return k

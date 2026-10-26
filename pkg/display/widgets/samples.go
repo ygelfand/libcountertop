@@ -1,29 +1,15 @@
 package widgets
 
 import (
-	"time"
-
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-func RowPreview(page string, r menu.Row, palette theme.Theme) gogui.View {
-	h := int(gogui.CurrentTheme().Cfg.SizeTextMedium * 2.4)
-	w := h * 2
-	return Picture(
-		Painted(
-			"row/"+page+"/"+r.Label+"/"+r.Value+"/"+time.Now().Format("15:04"),
-			w,
-			h,
-			palette.Background,
-			palette,
-			r.Preview,
-		),
-		w,
-		h,
-	)
+func RowPreview(r menu.Row) gogui.View {
+	h := gogui.CurrentTheme().Cfg.SizeTextMedium * 2.4
+	return gogui.ViewFunc(func(w *gogui.Window) gogui.View { return r.Preview.View(w, h*2, h) })
 }
 
 func Swatch(p theme.Theme, w, h float32) gogui.View {

@@ -17,6 +17,8 @@ import (
 const (
 	checkSession = 1 << 31
 	provisionFor = 30 * time.Second
+	drmWait      = 30 * time.Second
+	drmRetry     = 2 * time.Second
 )
 
 var probe = []byte{
@@ -72,6 +74,15 @@ func (d *Provisioner) bring(ctx context.Context) startup.Progress {
 	}
 	began := time.Now()
 	level, ready, err := provisioned(c)
+	for err != nil && time.Since(began) < drmWait {
+		d.set(startup.Progress{Doing: "waiting for DRM"})
+		select {
+		case <-ctx.Done():
+			return startup.Progress{Failed: true, Doing: err.Error()}
+		case <-time.After(drmRetry):
+		}
+		level, ready, err = provisioned(c)
+	}
 	slog.Info(
 		"widevine check",
 		"level",

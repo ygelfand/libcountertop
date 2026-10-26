@@ -108,6 +108,7 @@ func fitOwn(box display.Rect, own Size, right bool) display.Rect {
 
 type layer struct {
 	display Display
+	codec   uint32
 	id      uint32
 	z       int
 	size    Size
@@ -157,7 +158,7 @@ func (l *layer) Show(f rtc.Frame) {
 		_ = c.VideoClose(l.id)
 		if err := c.VideoOpen(
 			l.id,
-			surface.AVC,
+			l.codec,
 			l.size.Width,
 			l.size.Height,
 			l.z,
@@ -318,6 +319,7 @@ func (v *Video) Start(f call.Feed) (call.Picture, rtc.Camera) {
 	p := &pictures{display: v.o.Display, shown: f.Shown}
 	p.remote = &layer{
 		display: v.o.Display,
+		codec:   surface.AVC,
 		id:      remoteLayer,
 		z:       remoteZ,
 		size:    f.Shown.Remote,
@@ -350,6 +352,7 @@ func (p *pictures) layout(vw, vh int) Layout {
 func (p *pictures) see(ctx context.Context, cam camera, own Size, visible bool) {
 	p.self = &layer{
 		display: p.display,
+		codec:   surface.AVC,
 		id:      selfLayer,
 		z:       selfZ,
 		size:    own,

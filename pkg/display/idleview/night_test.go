@@ -145,30 +145,30 @@ func TestNightNeedsALightReading(t *testing.T) {
 func TestQuietNightsDrawNoVisuals(t *testing.T) {
 	c := schema.DefaultIdle()
 	c.First = schema.IdleVisual{Kind: "orb", Source: schema.SourceMic}
-	c.Face = schema.FaceAnalog
+	c.Face = schema.Face("analog")
 	c.Placement = schema.Placement{
 		Position: schema.PositionTop,
 		Align:    schema.AlignLeft,
 		Size:     schema.SizeSmall,
 	}
 
-	if got := Dark(c, schema.FacePlain, schema.NightDim); got != c {
+	if got := Dark(c, schema.DefaultFace, schema.NightDim); got != c {
 		t.Errorf("dim changed the saver to %+v", got)
 	}
 
-	clock := Dark(c, schema.FacePlain, schema.NightClock)
-	if len(Chosen(clock)) != 0 || clock.Face != schema.FaceAnalog ||
+	clock := Dark(c, schema.DefaultFace, schema.NightClock)
+	if len(Chosen(clock)) != 0 || clock.Face != schema.Face("analog") ||
 		clock.Position != schema.PositionCenter || clock.Align != schema.AlignCenter ||
 		clock.Size != schema.SizeLarge {
 		t.Errorf("clock night drew %+v", clock)
 	}
 
 	c.Face = schema.FaceNone
-	if got := Dark(c, schema.FacePlain, schema.NightClock); got.Face != schema.FacePlain {
+	if got := Dark(c, schema.DefaultFace, schema.NightClock); got.Face != schema.DefaultFace {
 		t.Errorf("a saver with no clock fell back to %q, want the dashboard face", got.Face)
 	}
 
-	off := Dark(c, schema.FacePlain, schema.NightOff)
+	off := Dark(c, schema.DefaultFace, schema.NightOff)
 	if len(Chosen(off)) != 0 || off.Face != schema.FaceNone {
 		t.Errorf("off night drew %+v", off)
 	}

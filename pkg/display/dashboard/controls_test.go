@@ -29,10 +29,10 @@ func TestASaveThatFailsAfterWritingStillRedraws(t *testing.T) {
 		Display:     drawn,
 	})
 
-	if err := c.Change("face", string(schema.FaceAnalog)); err == nil {
+	if err := c.Change("face", string(schema.Face("analog"))); err == nil {
 		t.Fatal("the failed write was not reported")
 	}
-	if clock.Face != schema.FaceAnalog || *drawn != 1 {
+	if clock.Face != schema.Face("analog") || *drawn != 1 {
 		t.Fatalf("face %q, %d redraws", clock.Face, *drawn)
 	}
 }

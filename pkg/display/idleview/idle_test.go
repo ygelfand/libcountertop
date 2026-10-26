@@ -197,7 +197,7 @@ func TestAnActivityThatIsNotKnownDoesNotCount(t *testing.T) {
 func TestEverySettingReachesBothSides(t *testing.T) {
 	r := newRig(t)
 
-	r.SetFace(schema.FaceAnalog)
+	r.SetFace(schema.Face("analog"))
 	r.SetPosition(schema.PositionTop)
 	r.SetAlign(schema.AlignRight)
 	r.SetSize(schema.SizeSmall)
@@ -206,7 +206,7 @@ func TestEverySettingReachesBothSides(t *testing.T) {
 	r.SetKind(0, "no-such-visual")
 
 	got := r.store.Get()
-	if got.Face != schema.FaceAnalog || got.Position != schema.PositionTop ||
+	if got.Face != schema.Face("analog") || got.Position != schema.PositionTop ||
 		got.Align != schema.AlignRight || got.Size != schema.SizeSmall {
 		t.Errorf("saved %+v", got)
 	}
@@ -225,7 +225,7 @@ func TestEverySettingReachesBothSides(t *testing.T) {
 func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 	r := newRig(t)
 
-	for _, want := range schema.IdleFaces() {
+	for _, want := range Faces() {
 		r.sel("face").OnCommand(want.Label())
 		if got := r.store.Get().Face; got != want {
 			t.Errorf("%q from Home Assistant saved as %q", want, got)
@@ -236,7 +236,7 @@ func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 		t.Errorf("none from Home Assistant saved as %q", got)
 	}
 	r.sel("face").OnCommand("Sundial")
-	if got := r.store.Get().Face; got != schema.IdleFaces()[len(schema.IdleFaces())-1] {
+	if got := r.store.Get().Face; got != Faces()[len(Faces())-1] {
 		t.Errorf("an unknown face moved the setting to %q", got)
 	}
 }
@@ -244,7 +244,7 @@ func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 func TestRestorePutsEveryEntityBack(t *testing.T) {
 	r := newRig(t)
 	c := schema.DefaultIdle()
-	c.Face = schema.FaceWords
+	c.Face = schema.Face("words")
 	c.Second = schema.IdleVisual{Kind: "orb", Source: schema.SourceSpeaker}
 	r.Restore(c)
 

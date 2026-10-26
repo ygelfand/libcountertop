@@ -12,6 +12,7 @@ import (
 	"github.com/pion/webrtc/v4"
 
 	"github.com/ygelfand/libcountertop/pkg/display/callvideo"
+	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 )
@@ -49,7 +50,7 @@ func (c *Cameras) stream(ctx context.Context, cam homeassistant.Camera, live fun
 	playing, played := context.WithCancel(ctx)
 	defer played()
 
-	out := callvideo.NewStream(c.o.Display, streamLayer, streamZ)
+	out := callvideo.NewStream(c.o.Display, surface.AVC, streamLayer, streamZ)
 	defer out.Close()
 	var once sync.Once
 	v, err := rtc.NewViewer(

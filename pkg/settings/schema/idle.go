@@ -25,8 +25,6 @@ type IdleVisual struct {
 
 func (v IdleVisual) On() bool { return v.Kind != "" }
 
-func IdleFaces() []Face { return append([]Face{FaceNone}, Faces()...) }
-
 func IdlePositions() []Position { return append(Positions(), PositionRandom) }
 
 func IdleAligns() []Align { return append(Aligns(), AlignRandom) }

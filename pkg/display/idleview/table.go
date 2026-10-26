@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
@@ -21,6 +22,8 @@ const (
 	noKind = "none"
 )
 
+func Faces() []schema.Face { return append([]schema.Face{schema.FaceNone}, clockview.Names()...) }
+
 func NewTable() *Table {
 	rows := []Setting{
 		setting.Pick(Setting{Name: "saver", Group: Group, Icon: "mdi:monitor-shimmer"},
@@ -30,7 +33,7 @@ func NewTable() *Table {
 		setting.Pick(Setting{Name: "media", Group: Group, Icon: "mdi:timer-pause-outline"},
 			schema.MediaDelays(), func(c *schema.Idle) *schema.Delay { return &c.Media }),
 		setting.Pick(Setting{Name: "face", Group: Group, Icon: "mdi:clock-digital"},
-			schema.IdleFaces(), func(c *schema.Idle) *schema.Face { return &c.Face }),
+			Faces(), func(c *schema.Idle) *schema.Face { return &c.Face }),
 		setting.Pick(Setting{Name: "position", Group: Group, Icon: "mdi:align-vertical-center"},
 			schema.IdlePositions(), func(c *schema.Idle) *schema.Position { return &c.Position }),
 		setting.Pick(Setting{Name: "align", Group: Group, Icon: "mdi:align-horizontal-center"},

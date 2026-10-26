@@ -98,7 +98,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			)
 		}
 	}
-	if build, ok := clockview.Of(idle.Face); ok {
+	if face, ok := clockview.Of(idle.Face); ok {
 		r := idleview.Reading(
 			idleview.Settings{Screen: cfg.Screen, Clock: cfg.Clock, Idle: idle},
 			time.Now(),
@@ -108,7 +108,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			tones[n] = visual.Kind(slot.Kind).Traits()
 		}
 		for _, p := range idleview.Pieces(pal, tones, areas, box) {
-			clock := build(w, box, r, cfg.Clock.Ink.Over(p.Palette))
+			clock := face.Draw(w, box, r, cfg.Clock.Ink.Over(p.Palette))
 			if p.Clip.W == 0 {
 				layers = append(layers, widgets.Placed(box, clock))
 				continue
