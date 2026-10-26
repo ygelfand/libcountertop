@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
-
-	"github.com/ygelfand/libcountertop/pkg/display/compositor/internal/bin"
 )
 
 // MessageBuilder is a message that is under construction.
@@ -54,7 +52,7 @@ func (mb *MessageBuilder) WriteInt(v int32) {
 		return
 	}
 
-	bin.Write(&mb.data, v)
+	putWord(&mb.data, uint32(v))
 }
 
 func (mb *MessageBuilder) WriteUint(v uint32) {
@@ -62,7 +60,7 @@ func (mb *MessageBuilder) WriteUint(v uint32) {
 		return
 	}
 
-	bin.Write(&mb.data, v)
+	putWord(&mb.data, v)
 }
 
 func (mb *MessageBuilder) WriteObject(v Object) {
@@ -88,7 +86,7 @@ func (mb *MessageBuilder) WriteFixed(v Fixed) {
 		return
 	}
 
-	bin.Write(&mb.data, v)
+	putWord(&mb.data, uint32(v))
 }
 
 func (mb *MessageBuilder) WriteString(v string) {
@@ -97,7 +95,7 @@ func (mb *MessageBuilder) WriteString(v string) {
 	}
 
 	pad := padding(uint32(len(v) + 1))
-	bin.Write(&mb.data, uint32(len(v)+1))
+	putWord(&mb.data, uint32(len(v)+1))
 	mb.data.WriteString(v)
 	mb.data.WriteByte(0)
 	for range pad {
@@ -111,7 +109,7 @@ func (mb *MessageBuilder) WriteArray(v []byte) {
 	}
 
 	pad := padding(uint32(len(v)))
-	bin.Write(&mb.data, uint32(len(v)))
+	putWord(&mb.data, uint32(len(v)))
 	mb.data.Write(v)
 	for range pad {
 		mb.data.WriteByte(0)
@@ -145,8 +143,8 @@ func (mb *MessageBuilder) Build(c *Conn) error {
 
 	length := uint32(8 + mb.data.Len())
 	msg := bytes.NewBuffer(make([]byte, 0, length))
-	bin.Write(msg, mb.sender.ID())
-	bin.Write(msg, (length<<16)|uint32(mb.op))
+	putWord(msg, mb.sender.ID())
+	putWord(msg, (length<<16)|uint32(mb.op))
 
 	io.Copy(msg, &mb.data)
 	oob := unix.UnixRights(mb.fds...)
@@ -184,5 +182,13 @@ func (mb *MessageBuilder) String() string {
 }
 
 func isNil(v any) bool {
-	return (v == nil) || ((*[2]uintptr)(unsafe.Pointer(&v))[1] == 0)
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.Interface:
+		return rv.IsNil()
+	}
+	return false
 }

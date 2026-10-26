@@ -447,7 +447,7 @@ func (st State) Says() string {
 	case Connecting:
 		return say.T("photos.status.connecting")
 	case Ready:
-		return say.F("photos.status.ready", map[string]any{"Version": st.Version})
+		return say.T("photos.status.ready")
 	case BadKey:
 		return say.T("photos.status.key")
 	case TooOld:

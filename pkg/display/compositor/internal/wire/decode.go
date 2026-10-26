@@ -8,8 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/ygelfand/libcountertop/pkg/display/compositor/internal/bin"
 )
 
 // MessageBuffer holds message data that has been read from the socket
@@ -31,13 +29,13 @@ func ReadMessage(c *Conn) (*MessageBuffer, error) {
 	var oob bytes.Buffer
 	r := unixTee{c: c.conn, oob: &oob}
 
-	sender, err := bin.Read[uint32](r)
+	sender, err := readWord(r)
 	if err != nil {
 		return nil, fmt.Errorf("read message sender: %w", err)
 	}
 	mr.sender = sender
 
-	so, err := bin.Read[uint32](r)
+	so, err := readWord(r)
 	if err != nil {
 		return nil, fmt.Errorf("read message size and opcode: %w", err)
 	}
@@ -90,7 +88,9 @@ func (r *MessageBuffer) ReadInt() (v int32) {
 		return
 	}
 
-	v, r.err = bin.Read[int32](&r.data)
+	var w uint32
+	w, r.err = readWord(&r.data)
+	v = int32(w)
 	r.args = append(r.args, v)
 	return v
 }
@@ -100,7 +100,7 @@ func (r *MessageBuffer) ReadUint() (v uint32) {
 		return
 	}
 
-	v, r.err = bin.Read[uint32](&r.data)
+	v, r.err = readWord(&r.data)
 	r.args = append(r.args, v)
 	return v
 }
@@ -122,7 +122,9 @@ func (r *MessageBuffer) ReadFixed() (v Fixed) {
 		return
 	}
 
-	v, r.err = bin.Read[Fixed](&r.data)
+	var w uint32
+	w, r.err = readWord(&r.data)
+	v = Fixed(w)
 	r.args = append(r.args, v)
 	return v
 }

@@ -954,7 +954,7 @@ photos.status.empty: No photos match
 photos.status.key: Wrong API key
 photos.status.permission: "API key needs {{.Name}}"
 photos.status.old: "Immich {{.Version}}: needs 3.2 or newer"
-photos.status.ready: "Connected · Immich {{.Version}}"
+photos.status.ready: Connected
 photos.status.unknown: "Nothing named {{.Name}}"
 photos.status.unreachable: Can't reach the server
 photos.status.unset: Not set up

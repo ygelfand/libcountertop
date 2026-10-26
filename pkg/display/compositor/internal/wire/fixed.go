@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"unsafe"
 )
 
 // Fixed is a 24_8 fixed-point number. Wayland does not have support
@@ -26,7 +25,7 @@ func (f Fixed) Int() int {
 }
 
 func (f Fixed) Frac() int {
-	return int(*(*uint32)(unsafe.Pointer(&f)) & 0xFF)
+	return int(uint32(f) & 0xFF)
 }
 
 func (f Fixed) Float() float64 {
