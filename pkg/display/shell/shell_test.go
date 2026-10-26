@@ -68,6 +68,7 @@ func TestIdlingKeepsWhatIsHeld(t *testing.T) {
 	player, page := &view{covers: true}, &view{covers: true}
 	s.Hold(player)
 	s.Push(page)
+	s.woke = time.Now().Add(-SettingsTimeout)
 	s.idled(s.generation)
 	if got := s.Views(); len(got) != 1 || got[0] != player {
 		t.Errorf("left %v, want the held player", got)
@@ -167,12 +168,39 @@ func TestVisibleIsTheCoveringViewAndWhatIsAboveIt(t *testing.T) {
 	}
 }
 
-func TestTheLongestTimeoutInTheStackWins(t *testing.T) {
+func TestTheTopViewsTimeoutRunsFirst(t *testing.T) {
+	s := &Shell{}
+	s.Push(&view{wait: time.Hour})
+	s.Push(&view{covers: true})
+	if got, _ := s.next(); got != SettingsTimeout {
+		t.Errorf("timeout %v, want %v", got, SettingsTimeout)
+	}
+}
+
+func TestIdlingClosesPagesOverALongLivedApp(t *testing.T) {
+	s := &Shell{}
+	app, page, sub := &view{wait: time.Hour}, &view{covers: true}, &view{covers: true}
+	s.Push(app)
+	s.Push(page)
+	s.Push(sub)
+	s.woke = time.Now().Add(-SettingsTimeout)
+	s.idled(s.generation)
+	if got := s.Views(); len(got) != 1 || got[0] != app {
+		t.Errorf("left %v, want the app", got)
+	}
+	if s.timer == nil {
+		t.Error("no timer left for the app")
+	}
+}
+
+func TestIdlingClosesAShortViewUnderALongerOne(t *testing.T) {
 	s := &Shell{}
 	s.Push(&view{wait: DockTimeout})
 	s.Push(&view{covers: true})
-	if got := s.timeout(); got != SettingsTimeout {
-		t.Errorf("timeout %v, want %v", got, SettingsTimeout)
+	s.woke = time.Now().Add(-SettingsTimeout)
+	s.idled(s.generation)
+	if got := s.Views(); len(got) != 0 {
+		t.Errorf("left %v, want nothing", got)
 	}
 }
 

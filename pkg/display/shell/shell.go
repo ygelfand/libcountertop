@@ -38,6 +38,7 @@ type Shell struct {
 	holds      map[View]bool
 	timer      *time.Timer
 	closed     time.Time
+	woke       time.Time
 	generation uint64
 	reported   View
 	pending    []notice
@@ -412,7 +413,21 @@ func (s *Shell) idled(generation uint64) {
 		return
 	}
 	s.timer = nil
-	s.stack = slices.DeleteFunc(s.stack, func(v View) bool { return !s.holds[v] })
+	idle := time.Since(s.woke)
+	for i := len(s.stack) - 1; i >= 0; i-- {
+		v := s.stack[i]
+		if s.holds[v] {
+			continue
+		}
+		if expiry(v) > idle {
+			break
+		}
+		s.stack = slices.Delete(s.stack, i, i+1)
+	}
+	if next, ok := s.next(); ok {
+		generation := s.generation
+		s.timer = time.AfterFunc(next-idle, func() { s.idled(generation) })
+	}
 	if len(s.stack) == 0 {
 		s.closed = time.Now()
 		s.generation++
@@ -436,19 +451,27 @@ func (s *Shell) wake() {
 	if len(s.stack) == 0 {
 		return
 	}
+	s.woke = time.Now()
+	next, ok := s.next()
+	if !ok {
+		return
+	}
 	generation := s.generation
-	s.timer = time.AfterFunc(s.timeout(), func() { s.idled(generation) })
+	s.timer = time.AfterFunc(next, func() { s.idled(generation) })
 }
 
-func (s *Shell) timeout() time.Duration {
-	var idle time.Duration
-	for _, v := range s.stack {
-		if t, ok := v.(Timeouter); ok {
-			idle = max(idle, t.Timeout())
+func (s *Shell) next() (time.Duration, bool) {
+	for i := len(s.stack) - 1; i >= 0; i-- {
+		if v := s.stack[i]; !s.holds[v] {
+			return expiry(v), true
 		}
 	}
-	if idle == 0 {
-		return DockTimeout
+	return 0, false
+}
+
+func expiry(v View) time.Duration {
+	if t, ok := v.(Timeouter); ok {
+		return t.Timeout()
 	}
-	return idle
+	return DockTimeout
 }

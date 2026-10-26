@@ -432,13 +432,17 @@ func (d *Doorbell) assistantEvents(
 	return nil
 }
 
-func (d *Doorbell) Rehearse(slot int, k Kind) error {
+func (d *Doorbell) Rehearse(slot int, k Kind, picture []byte) error {
 	door, ok := doorAt(d.o.Settings.Read(), slot)
 	if !ok {
 		return errUnsupported
 	}
 	if !slices.Contains(kinds, k) {
 		return fmt.Errorf("doorbell: no event kind %q", k)
+	}
+	if picture != nil {
+		d.emit(Event{Kind: k, Slot: slot, Door: door.Name, At: d.o.Now(), Snapshot: picture})
+		return nil
 	}
 	go d.record(context.Background(), slot, door, k)
 	return nil
@@ -451,6 +455,10 @@ func (d *Doorbell) record(ctx context.Context, slot int, door schema.DoorbellDoo
 	if pic, err := d.Snapshot(ctx, slot); err == nil {
 		ev.Snapshot = pic
 	}
+	d.emit(ev)
+}
+
+func (d *Doorbell) emit(ev Event) {
 	d.mu.Lock()
 	d.recent = append([]Event{ev}, d.recent...)
 	if len(d.recent) > keep {

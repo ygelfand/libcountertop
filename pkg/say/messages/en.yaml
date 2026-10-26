@@ -133,7 +133,7 @@ calendar.empty: Nothing coming up
 calendar.group.calendar: Calendar
 calendar.none: No calendars in Home Assistant
 calendar.off: "Off"
-calendar.pick: Pick calendars under Settings → Home Assistant
+calendar.pick: Pick calendars in Settings → Home control → Calendar
 calendar.example.entities: calendar.family, calendar.work
 calendar.setting.entities: Calendars
 calendar.setting.span: Days to show
@@ -164,7 +164,7 @@ cameras.group.cameras: Cameras
 cameras.failed: Couldn't list the cameras in Home Assistant
 cameras.loading: Loading cameras
 cameras.none: No cameras selected
-cameras.nosite: Home Assistant's address isn't known. Set it in Settings, Cameras.
+cameras.nosite: Home Assistant's address isn't known. Set Home Assistant URL in Settings → Home control → Cameras
 cameras.off: "Off"
 cameras.pick: Select
 cameras.seconds: "{{.N}} s"
@@ -490,7 +490,7 @@ mode.firmware: Tessera embedded
 home.noarea: No area
 home.none: None
 home.off: Home Assistant is off
-home.off.hint: Turn on home control in Settings → Home Assistant
+home.off.hint: Turn on home control in Settings → Home control
 home.picked.areas: "{{.N}} area{{if ne .N 1}}s{{end}}"
 home.picked.entities: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.picked.labels: "{{.N}} label{{if ne .N 1}}s{{end}}"
@@ -1237,7 +1237,7 @@ tessera.range.week: 7 d
 tessera.ago: "{{.T}} ago"
 tessera.connected: Set up this screen in Tessera
 tessera.empty: "Configure and add tiles to this screen ({{.Name}}) in Tessera."
-tessera.enable: Turn on landscape or portrait in Settings, Home control, Tessera.
+tessera.enable: Turn on landscape or portrait in Settings → Dashboard
 tessera.in: "in {{.T}}"
 tessera.install: Install Tessera Screen Manager in Home Assistant, then add this screen to it.
 tessera.now: Just now
@@ -1322,7 +1322,7 @@ todo.entity: To-do list
 todo.group.todo: Shopping list
 todo.none: No to-do lists in Home Assistant
 todo.off: "Off"
-todo.pick: Pick a list under Settings → Home Assistant
+todo.pick: Pick a list in Settings → Home control → Shopping list
 todo.setting.completed: Show completed items
 todo.example.entity: todo.shopping_list
 todo.setting.entity: To-do list

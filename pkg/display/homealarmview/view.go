@@ -227,6 +227,7 @@ func (v *View) lower() {
 
 func (v *View) close(s shell.View) {
 	if s == v.popup {
+		v.o.Quiet()
 		v.lower()
 		return
 	}
@@ -266,10 +267,7 @@ func (v *View) toggle(entity string) func() {
 }
 
 func (v *View) trigger() {
-	v.request(
-		false,
-		func(ctx context.Context, _ string) error { return v.o.Alarm.Trigger(ctx, "") },
-	)
+	v.request(false, v.o.Alarm.Trigger)
 }
 
 func (v *View) request(arming bool, send func(context.Context, string) error) {

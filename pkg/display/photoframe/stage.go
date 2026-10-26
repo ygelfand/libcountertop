@@ -181,16 +181,19 @@ func (s *Stage) draw(shot Shot, ok bool, now time.Time) error {
 		s.pairs = [2]pair{}
 	case shot.Version != cur.version || !cur.set:
 		k := s.newest
-		if cur.set && s.look.Change != schema.TransitionCut {
+		blend := cur.set && s.look.Change != schema.TransitionCut
+		if blend {
 			k = 1 - k
-			s.changed = now
-		} else {
-			s.changed = time.Time{}
 		}
 		if err := s.load(k, shot); err != nil {
 			return err
 		}
 		s.newest = k
+		s.changed = time.Time{}
+		if blend {
+			now = time.Now()
+			s.changed = now
+		}
 	}
 	vals := s.values(now)
 	if slices.Equal(vals, s.sent) {

@@ -3,6 +3,7 @@ package doorbellcmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -31,9 +32,9 @@ func Command(bell func() *doorbell.Doorbell) *cobra.Command {
 			},
 		},
 		&cobra.Command{
-			Use:   "ring SLOT [" + strings.Join(kindNames(), "|") + "]",
-			Short: "Act as if a doorbell saw something: ring by default, with a fresh picture",
-			Args:  cobra.RangeArgs(1, 2),
+			Use:   "ring SLOT [" + strings.Join(kindNames(), "|") + " [PICTURE]]",
+			Short: "Act as if a doorbell saw something: ring by default, with a fresh picture or the JPEG at PICTURE",
+			Args:  cobra.RangeArgs(1, 3),
 			RunE: func(_ *cobra.Command, args []string) error {
 				slot, err := slotOf(args[0])
 				if err != nil {
@@ -43,7 +44,13 @@ func Command(bell func() *doorbell.Doorbell) *cobra.Command {
 				if len(args) > 1 {
 					kind = doorbell.Kind(args[1])
 				}
-				return bell().Rehearse(slot, kind)
+				var picture []byte
+				if len(args) > 2 {
+					if picture, err = os.ReadFile(args[2]); err != nil {
+						return err
+					}
+				}
+				return bell().Rehearse(slot, kind, picture)
 			},
 		},
 		&cobra.Command{
