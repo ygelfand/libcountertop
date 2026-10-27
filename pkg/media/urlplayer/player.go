@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
@@ -87,7 +88,7 @@ type programmed struct {
 
 func New(o Options) *Player {
 	if o.HTTP == nil {
-		o.HTTP = http.DefaultClient
+		o.HTTP = fetch.Client(0)
 	}
 	return &Player{o: o}
 }

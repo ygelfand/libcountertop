@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	httpfetch "github.com/ygelfand/libcountertop/pkg/fetch"
 )
 
 const (
@@ -129,7 +131,7 @@ func Download(ctx context.Context, url, sum, dest string, limit int64) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpfetch.Client(0).Do(req)
 	if err != nil {
 		return fmt.Errorf("releases: fetching %s: %w", url, err)
 	}
@@ -166,7 +168,7 @@ func fetch(ctx context.Context, url string, limit int64, read func(io.Reader) er
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpfetch.Client(0).Do(req)
 	if err != nil {
 		return fmt.Errorf("releases: fetching %s: %w", url, err)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	kit "github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/tessera"
 )
@@ -38,7 +39,7 @@ type photo struct {
 	fails   int
 }
 
-var photoClient = &http.Client{Timeout: photoTimeout}
+var photoClient = fetch.Client(photoTimeout)
 
 func fetchPhoto(url string) (image.Image, error) {
 	resp, err := photoClient.Get(url)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )
 
@@ -152,7 +153,7 @@ func provision(ctx context.Context, c *surface.Client) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(hr)
+	resp, err := fetch.Client(0).Do(hr)
 	if err != nil {
 		return fmt.Errorf("provisioning server: %w", err)
 	}

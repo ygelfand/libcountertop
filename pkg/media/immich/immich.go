@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 )
 
 const (
@@ -91,7 +93,7 @@ func New(base, key string) *Client {
 	return &Client{
 		Base: strings.TrimRight(base, "/"),
 		Key:  key,
-		HTTP: &http.Client{Timeout: 30 * time.Second},
+		HTTP: fetch.Client(30 * time.Second),
 	}
 }
 

@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 )
 
 const (
@@ -126,7 +128,7 @@ func pickAddr(addrs []string, host string) string {
 }
 
 func Dial(ctx context.Context, device, user, pass string) (*Client, error) {
-	c := &Client{http: &http.Client{Timeout: callWait}, user: user, pass: pass, device: device}
+	c := &Client{http: fetch.Client(callWait), user: user, pass: pass, device: device}
 	var r struct {
 		Media  string `xml:"Body>GetCapabilitiesResponse>Capabilities>Media>XAddr"`
 		Events string `xml:"Body>GetCapabilitiesResponse>Capabilities>Events>XAddr"`

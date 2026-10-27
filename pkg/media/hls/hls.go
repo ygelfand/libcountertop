@@ -22,6 +22,8 @@ import (
 	"github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts"
 	tscodecs "github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts/codecs"
 	"github.com/tphakala/go-aac/pcm"
+
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 )
 
 type Options struct {
@@ -946,7 +948,7 @@ func fetchPlaylist(ctx context.Context, master string, o Options) (playlist.Play
 
 func client(o Options) *http.Client {
 	if o.HTTP == nil {
-		return http.DefaultClient
+		return fetch.Client(0)
 	}
 	return o.HTTP
 }

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/runtime/remember"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -89,7 +90,7 @@ type NWS struct {
 
 func New(o Options) *NWS {
 	if o.Client == nil {
-		o.Client = &http.Client{Timeout: wait}
+		o.Client = fetch.Client(wait)
 	}
 	return &NWS{o: o}
 }

@@ -18,6 +18,7 @@ import (
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -111,7 +112,7 @@ type Radar struct {
 
 func New(o Options) *Radar {
 	if o.Client == nil {
-		o.Client = &http.Client{Timeout: 20 * time.Second}
+		o.Client = fetch.Client(20 * time.Second)
 	}
 	return &Radar{o: o, tiles: &tiles{
 		client: o.Client,

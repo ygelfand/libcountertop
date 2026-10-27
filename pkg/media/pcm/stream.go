@@ -18,6 +18,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/background"
 	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 	"github.com/ygelfand/libcountertop/pkg/audio/noise"
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
@@ -376,15 +377,15 @@ func (t *track) stop() {
 }
 
 func (m *Stream) run(ctx context.Context, t *track, url string) error {
-	fetch, giveUp := context.WithCancel(ctx)
+	fetchCtx, giveUp := context.WithCancel(ctx)
 	defer giveUp()
 
-	req, err := http.NewRequestWithContext(fetch, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := fetch.Client(0).Do(req)
 	if err != nil {
 		return err
 	}
@@ -420,7 +421,7 @@ func (m *Stream) run(ctx context.Context, t *track, url string) error {
 		case err == nil:
 		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
 			return m.settle(ctx)
-		case fetch.Err() != nil && ctx.Err() == nil:
+		case fetchCtx.Err() != nil && ctx.Err() == nil:
 			return fmt.Errorf("nothing arrived for %s", stall)
 		default:
 			return err

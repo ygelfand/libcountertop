@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -38,7 +39,7 @@ type googleSource struct {
 }
 
 func Google(most func() int) Provider {
-	return googleSource{client: &http.Client{Timeout: googleWait}, most: most}
+	return googleSource{client: fetch.Client(googleWait), most: most}
 }
 
 func (googleSource) Key() string { return "google" }

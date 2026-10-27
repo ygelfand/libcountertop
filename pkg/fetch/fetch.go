@@ -3,7 +3,6 @@ package fetch
 import (
 	"crypto/tls"
 	"net/http"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -44,7 +43,3 @@ func lax() http.RoundTripper {
 	c.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // the point of it
 	return c
 }
-
-var installDefault sync.Once
-
-func UseAsDefault() { installDefault.Do(func() { http.DefaultTransport = shared }) }

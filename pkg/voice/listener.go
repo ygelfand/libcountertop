@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/inference/whistle"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -39,7 +40,7 @@ type Listener struct {
 
 func NewListener(o Options) *Listener {
 	if o.Client == nil {
-		o.Client = &http.Client{Timeout: 10 * time.Minute}
+		o.Client = fetch.Client(10 * time.Minute)
 	}
 	engine := whistle.New(whistle.Options{
 		Helper: o.Helper,

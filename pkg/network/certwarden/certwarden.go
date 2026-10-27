@@ -19,6 +19,7 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
@@ -63,7 +64,7 @@ func New(o Options) *Warden {
 		o.Now = time.Now
 	}
 	if o.Client == nil {
-		o.Client = &http.Client{Timeout: fetchWait}
+		o.Client = fetch.Client(fetchWait)
 	}
 	w := &Warden{o: o, again: make(chan struct{}, 1)}
 	w.knobs = &setting.Controls[schema.Certs]{
