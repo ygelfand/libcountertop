@@ -52,7 +52,7 @@ func (k *fakeKeys) Fail(error)                           {}
 
 func (k *fakeKeys) Video(width, height int) playback.Picture {
 	return playback.Picture{
-		H264:   true,
+		Codec:  playback.H264,
 		Width:  width,
 		Height: height,
 		Sealed: func(context.Context) ([]byte, time.Duration, *cenc.Crypt, error) { return nil, 0, nil, nil },

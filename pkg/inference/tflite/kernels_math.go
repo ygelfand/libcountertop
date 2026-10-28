@@ -388,56 +388,54 @@ func expandDims(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
-func init() {
-	kernels = map[Op]kernel{
-		OpConv2D:         conv2D,
-		OpMaxPool2D:      maxPool2D,
-		OpFullyConnected: fullyConnected,
-		OpBatchMatMul:    batchMatMul,
+var kernels = map[Op]kernel{
+	OpConv2D:         conv2D,
+	OpMaxPool2D:      maxPool2D,
+	OpFullyConnected: fullyConnected,
+	OpBatchMatMul:    batchMatMul,
 
-		OpAdd:     elementwise(func(a, b float32) float32 { return a + b }),
-		OpSub:     elementwise(func(a, b float32) float32 { return a - b }),
-		OpMul:     elementwise(func(a, b float32) float32 { return a * b }),
-		OpDiv:     elementwise(func(a, b float32) float32 { return a / b }),
-		OpMaximum: elementwise(func(a, b float32) float32 { return max(a, b) }),
-		OpMinimum: elementwise(func(a, b float32) float32 { return min(a, b) }),
-		OpSquaredDiff: elementwise(func(a, b float32) float32 {
-			d := a - b
-			return d * d
-		}),
-		OpGreaterEqual: compare(func(a, b float32) bool { return a >= b }),
+	OpAdd:     elementwise(func(a, b float32) float32 { return a + b }),
+	OpSub:     elementwise(func(a, b float32) float32 { return a - b }),
+	OpMul:     elementwise(func(a, b float32) float32 { return a * b }),
+	OpDiv:     elementwise(func(a, b float32) float32 { return a / b }),
+	OpMaximum: elementwise(func(a, b float32) float32 { return max(a, b) }),
+	OpMinimum: elementwise(func(a, b float32) float32 { return min(a, b) }),
+	OpSquaredDiff: elementwise(func(a, b float32) float32 {
+		d := a - b
+		return d * d
+	}),
+	OpGreaterEqual: compare(func(a, b float32) bool { return a >= b }),
 
-		OpLogistic: unary(func(v float32) float32 {
-			return float32(1 / (1 + math.Exp(-float64(v))))
-		}),
-		OpLog:    unary(func(v float32) float32 { return float32(math.Log(float64(v))) }),
-		OpExp:    unary(func(v float32) float32 { return float32(math.Exp(float64(v))) }),
-		OpSqrt:   unary(func(v float32) float32 { return float32(math.Sqrt(float64(v))) }),
-		OpRsqrt:  unary(func(v float32) float32 { return 1 / float32(math.Sqrt(float64(v))) }),
-		OpSquare: unary(func(v float32) float32 { return v * v }),
-		OpRelu:   unary(func(v float32) float32 { return max(v, 0) }),
-		OpRelu6:  unary(func(v float32) float32 { return min(max(v, 0), 6) }),
+	OpLogistic: unary(func(v float32) float32 {
+		return float32(1 / (1 + math.Exp(-float64(v))))
+	}),
+	OpLog:    unary(func(v float32) float32 { return float32(math.Log(float64(v))) }),
+	OpExp:    unary(func(v float32) float32 { return float32(math.Exp(float64(v))) }),
+	OpSqrt:   unary(func(v float32) float32 { return float32(math.Sqrt(float64(v))) }),
+	OpRsqrt:  unary(func(v float32) float32 { return 1 / float32(math.Sqrt(float64(v))) }),
+	OpSquare: unary(func(v float32) float32 { return v * v }),
+	OpRelu:   unary(func(v float32) float32 { return max(v, 0) }),
+	OpRelu6:  unary(func(v float32) float32 { return min(max(v, 0), 6) }),
 
-		OpLeakyRelu: leakyRelu,
+	OpLeakyRelu: leakyRelu,
 
-		OpMean: reduceOp(0, func(a, v float32) float32 { return a + v }, true),
-		OpSum:  reduceOp(0, func(a, v float32) float32 { return a + v }, false),
-		OpReduceMax: reduceOp(
-			float32(math.Inf(-1)),
-			func(a, v float32) float32 { return max(a, v) },
-			false,
-		),
+	OpMean: reduceOp(0, func(a, v float32) float32 { return a + v }, true),
+	OpSum:  reduceOp(0, func(a, v float32) float32 { return a + v }, false),
+	OpReduceMax: reduceOp(
+		float32(math.Inf(-1)),
+		func(a, v float32) float32 { return max(a, v) },
+		false,
+	),
 
-		OpPad:        padZero,
-		OpTranspose:  transpose,
-		OpReshape:    reshape,
-		OpSqueeze:    squeeze,
-		OpExpandDims: expandDims,
+	OpPad:        padZero,
+	OpTranspose:  transpose,
+	OpReshape:    reshape,
+	OpSqueeze:    squeeze,
+	OpExpandDims: expandDims,
 
-		OpShape:        shapeOf,
-		OpFill:         fill,
-		OpPack:         pack,
-		OpStridedSlice: stridedSlice,
-		OpReduceProd:   reduceProdI32,
-	}
+	OpShape:        shapeOf,
+	OpFill:         fill,
+	OpPack:         pack,
+	OpStridedSlice: stridedSlice,
+	OpReduceProd:   reduceProdI32,
 }

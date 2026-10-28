@@ -81,8 +81,8 @@ func (v *View) directory(d *Directory) *navigation.Screen {
 		Title: say.T("sync.title"),
 		View:  d,
 		Build: func(w *gogui.Window) gogui.View {
-			vw, vh := w.WindowSize()
-			at := ui.Rect{W: vw - 2*gogui.PadLarge, H: vh}
+			_, vh := w.WindowSize()
+			at := ui.Rect{W: int(widgets.PageWidth(w)), H: vh}
 			return peerboard.Board{
 				UI:      v.o.UI,
 				ID:      "sync-peers",

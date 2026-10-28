@@ -10,6 +10,12 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
+const (
+	H264 uint32 = 'H' | '2'<<8 | '6'<<16 | '4'<<24
+	HEVC uint32 = 'H' | 'E'<<8 | 'V'<<16 | 'C'<<24
+	VP9  uint32 = 'V' | 'P'<<8 | '9'<<16 | '0'<<24
+)
+
 type Branded interface {
 	Logo() string
 }
@@ -55,7 +61,7 @@ type Pictures interface {
 }
 
 type Picture struct {
-	H264          bool
+	Codec         uint32
 	Width, Height int
 	Next          func(context.Context) (data []byte, at time.Duration, err error)
 	Sparse        bool
@@ -65,6 +71,10 @@ type Picture struct {
 
 type Live interface {
 	Live(ctx context.Context) (Picture, error)
+}
+
+type ReadAhead interface {
+	ReadAhead() time.Duration
 }
 
 type Attendant interface {

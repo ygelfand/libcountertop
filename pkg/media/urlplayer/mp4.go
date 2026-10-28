@@ -278,9 +278,21 @@ func (t *track) openMP4(ctx context.Context, s stream) error {
 			if err := sps.Unmarshal(c.SPS); err != nil {
 				continue
 			}
-			pic = newPicture(sps.Width(), sps.Height(), avcConfig{
-				lengthSize: 4, sps: [][]byte{c.SPS}, pps: [][]byte{c.PPS},
-			})
+			pic = newPicture(
+				sps.Width(),
+				sps.Height(),
+				avcConfig(4, [][]byte{c.SPS}, [][]byte{c.PPS}),
+			)
+			tracks = append(tracks, newMP4Track(tr, true))
+		case *codecs.H265:
+			if !t.screen || pic != nil {
+				continue
+			}
+			config, w, h, err := hevcConfig(c.VPS, c.SPS, c.PPS)
+			if err != nil {
+				continue
+			}
+			pic = newPicture(w, h, config)
 			tracks = append(tracks, newMP4Track(tr, true))
 		}
 	}

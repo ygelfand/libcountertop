@@ -25,6 +25,11 @@ type FrameOptions struct {
 	Search   gogui.View
 }
 
+func PageWidth(w *gogui.Window) float32 {
+	vw, _ := w.WindowSize()
+	return float32(vw) - 2*(gogui.PadLarge+gogui.PadMedium)
+}
+
 func Placed(at ui.Rect, v gogui.View) gogui.View {
 	return gogui.Column(gogui.ContainerCfg{
 		Float:        true,
@@ -132,6 +137,7 @@ func (kit *Toolkit) PageFrame(w *gogui.Window, p FrameOptions) gogui.View {
 				gogui.ContainerCfg{
 					ID:         "page",
 					Sizing:     gogui.FillFill,
+					Padding:    gogui.PaddingMedium,
 					Scrollable: !p.Fixed,
 					OnGesture:  p.Gesture,
 					Content:    append([]gogui.View{p.Build(w)}, p.Room...),

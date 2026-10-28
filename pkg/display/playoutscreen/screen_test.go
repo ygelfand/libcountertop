@@ -74,7 +74,7 @@ func TestAWebMStreamPlaysOnTheOutputsClock(t *testing.T) {
 	if err := s.Play(context.Background(), nil, webm(vp9Head()), f); err != nil {
 		t.Fatal(err)
 	}
-	if got.Codec != video.VP9 || got.Width != 1920 || got.Height != 1080 {
+	if got.Codec != playback.VP9 || got.Width != 1920 || got.Height != 1080 {
 		t.Errorf("stream %+v", got)
 	}
 	if at, running := got.Clock(); at != 10*time.Second || !running {
@@ -118,7 +118,13 @@ func (sparse) Pictures(context.Context) (io.ReadCloser, time.Duration, error) {
 
 func (sparse) Live(context.Context) (playback.Picture, error) {
 	next := func(context.Context) ([]byte, time.Duration, error) { return nil, 0, io.EOF }
-	return playback.Picture{H264: true, Width: 1088, Height: 1740, Next: next, Sparse: true}, nil
+	return playback.Picture{
+		Codec:  playback.H264,
+		Width:  1088,
+		Height: 1740,
+		Next:   next,
+		Sparse: true,
+	}, nil
 }
 
 func TestASparsePictureReachesThePlayer(t *testing.T) {
@@ -133,7 +139,7 @@ func TestASparsePictureReachesThePlayer(t *testing.T) {
 	if err := s.Play(context.Background(), nil, sparse{}, f); err != nil {
 		t.Fatal(err)
 	}
-	if !got.Sparse || got.Codec != video.H264 {
+	if !got.Sparse || got.Codec != playback.H264 {
 		t.Errorf("stream %+v, want a sparse H.264 stream", got)
 	}
 }

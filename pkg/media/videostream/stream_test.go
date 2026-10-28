@@ -3,6 +3,8 @@ package videostream
 import (
 	"encoding/binary"
 	"testing"
+
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
 func TestAnnexBSplitsAtAccessUnitDelimiters(t *testing.T) {
@@ -10,7 +12,7 @@ func TestAnnexBSplitsAtAccessUnitDelimiters(t *testing.T) {
 	idr := []byte{0, 0, 0, 1, 0x65, 1, 2, 3}
 	stream := append(append(append(append([]byte{}, aud...), idr...), aud...), idr...)
 	codec, w, h, units := Split(stream)
-	if codec != H264 || w != 1920 || h != 1080 {
+	if codec != playback.H264 || w != 1920 || h != 1080 {
 		t.Errorf("codec %08x %dx%d", codec, w, h)
 	}
 	if len(units) != 2 || len(units[0]) != len(aud)+len(idr) {
@@ -32,7 +34,7 @@ func TestIVFGivesItsFramesAndSize(t *testing.T) {
 	}
 	stream := append(append(hdr, frame(5)...), frame(3)...)
 	codec, w, h, units := Split(stream)
-	if codec != VP9 || w != 640 || h != 360 {
+	if codec != playback.VP9 || w != 640 || h != 360 {
 		t.Errorf("codec %08x %dx%d", codec, w, h)
 	}
 	if len(units) != 2 || len(units[0]) != 5 || len(units[1]) != 3 {

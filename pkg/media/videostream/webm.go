@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	"github.com/ygelfand/libcountertop/pkg/media/webm"
 )
 
@@ -56,7 +57,7 @@ func WebM(r io.Reader, from time.Duration) (Stream, error) {
 	var codec uint32
 	switch tr.Codec {
 	case "V_VP9":
-		codec = VP9
+		codec = playback.VP9
 	default:
 		return Stream{}, fmt.Errorf("video: %s is not decoded here", tr.Codec)
 	}

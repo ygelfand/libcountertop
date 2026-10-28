@@ -32,7 +32,7 @@ func (p *Pages) Cast() *shell.Page {
 		Build: func() ([]menu.Row, []func(int)) {
 			c := p.options.Settings.Read()
 			return []menu.Row{
-				{Label: say.T("cast.enable"), Kind: menu.Toggle, On: c.Receiver},
+				{Label: say.T("features.cast"), Kind: menu.Toggle, On: c.Receiver},
 				{
 					Label: say.T("youtube.skip"),
 					Open:  func() shell.View { return p.Sponsor() },

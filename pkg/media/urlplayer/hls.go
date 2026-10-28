@@ -55,7 +55,7 @@ func (t *track) openHLS(ctx context.Context) error {
 	if t.screen && s.Width > 0 {
 		start := t.at
 		t.picture = playback.Picture{
-			H264: true, Width: s.Width, Height: s.Height,
+			Codec: playback.H264, Width: s.Width, Height: s.Height,
 			Next: func(ctx context.Context) ([]byte, time.Duration, error) {
 				f, err := s.Next(ctx)
 				return f.Data, f.At + start, err

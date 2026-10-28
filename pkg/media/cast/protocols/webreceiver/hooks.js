@@ -4,14 +4,14 @@
   const base = "http://127.0.0.1:" + port;
 
   const answers = new Map();
-  const ask = (type, feed) => {
+  const ask = (type, how) => {
     type = String(type);
-    const key = (feed ? "feed:" : "") + type;
+    const key = how + ":" + type;
     if (answers.has(key)) return answers.get(key);
     let ok = false;
     try {
       const x = new XMLHttpRequest();
-      x.open("GET", base + "/plays?type=" + encodeURIComponent(type) + (feed ? "&feed=1" : ""), false);
+      x.open("GET", base + "/plays?type=" + encodeURIComponent(type) + (how ? "&" + how + "=1" : ""), false);
       x.send();
       ok = x.responseText === "true";
     } catch (e) {
@@ -20,8 +20,9 @@
     answers.set(key, ok);
     return ok;
   };
-  const plays = (type) => ask(type, false);
-  const feeds = (type) => ask(type, true);
+  const plays = (type) => ask(type, "");
+  const feeds = (type) => ask(type, "feed");
+  const seals = (type) => ask(type, "sealed");
 
   window.cast = window.cast || {};
   window.cast.__platform__ = {
@@ -276,7 +277,7 @@
 
   const choose = (configs) => {
     for (const c of configs || []) {
-      const pick = (caps) => (caps || []).filter((x) => feeds(x.contentType));
+      const pick = (caps) => (caps || []).filter((x) => seals(x.contentType));
       const video = pick(c.videoCapabilities), audio = pick(c.audioCapabilities);
       if ((c.videoCapabilities || []).length && !video.length) continue;
       if ((c.audioCapabilities || []).length && !audio.length) continue;

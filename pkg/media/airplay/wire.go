@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
 const (
-	version    = 2
+	version    = 4
 	maxPayload = 4 << 20
 
 	msgReady      = 'R'
@@ -21,6 +23,12 @@ const (
 	msgSound      = 'S'
 
 	codecH264 = 1
+	codecH265 = 2
+)
+
+var (
+	TCPPorts = []int{7000, 7100}
+	UDPPorts = []int{6000, 6001, 7011}
 )
 
 type message struct {
@@ -80,6 +88,16 @@ func mirroringOf(p []byte) (mirroring, error) {
 	}, nil
 }
 
+func (m mirroring) picture() (uint32, bool) {
+	switch m.codec {
+	case codecH264:
+		return playback.H264, true
+	case codecH265:
+		return playback.HEVC, true
+	}
+	return 0, false
+}
+
 type frame struct {
 	at   time.Duration
 	data []byte
@@ -95,23 +113,27 @@ func frameOf(p []byte) (frame, error) {
 
 type audio struct {
 	rate, channels int
+	due            time.Duration
 	pcm            []int16
 }
 
+const audioHead = 12
+
 func audioOf(p []byte) (audio, error) {
-	if len(p) < 8 || (len(p)-8)%2 != 0 {
+	if len(p) < audioHead || (len(p)-audioHead)%2 != 0 {
 		return audio{}, fmt.Errorf("airplay: %d byte audio", len(p))
 	}
 	a := audio{
 		rate:     int(binary.LittleEndian.Uint32(p[0:])),
 		channels: int(binary.LittleEndian.Uint32(p[4:])),
-		pcm:      make([]int16, (len(p)-8)/2),
+		due:      time.Duration(int32(binary.LittleEndian.Uint32(p[8:]))) * time.Microsecond,
+		pcm:      make([]int16, (len(p)-audioHead)/2),
 	}
 	if a.rate <= 0 || a.channels <= 0 {
 		return audio{}, fmt.Errorf("airplay: audio at %d Hz x%d", a.rate, a.channels)
 	}
 	for i := range a.pcm {
-		a.pcm[i] = int16(binary.LittleEndian.Uint16(p[8+2*i:]))
+		a.pcm[i] = int16(binary.LittleEndian.Uint16(p[audioHead+2*i:]))
 	}
 	return a, nil
 }

@@ -86,12 +86,11 @@ func (app *App) fullScreen(f *homecontrol.Full) *Screen {
 		Fixed:    true,
 		Settings: func() { app.o.Shell.Push(app.o.Home.NewPicker(f.Sel)) },
 		Build: func(w *gogui.Window) gogui.View {
-			vw, _ := w.WindowSize()
 			s, ok := app.o.Home.Dash().Find(f.Sel.Key)
 			if !ok {
 				return gogui.Label(say.T("home.empty"), widgets.Secondary())
 			}
-			return app.tileList(float32(vw)-2*gogui.PadLarge, s, app.ui.Palette())
+			return app.tileList(widgets.PageWidth(w), s, app.ui.Palette())
 		},
 	}
 }

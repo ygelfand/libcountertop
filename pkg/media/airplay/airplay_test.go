@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 func TestMessagesRoundTrip(t *testing.T) {
@@ -84,7 +85,7 @@ func TestFramesCountFromTheFirst(t *testing.T) {
 	m.push(ctx, frame{at: 5*time.Second + 33*time.Millisecond, data: []byte{2}})
 
 	p, err := m.Live(ctx)
-	if err != nil || !p.H264 || p.Width != 1920 || p.Height != 1080 {
+	if err != nil || p.Codec != playback.H264 || p.Width != 1920 || p.Height != 1080 {
 		t.Fatalf("Live = %+v, %v", p, err)
 	}
 	for _, want := range []time.Duration{0, 33 * time.Millisecond} {
@@ -119,6 +120,7 @@ func screeningRig(t *testing.T) (*screening, *output, *os.File) {
 	t.Cleanup(func() { read.Close(); write.Close() })
 	out := &output{width: 1200, height: 1920}
 	r := &Receiver{opts: Options{
+		Settings: &section{cfg: schema.DefaultAirPlay()},
 		Rate:     48000,
 		Channels: 2,
 		Size:     func() (int, int) { return out.width, out.height },
@@ -137,11 +139,46 @@ func screeningRig(t *testing.T) (*screening, *output, *os.File) {
 	return s, out, read
 }
 
-func mirrorMessage(w, h uint32) message {
-	p := binary.LittleEndian.AppendUint32(nil, codecH264)
+func mirrorMessage(w, h uint32) message { return codecMirrorMessage(codecH264, w, h) }
+
+func codecMirrorMessage(codec, w, h uint32) message {
+	p := binary.LittleEndian.AppendUint32(nil, codec)
 	p = binary.LittleEndian.AppendUint32(p, w)
 	p = binary.LittleEndian.AppendUint32(p, h)
 	return message{kind: msgMirror, payload: p}
+}
+
+func TestAMirrorShowsTheCodecTheSenderChose(t *testing.T) {
+	for _, c := range []struct {
+		codec uint32
+		want  uint32
+	}{
+		{codecH264, playback.H264},
+		{codecH265, playback.HEVC},
+	} {
+		s, out, _ := screeningRig(t)
+		ctx := context.Background()
+		s.handle(ctx, codecMirrorMessage(c.codec, 1920, 1080))
+		if len(out.played) != 1 {
+			t.Fatalf("codec %d: played %d sources, want 1", c.codec, len(out.played))
+		}
+		p, _ := out.played[0].(playback.Live).Live(ctx)
+		if p.Codec != c.want {
+			t.Errorf("codec %d: picture %08x, want %08x", c.codec, p.Codec, c.want)
+		}
+	}
+}
+
+func TestAMirrorInAnUnknownCodecIsRefused(t *testing.T) {
+	s, out, helper := screeningRig(t)
+	s.handle(context.Background(), codecMirrorMessage(9, 1920, 1080))
+	if len(out.played) != 0 {
+		t.Errorf("played %d sources, want none", len(out.played))
+	}
+	m, err := readMessage(helper)
+	if err != nil || m.kind != msgDisconnect {
+		t.Fatalf("helper heard %q (%v), want a disconnect", rune(m.kind), err)
+	}
 }
 
 func TestAMirrorPlaysUntilTheSenderEndsIt(t *testing.T) {
@@ -185,12 +222,7 @@ func TestAudioOnlyPlaysWithoutAPicture(t *testing.T) {
 		t.Error("an audio-only session offers a picture")
 	}
 
-	p := binary.LittleEndian.AppendUint32(nil, 48000)
-	p = binary.LittleEndian.AppendUint32(p, 2)
-	for range 4 {
-		p = binary.LittleEndian.AppendUint16(p, 1000)
-	}
-	s.handle(ctx, message{kind: msgAudio, payload: p})
+	s.handle(ctx, audioMessage(0))
 	pcm := make([]int16, 8)
 	if n, err := src.Read(ctx, pcm); err != nil || n != 4 || pcm[0] != 1000 {
 		t.Errorf("Read = %d %v (%v), want the 4 samples sent", n, pcm[:n], err)
@@ -199,6 +231,63 @@ func TestAudioOnlyPlaysWithoutAPicture(t *testing.T) {
 	s.handle(ctx, message{kind: msgEnded})
 	if len(out.stopped) != 1 || out.stopped[0] != src {
 		t.Errorf("stopped %v, want the audio", out.stopped)
+	}
+}
+
+type section struct{ cfg schema.AirPlay }
+
+func (s *section) Read() schema.AirPlay { return s.cfg }
+
+func (s *section) Update(change func(*schema.AirPlay)) error {
+	change(&s.cfg)
+	return nil
+}
+
+func audioMessage(due time.Duration) message {
+	p := binary.LittleEndian.AppendUint32(nil, 48000)
+	p = binary.LittleEndian.AppendUint32(p, 2)
+	p = binary.LittleEndian.AppendUint32(p, uint32(int32(due/time.Microsecond)))
+	for range 4 {
+		p = binary.LittleEndian.AppendUint16(p, 1000)
+	}
+	return message{kind: msgAudio, payload: p}
+}
+
+func TestSyncedAudioWaitsForItsTime(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		mode    schema.AirPlayAudioMode
+		latency time.Duration
+		want    int
+	}{
+		{schema.AirPlaySynced, 0, 0},
+		{schema.AirPlaySynced, time.Second, 4},
+		{schema.AirPlayInstant, 0, 4},
+	} {
+		s := newSound("mac", 48000, 2, tc.mode, func() {})
+		s.latency = tc.latency
+		a, err := audioOf(audioMessage(time.Second).payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.hear(a)
+		pcm := make([]int16, 8)
+		if n, err := s.Read(ctx, pcm); err != nil || n != tc.want {
+			t.Errorf("%s %v: Read = %d (%v), want %d", tc.mode, tc.latency, n, err, tc.want)
+		}
+	}
+}
+
+func TestWithoutAScreenAMirrorIsRefused(t *testing.T) {
+	s, out, helper := screeningRig(t)
+	s.r.opts.Size = nil
+	s.handle(context.Background(), mirrorMessage(1920, 1080))
+	if len(out.played) != 0 {
+		t.Errorf("played %d sources, want none", len(out.played))
+	}
+	m, err := readMessage(helper)
+	if err != nil || m.kind != msgDisconnect {
+		t.Fatalf("helper heard %q (%v), want a disconnect", rune(m.kind), err)
 	}
 }
 
@@ -233,8 +322,8 @@ func TestHeardAudioPlaysBeforeSilence(t *testing.T) {
 	}
 
 	m.hear(audio{rate: 48000, channels: 2, pcm: make([]int16, 48000*2)})
-	if most := int(mostAudio * 48000 / time.Second * 2); len(m.pending) != most {
-		t.Errorf("held %d samples, want at most %d", len(m.pending), most)
+	if most := int(mostAudio * 48000 / time.Second * 2); m.queued != most {
+		t.Errorf("held %d samples, want at most %d", m.queued, most)
 	}
 }
 

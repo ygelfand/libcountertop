@@ -11,6 +11,7 @@ type codec int
 
 const (
 	codecAVC codec = iota + 1
+	codecHEVC
 	codecAAC
 	codecOpus
 	codecMP3
@@ -30,12 +31,13 @@ var containers = map[string][]codec{
 	"audio/x-wav":      {codecPCM},
 	"audio/mp4":        {codecAAC, codecOpus, codecMP3},
 	"audio/x-m4a":      {codecAAC, codecOpus, codecMP3},
-	"video/mp4":        {codecAVC, codecAAC, codecOpus, codecMP3},
+	"video/mp4":        {codecAVC, codecHEVC, codecAAC, codecOpus, codecMP3},
 	"audio/webm":       {codecOpus, codecVorbis},
 	"video/webm":       {codecAVC, codecAAC, codecOpus, codecVorbis},
 	"audio/x-matroska": {codecAAC, codecOpus, codecMP3, codecFLAC, codecVorbis},
 	"video/x-matroska": {
 		codecAVC,
+		codecHEVC,
 		codecAAC,
 		codecOpus,
 		codecMP3,
@@ -67,7 +69,7 @@ func (p *Player) Plays(mimeType string, width, height, rate int) bool {
 		if !ok || !slices.Contains(allowed, c) {
 			return false
 		}
-		video = video || c == codecAVC
+		video = video || c == codecAVC || c == codecHEVC
 	}
 	if !video {
 		return true
@@ -92,6 +94,8 @@ func parseCodec(name string) (codec, bool) {
 		return codecAVC, avcProfile(lower[5:])
 	case lower == "avc1" || lower == "avc3":
 		return codecAVC, true
+	case strings.HasPrefix(lower, "hvc1.") || strings.HasPrefix(lower, "hev1."):
+		return codecHEVC, hevcProfile(lower[5:])
 	case lower == "mp4a.40.2" || lower == "mp4a.40":
 		return codecAAC, true
 	case lower == "mp4a.40.34" || lower == "mp4a.6b" || lower == "mp4a.69" || lower == "mp3":
@@ -106,6 +110,28 @@ func parseCodec(name string) (codec, bool) {
 		return codecPCM, true
 	}
 	return 0, false
+}
+
+func hevcProfile(rest string) bool {
+	fields := strings.Split(rest, ".")
+	if len(fields) < 2 {
+		return false
+	}
+	idc, err := strconv.ParseUint(strings.TrimLeft(fields[0], "abc"), 10, 8)
+	if err != nil {
+		return false
+	}
+	flags, err := strconv.ParseUint(fields[1], 16, 32)
+	if err != nil {
+		return false
+	}
+	switch {
+	case idc == hevcMain:
+		return true
+	case idc >= 2 && idc <= 11:
+		return false
+	}
+	return flags&0b11 != 0
 }
 
 func avcProfile(rest string) bool {

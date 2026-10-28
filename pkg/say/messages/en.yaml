@@ -10,6 +10,9 @@ access.group.access: Access
 access.setting.adb: ADB over network
 media.group.airplay: AirPlay
 media.setting.airplay: AirPlay
+media.setting.airplay_audio_mode: AirPlay audio mode
+media.option.airplay_audio_mode.instant: Instant
+media.option.airplay_audio_mode.synced: Synced with video
 alarm.add: Add alarm
 alarm.app: Alarms
 alarm.daily: Every day
@@ -338,7 +341,6 @@ camera.setting.whitebalance: White balance
 camera.starting: Starting the camera
 camera.muted: Microphones are muted
 camera.shutter: Camera shutter is closed
-cast.enable: Enable
 cast.entity.receiver: Cast receiver
 cast.entity.youtube.lounge: YouTube lounge
 cast.entity.youtube.skip: YouTube SponsorBlock categories

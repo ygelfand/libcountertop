@@ -187,15 +187,21 @@ func TestThePageAsksWhatThePlayerPlays(t *testing.T) {
 	}, Options{})
 	srv := httptest.NewServer(r.handler())
 	defer srv.Close()
-	for typ, want := range map[string]string{
-		`video/mp4; codecs="avc1.64001f"; width=1280; height=720; framerate=30`: "true",
-		`video/mp4; codecs="avc1.64001f"; width=1920; height=1080`:              "false",
-		`video/webm; codecs="vp9"`:                                              "false",
-		`audio/mp4; codecs="mp4a.40.2"`:                                         "true",
-		`video/mp4; codecs="avc1.4d401e"; width=99999`:                          "false",
-		`video/mp4; codecs="avc1.4d401e"; framerate=9999`:                       "false",
+	for _, c := range []struct{ how, typ, want string }{
+		{"", `video/mp4; codecs="avc1.64001f"; width=1280; height=720; framerate=30`, "true"},
+		{"", `video/mp4; codecs="avc1.64001f"; width=1920; height=1080`, "false"},
+		{"", `video/webm; codecs="vp9"`, "false"},
+		{"", `audio/mp4; codecs="mp4a.40.2"`, "true"},
+		{"", `video/mp4; codecs="avc1.4d401e"; width=99999`, "false"},
+		{"", `video/mp4; codecs="avc1.4d401e"; framerate=9999`, "false"},
+		{"", `video/mp4; codecs="hvc1.1.6.L93.B0"; width=1280; height=720`, "true"},
+		{"", `video/mp4; codecs="hvc1.2.4.L93.B0"; width=1280; height=720`, "false"},
+		{"&feed=1", `video/mp4; codecs="hvc1.1.6.L93.B0"; width=1280; height=720`, "true"},
+		{"&sealed=1", `video/mp4; codecs="hvc1.1.6.L93.B0"; width=1280; height=720`, "false"},
+		{"&sealed=1", `video/mp4; codecs="avc1.64001f"; width=1280; height=720`, "true"},
 	} {
-		resp, err := http.Get(srv.URL + "/plays?type=" + url.QueryEscape(typ))
+		typ, want := c.typ, c.want
+		resp, err := http.Get(srv.URL + "/plays?type=" + url.QueryEscape(typ) + c.how)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -384,6 +390,39 @@ func TestTheFirstSourceSettlesBeforeItPlays(t *testing.T) {
 	}
 	if at := r.player.Begins(); at != 500*time.Millisecond {
 		t.Fatalf("the settled source began at %v, want where the page seeked", at)
+	}
+}
+
+func TestASeekThePlayerRefusesStillEndsTheSeek(t *testing.T) {
+	r := New(
+		cast.Env{Output: quietOutput{}, Video: func() playback.Target { return playback.Target{} }},
+		Options{},
+	)
+	srv := httptest.NewServer(r.handler())
+	defer srv.Close()
+	c, _, err := websocket.DefaultDialer.Dial(
+		"ws"+strings.TrimPrefix(srv.URL, "http")+"/media",
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if err := c.WriteMessage(websocket.TextMessage, []byte(`{"op":"seek","t":600}`)); err != nil {
+		t.Fatal(err)
+	}
+	_ = c.SetReadDeadline(time.Now().Add(time.Second))
+	for {
+		var got report
+		if err := c.ReadJSON(&got); err != nil {
+			t.Fatalf("the page never heard its refused seek end: %v", err)
+		}
+		if got.Event == "seeked" {
+			if got.T == nil || *got.T != 0 {
+				t.Fatalf("the refused seek ended at %+v, want where playback already was", got)
+			}
+			return
+		}
 	}
 }
 

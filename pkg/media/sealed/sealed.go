@@ -368,7 +368,7 @@ func (p *Player) next(ctx context.Context) ([]byte, time.Duration, *surface.Cryp
 
 func (p *Player) Video(width, height int) playback.Picture {
 	return playback.Picture{
-		H264:    true,
+		Codec:   playback.H264,
 		Width:   width,
 		Height:  height,
 		Session: p.drm,

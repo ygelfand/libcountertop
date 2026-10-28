@@ -201,13 +201,16 @@ func (b *bridge) handle(o order, payload []byte) {
 			b.tell(b.at("pause"))
 		}
 	case "seek":
-		if p.Seek(time.Duration(o.T*float64(time.Second))) == nil {
-			b.mu.Lock()
-			b.began = false
-			b.mu.Unlock()
+		if err := p.Seek(time.Duration(o.T * float64(time.Second))); err != nil {
+			slog.Debug("the cast page's seek stays where it is", "t", o.T, "err", err)
 			b.tell(b.at("seeked"))
-			b.started()
+			return
 		}
+		b.mu.Lock()
+		b.began = false
+		b.mu.Unlock()
+		b.tell(b.at("seeked"))
+		b.started()
 	case "page":
 		b.r.mu.Lock()
 		b.r.url = o.URL

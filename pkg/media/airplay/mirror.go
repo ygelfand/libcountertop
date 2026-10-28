@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const frameDepth = 64
@@ -25,7 +26,7 @@ type mirror struct {
 
 func newMirror(client string, size mirroring, rate, channels int, disconnect func()) *mirror {
 	return &mirror{
-		sound:  newSound(client, rate, channels, disconnect),
+		sound:  newSound(client, rate, channels, schema.AirPlayInstant, disconnect),
 		size:   size,
 		frames: make(chan frame, frameDepth),
 		first:  -1,
@@ -47,8 +48,9 @@ func (m *mirror) Pictures(context.Context) (io.ReadCloser, time.Duration, error)
 }
 
 func (m *mirror) Live(context.Context) (playback.Picture, error) {
+	codec, _ := m.size.picture()
 	return playback.Picture{
-		H264:   true,
+		Codec:  codec,
 		Width:  int(m.size.width),
 		Height: int(m.size.height),
 		Next:   m.next,

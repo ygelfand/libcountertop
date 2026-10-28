@@ -2,13 +2,8 @@ package videostream
 
 import (
 	"encoding/binary"
-)
 
-func fourcc(s string) uint32 { return binary.LittleEndian.Uint32([]byte(s)) }
-
-var (
-	H264 = fourcc("H264")
-	VP9  = fourcc("VP90")
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
 func Split(stream []byte) (codec, width, height uint32, units [][]byte) {
@@ -18,7 +13,7 @@ func Split(stream []byte) (codec, width, height uint32, units [][]byte) {
 		height = uint32(binary.LittleEndian.Uint16(stream[14:]))
 		return codec, width, height, IVFFrames(stream)
 	}
-	return H264, 1920, 1080, AccessUnits(stream)
+	return playback.H264, 1920, 1080, AccessUnits(stream)
 }
 
 func AccessUnits(stream []byte) [][]byte {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
 const (
@@ -190,8 +191,8 @@ func TestAFeedPlaysThroughTheTrack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pic.H264 || pic.Width != 64 || pic.Height != 64 {
-		t.Fatalf("picture h264=%v %dx%d, want h264 64x64", pic.H264, pic.Width, pic.Height)
+	if pic.Codec != playback.H264 || pic.Width != 64 || pic.Height != 64 {
+		t.Fatalf("picture %08x %dx%d, want H264 64x64", pic.Codec, pic.Width, pic.Height)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

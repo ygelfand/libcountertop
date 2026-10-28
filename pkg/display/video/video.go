@@ -11,6 +11,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	"github.com/ygelfand/libcountertop/pkg/media/videostream"
 )
 
@@ -42,10 +43,12 @@ func placement(
 
 func codecOf(fourcc uint32) (uint32, error) {
 	switch fourcc {
-	case videostream.VP9:
+	case playback.VP9:
 		return surface.VP9, nil
-	case videostream.H264:
+	case playback.H264:
 		return surface.AVC, nil
+	case playback.HEVC:
+		return surface.HEVC, nil
 	}
 	return 0, fmt.Errorf("video: no decoder for %08x", fourcc)
 }

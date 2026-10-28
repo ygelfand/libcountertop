@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h265"
 
 	"github.com/ygelfand/libcountertop/pkg/media/cenc"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
@@ -19,21 +20,31 @@ import (
 
 const (
 	AVC        = "V_MPEG4/ISO/AVC"
+	HEVC       = "V_MPEGH/ISO/HEVC"
 	heldFrames = 300
 	heldAudio  = 256
+	hevcMain   = 1
 )
 
-type avcConfig struct {
+type nalConfig struct {
+	codec      uint32
 	lengthSize int
-	sps, pps   [][]byte
+	params     [][]byte
 }
 
-func parseAVCConfig(b []byte) (avcConfig, error) {
-	var c avcConfig
-	if len(b) < 7 || b[0] != 1 {
-		return c, errors.New("urlplayer: not an avcC record")
+func avcConfig(lengthSize int, sps, pps [][]byte) nalConfig {
+	return nalConfig{
+		codec:      playback.H264,
+		lengthSize: lengthSize,
+		params:     append(slices.Clone(sps), pps...),
 	}
-	c.lengthSize = int(b[4]&3) + 1
+}
+
+func parseAVCConfig(b []byte) (nalConfig, error) {
+	if len(b) < 7 || b[0] != 1 {
+		return nalConfig{}, errors.New("urlplayer: not an avcC record")
+	}
+	lengthSize := int(b[4]&3) + 1
 	read := func(at int, count int) ([][]byte, int, error) {
 		var out [][]byte
 		for range count {
@@ -52,20 +63,76 @@ func parseAVCConfig(b []byte) (avcConfig, error) {
 	}
 	sps, at, err := read(6, int(b[5]&0x1f))
 	if err != nil {
-		return c, err
+		return nalConfig{}, err
 	}
 	if at >= len(b) {
-		return c, errors.New("urlplayer: avcC record cut short")
+		return nalConfig{}, errors.New("urlplayer: avcC record cut short")
 	}
 	pps, _, err := read(at+1, int(b[at]))
 	if err != nil {
-		return c, err
+		return nalConfig{}, err
 	}
-	c.sps, c.pps = sps, pps
-	return c, nil
+	return avcConfig(lengthSize, sps, pps), nil
 }
 
-func (c avcConfig) units(data []byte) ([][]byte, error) {
+func hevcConfig(vps, sps, pps []byte) (nalConfig, int, int, error) {
+	var s h265.SPS
+	if err := s.Unmarshal(sps); err != nil {
+		return nalConfig{}, 0, 0, err
+	}
+	if s.ProfileTierLevel.GeneralProfileIdc != hevcMain || s.BitDepthLumaMinus8 != 0 {
+		return nalConfig{}, 0, 0, fmt.Errorf(
+			"%w: HEVC profile %d at %d bits",
+			errUnplayable,
+			s.ProfileTierLevel.GeneralProfileIdc,
+			s.BitDepthLumaMinus8+8,
+		)
+	}
+	c := nalConfig{codec: playback.HEVC, lengthSize: 4, params: [][]byte{vps, sps, pps}}
+	return c, s.Width(), s.Height(), nil
+}
+
+func parseHEVCConfig(b []byte) (nalConfig, error) {
+	if len(b) < 23 || b[0] != 1 {
+		return nalConfig{}, errors.New("urlplayer: not an hvcC record")
+	}
+	if b[1]&0x1f != hevcMain {
+		return nalConfig{}, fmt.Errorf("%w: HEVC profile %d", errUnplayable, b[1]&0x1f)
+	}
+	sets := map[h265.NALUType][][]byte{}
+	at := 23
+	for range int(b[22]) {
+		if at+3 > len(b) {
+			return nalConfig{}, errors.New("urlplayer: hvcC record cut short")
+		}
+		kind := h265.NALUType(b[at] & 0x3f)
+		count := int(binary.BigEndian.Uint16(b[at+1:]))
+		at += 3
+		for range count {
+			if at+2 > len(b) {
+				return nalConfig{}, errors.New("urlplayer: hvcC record cut short")
+			}
+			n := int(binary.BigEndian.Uint16(b[at:]))
+			at += 2
+			if at+n > len(b) {
+				return nalConfig{}, errors.New("urlplayer: hvcC record cut short")
+			}
+			sets[kind] = append(sets[kind], b[at:at+n])
+			at += n
+		}
+	}
+	vps, sps, pps := sets[h265.NALUType_VPS_NUT], sets[h265.NALUType_SPS_NUT], sets[h265.NALUType_PPS_NUT]
+	if len(vps) == 0 || len(sps) == 0 || len(pps) == 0 {
+		return nalConfig{}, errors.New("urlplayer: hvcC record without VPS, SPS and PPS")
+	}
+	return nalConfig{
+		codec:      playback.HEVC,
+		lengthSize: int(b[21]&3) + 1,
+		params:     slices.Concat(vps, sps, pps),
+	}, nil
+}
+
+func (c nalConfig) units(data []byte) ([][]byte, error) {
 	var out [][]byte
 	for len(data) > 0 {
 		if len(data) < c.lengthSize {
@@ -85,13 +152,17 @@ func (c avcConfig) units(data []byte) ([][]byte, error) {
 	return out, nil
 }
 
-func (c avcConfig) idr(data []byte) bool {
+func (c nalConfig) key(data []byte) bool {
 	units, err := c.units(data)
 	if err != nil {
 		return false
 	}
+	units = slices.DeleteFunc(units, func(u []byte) bool { return len(u) == 0 })
+	if c.codec == playback.HEVC {
+		return h265.IsRandomAccess(units)
+	}
 	return slices.ContainsFunc(units, func(u []byte) bool {
-		return len(u) > 0 && h264.NALUType(u[0]&0x1f) == h264.NALUTypeIDR
+		return h264.NALUType(u[0]&0x1f) == h264.NALUTypeIDR
 	})
 }
 
@@ -100,7 +171,7 @@ type sample struct {
 	data   []byte
 	at     time.Duration
 	key    bool
-	config *avcConfig
+	config *nalConfig
 	sealed *cenc.Sample
 	track  *cenc.Track
 }
@@ -112,23 +183,30 @@ type videoFrame struct {
 
 type picture struct {
 	width, height int
-	config        avcConfig
+	config        nalConfig
 	frames        chan videoFrame
 	keyed         bool
 }
 
-func newPicture(width, height int, c avcConfig) *picture {
+func newPicture(width, height int, c nalConfig) *picture {
 	return &picture{
 		width: width, height: height, config: c,
 		frames: make(chan videoFrame, heldFrames),
 	}
 }
 
-func matroskaPicture(codec string, private []byte, width, height int) (*picture, error) {
-	if codec != AVC {
-		return nil, fmt.Errorf("%w: video %s", errUnplayable, codec)
+func matroskaConfig(codec string, private []byte) (nalConfig, error) {
+	switch codec {
+	case AVC:
+		return parseAVCConfig(private)
+	case HEVC:
+		return parseHEVCConfig(private)
 	}
-	c, err := parseAVCConfig(private)
+	return nalConfig{}, fmt.Errorf("%w: video %s", errUnplayable, codec)
+}
+
+func matroskaPicture(codec string, private []byte, width, height int) (*picture, error) {
+	c, err := matroskaConfig(codec, private)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +214,7 @@ func matroskaPicture(codec string, private []byte, width, height int) (*picture,
 }
 
 func (p *picture) playback() playback.Picture {
-	return playback.Picture{H264: true, Width: p.width, Height: p.height, Next: p.next}
+	return playback.Picture{Codec: p.config.codec, Width: p.width, Height: p.height, Next: p.next}
 }
 
 func (p *picture) push(ctx context.Context, s sample) {
@@ -152,7 +230,7 @@ func (p *picture) push(ctx context.Context, s sample) {
 		return
 	}
 	if s.key {
-		au = append(append(append([][]byte(nil), c.sps...), c.pps...), au...)
+		au = slices.Concat(c.params, au)
 	}
 	data, err := h264.AnnexB(au).Marshal()
 	if err != nil {

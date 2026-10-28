@@ -83,8 +83,7 @@ func (g grid) drop(from int, dx, dy float32, count int) int {
 }
 
 func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
-	vw, _ := w.WindowSize()
-	width := float32(vw - 2*gogui.PadLarge)
+	width := widgets.PageWidth(w)
 	g := layout(width)
 	list := a.List()
 

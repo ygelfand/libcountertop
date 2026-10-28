@@ -685,14 +685,27 @@ func (r *Receiver) plays(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	asked := req.URL.Query().Get("type")
 	feed := req.URL.Query().Has("feed")
+	sealed := req.URL.Query().Has("sealed")
 	ok := r.player != nil
 	switch {
+	case ok && sealed:
+		ok = r.player.Seals(displayType(asked))
 	case ok && feed:
 		ok = r.player.Feeds(displayType(asked))
 	case ok:
 		ok = r.player.Plays(displayType(asked))
 	}
-	slog.Debug("the cast page asked what plays", "type", asked, "feed", feed, "answer", ok)
+	slog.Debug(
+		"the cast page asked what plays",
+		"type",
+		asked,
+		"feed",
+		feed,
+		"sealed",
+		sealed,
+		"answer",
+		ok,
+	)
 	_, _ = fmt.Fprint(w, ok)
 }
 

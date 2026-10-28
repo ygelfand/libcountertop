@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"golang.org/x/sys/unix"
@@ -27,18 +28,20 @@ var (
 )
 
 type Options struct {
-	Settings storage.Section[schema.AirPlay]
-	Device   uint32
-	Helper   string
-	Binary   []byte
-	Keyfile  string
-	Name     func() string
-	MAC      func() string
-	Size     func() (width, height int)
-	Largest  image.Point
-	Output   func(ended func()) playback.Output
-	Rate     int
-	Channels int
+	Settings  storage.Section[schema.AirPlay]
+	Device    uint32
+	Helper    string
+	Binary    []byte
+	Keyfile   string
+	Name      func() string
+	MAC       func() string
+	Size      func() (width, height int)
+	Largest   image.Point
+	Output    func(ended func()) playback.Output
+	OpenPorts func()
+	Latency   func() time.Duration
+	Rate      int
+	Channels  int
 }
 
 type Receiver struct {
@@ -142,13 +145,19 @@ func (r *Receiver) run(ctx context.Context) {
 }
 
 func (r *Receiver) session(ctx context.Context) error {
-	w, h := r.opts.Size()
-	if w <= 0 || h <= 0 {
-		return errNoScreen
+	var w, h, sentW, sentH int
+	if r.opts.Size != nil {
+		w, h = r.opts.Size()
+		if w <= 0 || h <= 0 {
+			return errNoScreen
+		}
+		sentW, sentH = w, h
+		if most := r.opts.Largest; most.X > 0 && most.Y > 0 {
+			sentW, sentH = fit(w, h, most)
+		}
 	}
-	sentW, sentH := w, h
-	if most := r.opts.Largest; most.X > 0 && most.Y > 0 {
-		sentW, sentH = fit(w, h, most)
+	if r.opts.OpenPorts != nil {
+		r.opts.OpenPorts()
 	}
 	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM, 0)
 	if err != nil {
@@ -266,7 +275,7 @@ func (s *screening) handle(ctx context.Context, m message) {
 		slog.Info("airplay client", "name", s.client)
 	case msgMirror:
 		size, err := mirroringOf(m.payload)
-		if err != nil || size.codec != codecH264 {
+		if _, known := size.picture(); err != nil || !known || s.r.opts.Size == nil {
 			slog.Warn("airplay mirror refused", "codec", size.codec, "err", err)
 			s.disconnect()
 			return
@@ -277,6 +286,8 @@ func (s *screening) handle(ctx context.Context, m message) {
 			s.client,
 			"size",
 			fmt.Sprintf("%dx%d", size.width, size.height),
+			"codec",
+			size.codec,
 		)
 		s.begin(size)
 	case msgFrame:
@@ -292,8 +303,18 @@ func (s *screening) handle(ctx context.Context, m message) {
 			shown.push(ctx, f)
 		}
 	case msgSound:
-		slog.Info("airplay audio", "client", s.client)
-		s.play(newSound(s.client, s.r.opts.Rate, s.r.opts.Channels, s.disconnect))
+		snd := newSound(
+			s.client,
+			s.r.opts.Rate,
+			s.r.opts.Channels,
+			s.r.opts.Settings.Read().Audio,
+			s.disconnect,
+		)
+		if s.r.opts.Latency != nil && snd.mode.Synced() {
+			snd.latency = s.r.opts.Latency()
+		}
+		slog.Info("airplay audio", "client", s.client, "mode", snd.mode, "latency", snd.latency)
+		s.play(snd)
 	case msgAudio:
 		a, err := audioOf(m.payload)
 		if err != nil {
@@ -356,7 +377,7 @@ func (s *screening) resized() {
 	s.mu.Lock()
 	showing := s.playing != nil
 	s.mu.Unlock()
-	if showing {
+	if showing || s.r.opts.Size == nil {
 		return
 	}
 	w, h := s.r.opts.Size()

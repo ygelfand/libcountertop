@@ -3,12 +3,14 @@ package urlplayer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
 func TestAnMKVWithH264ShowsPicturesAndPlaysSound(t *testing.T) {
@@ -31,8 +33,8 @@ func TestAnMKVWithH264ShowsPicturesAndPlaysSound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pic.H264 || pic.Width != 64 || pic.Height != 64 {
-		t.Fatalf("picture h264=%v %dx%d, want h264 64x64", pic.H264, pic.Width, pic.Height)
+	if pic.Codec != playback.H264 || pic.Width != 64 || pic.Height != 64 {
+		t.Fatalf("picture %08x %dx%d, want H264 64x64", pic.Codec, pic.Width, pic.Height)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -84,8 +86,8 @@ func TestAnMP4WithItsIndexAtTheEndShowsPicturesAndPlaysSound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pic.H264 || pic.Width != 64 || pic.Height != 64 {
-		t.Fatalf("picture h264=%v %dx%d, want h264 64x64", pic.H264, pic.Width, pic.Height)
+	if pic.Codec != playback.H264 || pic.Width != 64 || pic.Height != 64 {
+		t.Fatalf("picture %08x %dx%d, want H264 64x64", pic.Codec, pic.Width, pic.Height)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -136,6 +138,87 @@ func TestMatroskaSoundInEveryCodecWeDecode(t *testing.T) {
 				len(got),
 			)
 		}
+	}
+}
+
+func TestHEVCShowsPicturesInMKVAndMP4(t *testing.T) {
+	for file, kind := range map[string]string{
+		"testdata/clip-hevc.mkv": "video/x-matroska",
+		"testdata/clip-hevc.mp4": "video/mp4",
+	} {
+		body, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tr := New(
+			Options{HTTP: http.DefaultClient, Screen: true},
+		).track(cast.Media{ContentID: serve(t, kind, body, true)}, nil, 0)
+		if err := tr.ensure(); err != nil {
+			t.Fatalf("%s: %v", file, err)
+		}
+		pic, err := tr.Live(context.Background())
+		if err != nil {
+			t.Fatalf("%s: %v", file, err)
+		}
+		if pic.Codec != playback.HEVC || pic.Width != 64 || pic.Height != 64 {
+			t.Fatalf(
+				"%s: picture %08x %dx%d, want HEVC 64x64",
+				file,
+				pic.Codec,
+				pic.Width,
+				pic.Height,
+			)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		first, _, err := pic.Next(ctx)
+		cancel()
+		if err != nil {
+			t.Fatalf("%s: %v", file, err)
+		}
+		if !bytes.HasPrefix(first, []byte{0, 0, 0, 1}) || (first[4]>>1)&0x3f != 32 {
+			t.Fatalf(
+				"%s: first frame starts % x, want an Annex-B VPS",
+				file,
+				first[:min(8, len(first))],
+			)
+		}
+		if got := readAll(t, tr); len(got) < outRate {
+			t.Fatalf(
+				"%s: decoded %d samples alongside the picture, want about a second",
+				file,
+				len(got),
+			)
+		}
+		tr.close()
+	}
+}
+
+func TestTenBitHEVCPlaysSoundOnly(t *testing.T) {
+	body, err := os.ReadFile("testdata/clip-hevc10.mkv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := New(
+		Options{HTTP: http.DefaultClient, Screen: true},
+	).track(cast.Media{ContentID: serve(t, "video/x-matroska", body, true)}, nil, 0)
+	defer tr.close()
+	if got := readAll(t, tr); len(got) < outRate {
+		t.Fatalf("decoded %d samples, want about a second", len(got))
+	}
+	if tr.Pictured() {
+		t.Fatal("a Main 10 HEVC track was offered to the decoder")
+	}
+}
+
+func TestHEVCConfigRejectsCutShortAndNonMainRecords(t *testing.T) {
+	record := make([]byte, 23)
+	record[0], record[1], record[22] = 1, 1, 1
+	if _, err := parseHEVCConfig(record); err == nil {
+		t.Error("parsed an hvcC record whose array runs past its end")
+	}
+	record[1] = 2
+	if _, err := parseHEVCConfig(record); !errors.Is(err, errUnplayable) {
+		t.Errorf("a Main 10 hvcC record gave %v, want unplayable", err)
 	}
 }
 

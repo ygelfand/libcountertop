@@ -76,7 +76,7 @@ type lane struct {
 	width   int
 	height  int
 	sound   sound
-	config  *avcConfig
+	config  *nalConfig
 	samples []fed
 }
 
@@ -502,7 +502,14 @@ func (l *lane) init(moov []byte) error {
 			return fmt.Errorf("urlplayer: media source: %w", err)
 		}
 		l.video, l.width, l.height = true, sps.Width(), sps.Height()
-		l.config = &avcConfig{lengthSize: 4, sps: [][]byte{c.SPS}, pps: [][]byte{c.PPS}}
+		config := avcConfig(4, [][]byte{c.SPS}, [][]byte{c.PPS})
+		l.config = &config
+	case *codecs.H265:
+		config, w, h, err := hevcConfig(c.VPS, c.SPS, c.PPS)
+		if err != nil {
+			return fmt.Errorf("urlplayer: media source: %w", err)
+		}
+		l.video, l.width, l.height, l.config = true, w, h, &config
 	default:
 		if c.IsVideo() {
 			return fmt.Errorf("%w: media source video %T", errUnplayable, c)
@@ -521,7 +528,8 @@ func (l *lane) sealedInit(t cenc.Track) error {
 	switch t.Format {
 	case "avc1", "avc3":
 		l.video, l.width, l.height = true, t.Width, t.Height
-		l.config = &avcConfig{lengthSize: t.LengthSize, sps: t.SPS, pps: t.PPS}
+		config := avcConfig(t.LengthSize, t.SPS, t.PPS)
+		l.config = &config
 	case "mp4a":
 		l.sound = sound{name: codecAACName, private: t.Config, rate: t.Rate}
 	default:
@@ -588,7 +596,7 @@ func (l *lane) part(data []byte, offset time.Duration) error {
 				pts := dts + int64(s.PTSOffset)
 				key := !s.IsNonSyncSample
 				if l.config != nil {
-					key = l.config.idr(s.Payload)
+					key = l.config.key(s.Payload)
 				}
 				added = append(added, fed{
 					sample: sample{
@@ -630,7 +638,7 @@ func (l *lane) parseWebM(offset time.Duration) error {
 		}
 		key := fr.Key || !l.video
 		if l.config != nil {
-			key = l.config.idr(fr.Data)
+			key = l.config.key(fr.Data)
 		}
 		added = append(added, fed{
 			sample: sample{video: l.video, data: fr.Data, at: at, key: key, config: l.config},
@@ -652,8 +660,8 @@ func (l *lane) parseWebM(offset time.Duration) error {
 
 func (l *lane) useWebM(t webm.Track) error {
 	switch {
-	case t.Codec == AVC:
-		c, err := parseAVCConfig(t.Private)
+	case t.Codec == AVC || t.Codec == HEVC:
+		c, err := matroskaConfig(t.Codec, t.Private)
 		if err != nil {
 			return err
 		}
@@ -706,4 +714,17 @@ func (p *Player) Feeds(mimeType string, width, height, rate int) bool {
 		return p.Plays(mimeType, width, height, rate)
 	}
 	return false
+}
+
+func (p *Player) Seals(mimeType string, width, height, rate int) bool {
+	if !p.Feeds(mimeType, width, height, rate) {
+		return false
+	}
+	_, params, _ := mime.ParseMediaType(mimeType)
+	for name := range strings.SplitSeq(params["codecs"], ",") {
+		if c, _ := parseCodec(strings.TrimSpace(name)); c == codecHEVC {
+			return false
+		}
+	}
+	return true
 }

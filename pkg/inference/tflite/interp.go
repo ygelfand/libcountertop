@@ -219,8 +219,6 @@ func (in *Interpreter) Invoke() error {
 
 type kernel func(o *OpDesc, in, out []*Tensor) error
 
-var kernels map[Op]kernel
-
 func activate(v float32, a Activation) float32 {
 	switch a {
 	case ActRelu:

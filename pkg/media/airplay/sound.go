@@ -9,20 +9,28 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	"github.com/ygelfand/libcountertop/pkg/audio/resample"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
+	readAhead   = 250 * time.Millisecond
 	silenceLead = 100 * time.Millisecond
 	audioGap    = 150 * time.Millisecond
 	mostAudio   = 500 * time.Millisecond
+	mostSynced  = 4 * time.Second
 )
 
-var _ playback.Source = (*sound)(nil)
+var (
+	_ playback.Source    = (*sound)(nil)
+	_ playback.ReadAhead = (*sound)(nil)
+)
 
 type sound struct {
 	client     string
 	rate       int
 	channels   int
+	mode       schema.AirPlayAudioMode
+	latency    time.Duration
 	disconnect func()
 
 	done  chan struct{}
@@ -31,17 +39,29 @@ type sound struct {
 	mu       sync.Mutex
 	quiet    time.Time
 	silenced int64
-	pending  []int16
+	pending  []chunk
+	queued   int
 	heard    time.Time
 	from     int
 	convert  *resample.Rational
 }
 
-func newSound(client string, rate, channels int, disconnect func()) *sound {
+type chunk struct {
+	at  time.Time
+	pcm []int16
+}
+
+func newSound(
+	client string,
+	rate, channels int,
+	mode schema.AirPlayAudioMode,
+	disconnect func(),
+) *sound {
 	return &sound{
 		client:     client,
 		rate:       rate,
 		channels:   channels,
+		mode:       mode,
 		disconnect: disconnect,
 		done:       make(chan struct{}),
 	}
@@ -49,6 +69,7 @@ func newSound(client string, rate, channels int, disconnect func()) *sound {
 
 func (s *sound) hear(a audio) {
 	pcm := remix(a.pcm, a.channels, s.channels)
+	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if a.rate != s.rate {
@@ -57,12 +78,46 @@ func (s *sound) hear(a audio) {
 		}
 		pcm = s.convert.Run(pcm)
 	}
-	s.pending = append(s.pending, pcm...)
-	most := int(mostAudio*time.Duration(s.rate)/time.Second) * s.channels
-	if len(s.pending) > most {
-		s.pending = append(s.pending[:0], s.pending[len(s.pending)-most:]...)
+	c := chunk{pcm: pcm}
+	most := mostAudio
+	if s.mode.Synced() {
+		most = mostSynced
+		if a.due > 0 {
+			c.at = now.Add(a.due - readAhead - s.latency)
+		}
 	}
-	s.heard = time.Now()
+	s.pending = append(s.pending, c)
+	s.queued += len(pcm)
+	limit := int(most*time.Duration(s.rate)/time.Second) * s.channels
+	for s.queued > limit {
+		over, first := s.queued-limit, &s.pending[0]
+		if len(first.pcm) > over {
+			first.pcm = first.pcm[over:]
+			s.queued = limit
+			break
+		}
+		s.queued -= len(first.pcm)
+		s.pending = s.pending[1:]
+	}
+	s.heard = now
+}
+
+func (s *sound) take(pcm []int16, now time.Time) int {
+	n := 0
+	for n < len(pcm) && len(s.pending) > 0 {
+		c := &s.pending[0]
+		if !c.at.IsZero() && now.Before(c.at) {
+			break
+		}
+		k := copy(pcm[n:], c.pcm)
+		n += k
+		s.queued -= k
+		c.pcm = c.pcm[k:]
+		if len(c.pcm) == 0 {
+			s.pending = s.pending[1:]
+		}
+	}
+	return n
 }
 
 func (s *sound) end() { s.ended.Do(func() { close(s.done) }) }
@@ -79,13 +134,11 @@ func (s *sound) Read(ctx context.Context, pcm []int16) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
-	if len(s.pending) > 0 {
-		n := copy(pcm[:len(pcm)/s.channels*s.channels], s.pending)
-		s.pending = s.pending[n:]
+	if n := s.take(pcm[:len(pcm)/s.channels*s.channels], now); n > 0 {
 		s.quiet = time.Time{}
 		return n, nil
 	}
-	if !s.heard.IsZero() && now.Sub(s.heard) < audioGap {
+	if len(s.pending) > 0 || (!s.heard.IsZero() && now.Sub(s.heard) < audioGap) {
 		return 0, nil
 	}
 	if s.quiet.IsZero() {
@@ -103,6 +156,8 @@ func (s *sound) Read(ctx context.Context, pcm []int16) (int, error) {
 }
 
 func (s *sound) Start() time.Duration { return 0 }
+
+func (s *sound) ReadAhead() time.Duration { return readAhead }
 
 func (s *sound) Showing() playback.Showing {
 	return playback.Showing{Title: s.client, NoPause: true}

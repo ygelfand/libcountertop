@@ -265,11 +265,8 @@ func streamOf(ctx context.Context, pics playback.Pictures) (video.Stream, io.Clo
 			return video.Stream{}, nil, err
 		}
 		if p.Sealed != nil {
-			if !p.H264 {
-				return video.Stream{}, nil, errNoPicture
-			}
 			st := video.Stream{
-				Codec:   video.H264,
+				Codec:   p.Codec,
 				Width:   uint32(p.Width),
 				Height:  uint32(p.Height),
 				Session: p.Session,
@@ -278,11 +275,8 @@ func streamOf(ctx context.Context, pics playback.Pictures) (video.Stream, io.Clo
 			return st, io.NopCloser(nil), nil
 		}
 		if p.Next != nil {
-			if !p.H264 {
-				return video.Stream{}, nil, errNoPicture
-			}
 			st := video.Stream{
-				Codec:  video.H264,
+				Codec:  p.Codec,
 				Width:  uint32(p.Width),
 				Height: uint32(p.Height),
 				Source: liveFrames(p.Next),

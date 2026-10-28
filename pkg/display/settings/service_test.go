@@ -71,3 +71,33 @@ func TestAServicePageEditsItsTable(t *testing.T) {
 		t.Errorf("after saving: on %+v, password %+v", rows[0], rows[2])
 	}
 }
+
+func TestAServicePageShowsAChoiceAsSegments(t *testing.T) {
+	mode := "fast"
+	table := setting.NewTable("service", []setting.Group{"Service"}, []setting.Setting[string]{{
+		Name: "mode", Group: "Service", Kind: setting.Choice,
+		Options: []setting.Option{{Value: "fast", Key: "fast"}, {Value: "exact", Key: "exact"}},
+		Read:    func(c *string) string { return *c },
+		Write: func(c *string, v string) error {
+			*c = v
+			return nil
+		},
+	}}, setting.Messages{Text: func(k string) string { return k }})
+	page := ServicePage("Service", &setting.Controls[string]{
+		Table: table,
+		Read:  func() string { return mode },
+		Save:  func(s setting.Setting[string], v string) error { return s.Write(&mode, v) },
+	})
+
+	rows, taps := page.Build()
+	if len(rows) != 1 || rows[0].Kind != menu.Segments || rows[0].Level != 0 {
+		t.Fatalf("rows are %+v", rows)
+	}
+	if want := "service.option.mode.exact"; rows[0].Options[1] != want {
+		t.Errorf("second option is %q, want %q", rows[0].Options[1], want)
+	}
+	taps[0](1)
+	if mode != "exact" {
+		t.Errorf("saved %q, want exact", mode)
+	}
+}

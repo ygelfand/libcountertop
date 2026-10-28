@@ -501,7 +501,11 @@ func (o *Output) Behind(src playback.Source) time.Duration {
 
 func (o *Output) pump(ctx context.Context, p *playing) {
 	buf := make([]int16, o.options.Rate/50*o.options.Channels)
-	ahead := int(Queued * time.Duration(o.options.Rate) / time.Second)
+	most := Queued
+	if r, ok := p.src.(playback.ReadAhead); ok {
+		most = r.ReadAhead()
+	}
+	ahead := int(most * time.Duration(o.options.Rate) / time.Second)
 
 	if p.seen != nil {
 		select {
