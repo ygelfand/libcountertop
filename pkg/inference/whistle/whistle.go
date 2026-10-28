@@ -173,7 +173,7 @@ func (c *Client) session(ctx context.Context) error {
 		m, err := readMessage(ours)
 		if err != nil {
 			cancel()
-			<-pumped
+			err = errors.Join(err, <-pumped)
 			if ctx.Err() != nil {
 				return nil
 			}

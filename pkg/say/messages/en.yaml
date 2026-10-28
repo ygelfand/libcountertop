@@ -1022,6 +1022,25 @@ reply.download: Starts later, never gaps
 reply.stream: Starts sooner, can gap
 reply.title: Response playback
 actions.broadcast: Broadcast a message
+actions.alarm: Manage alarms
+actions.alarm.time: Say a time such as seven thirty AM, optionally followed by every weekday, every weekend, every day, or on named weekdays
+actions.alarm.exists: "{{.Alarm}} already exists"
+actions.alarm.set: "Set {{.Alarm}}"
+actions.alarm.empty: You have no saved alarms
+actions.alarm.off: "{{.Alarm}}, disabled"
+actions.alarm.none: You have no upcoming alarm
+actions.alarm.next: "Your next alarm is {{.Alarm}}, {{.When}}"
+actions.alarm.enable: "Enabled {{.Alarm}}"
+actions.alarm.disable: "Disabled {{.Alarm}}"
+actions.alarm.delete: "Deleted {{.Alarm}}"
+actions.alarm.not_ringing: No alarm is ringing
+actions.alarm.stopped: Alarm stopped
+actions.alarm.not_snoozed: No ringing alarm can be snoozed
+actions.alarm.snoozed: Alarm snoozed
+actions.alarm.target: Say the alarm name, time, or next alarm
+actions.alarm.missing: No saved alarm matches that name or time
+actions.alarm.ambiguous: More than one alarm matches; say its name
+actions.alarm.once: one time
 actions.broadcast.ask: Go ahead after the tone
 actions.broadcast.text: Broadcasting typed text needs the Home Assistant integration
 actions.call: Call a device
@@ -1029,6 +1048,12 @@ actions.call.busy: Already in a call
 actions.call.foreign: "{{.Peer}} isn't in this home"
 actions.call.unknown: "There's no device called {{.Peer}}"
 actions.call.unreachable: "{{.Peer}} can't be reached"
+actions.call_answer: Answer a call
+actions.call_answer.none: No incoming call to answer
+actions.call_answer.done: Answering the call
+actions.call_hangup: Hang up a call
+actions.call_hangup.none: No call to hang up
+actions.call_hangup.done: Call ended
 lock.again: Enter it again
 lock.change: Change PIN
 lock.clear: Remove PIN
@@ -1410,6 +1435,9 @@ voice.hacs.missing: Not installed
 voice.hacs.outdated: Update needed
 voice.hacs.unknown: Checking
 voice.setting.action.broadcast: Broadcast a message
+voice.setting.action.alarm: Manage alarms
+voice.setting.action.call_answer: Answer a call
+voice.setting.action.call_hangup: Hang up a call
 voice.setting.action.call: Call a device
 voice.setting.actions: All actions
 voice.setting.command.mirror: Mirror

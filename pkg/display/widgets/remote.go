@@ -70,12 +70,13 @@ func (e *Editor) Remote(w *gui.Window, r textentry.Request) (textentry.View, err
 			if !ok {
 				return textentry.View{}, textentry.ErrInvalid
 			}
-			if key == gui.KeyEnter {
+			switch key {
+			case gui.KeyEnter:
 				e.Save()
 				w.ClearFocus()
-			} else if key == gui.KeyEscape {
+			case gui.KeyEscape:
 				w.ClearFocus()
-			} else {
+			default:
 				mod := gui.ModNone
 				if r.Key == "SelectAll" {
 					mod = shortcut()

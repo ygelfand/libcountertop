@@ -161,7 +161,7 @@ func (m *Stream) PlayNoise(sounds ...string) {
 	safe.Go("noise", func() {
 		defer m.workers.Done()
 		err := m.generate(ctx, t, fill)
-		if err != nil && ctx.Err() == nil {
+		if ctx.Err() == nil {
 			slog.Error("playing noise failed", "err", err)
 		}
 		m.finished(t)

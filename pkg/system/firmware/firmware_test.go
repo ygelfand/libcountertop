@@ -362,7 +362,9 @@ func TestAFailedListKeepsWhatWasListed(t *testing.T) {
 func TestInstallingABuildInstallsThatVersionEvenWhenOlder(t *testing.T) {
 	src := &source{}
 	u := build(buildSource{source: src}, &settings{})
-	u.InstallBuild(context.Background(), "0.9")
+	if err := u.InstallBuild(context.Background(), "0.9"); err != nil {
+		t.Fatal(err)
+	}
 	if src.restarted != "update to 0.9" {
 		t.Errorf("restart reason = %q", src.restarted)
 	}
@@ -371,7 +373,9 @@ func TestInstallingABuildInstallsThatVersionEvenWhenOlder(t *testing.T) {
 func TestInstallingTheRunningBuildDoesNothing(t *testing.T) {
 	src := &source{}
 	u := build(buildSource{source: src}, &settings{})
-	u.InstallBuild(context.Background(), "1.0")
+	if err := u.InstallBuild(context.Background(), "1.0"); err != nil {
+		t.Fatal(err)
+	}
 	if src.restarted != "" {
 		t.Error("reinstalled the running version")
 	}
@@ -380,7 +384,9 @@ func TestInstallingTheRunningBuildDoesNothing(t *testing.T) {
 func TestABuildThatCannotBeFetchedIsReported(t *testing.T) {
 	src := &source{fetched: errors.New("404 Not Found")}
 	u := build(buildSource{source: src}, &settings{})
-	u.InstallBuild(context.Background(), "0.9")
+	if err := u.InstallBuild(context.Background(), "0.9"); err == nil {
+		t.Fatal("fetching a missing build returned no error")
+	}
 	if src.restarted != "" {
 		t.Error("restarted without a build")
 	}

@@ -144,7 +144,9 @@ func TestOptionalStartFailureDegrades(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func TestRestartsAfterFailure(t *testing.T) {
@@ -189,7 +191,9 @@ func TestRestartsAfterFailure(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func TestFailureWithoutRestartStaysFailed(t *testing.T) {
@@ -304,7 +308,9 @@ func TestNotRunUntilReacquired(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func TestRunsOnceReacquired(t *testing.T) {
@@ -335,7 +341,9 @@ func TestRunsOnceReacquired(t *testing.T) {
 		}
 		if time.Now().After(giveBack) {
 			cancel()
-			<-done
+			if err := <-done; err != nil {
+				t.Errorf("Run: %v", err)
+			}
 			t.Fatalf("never retried: %+v", statusOf(g, "device"))
 		}
 		time.Sleep(time.Millisecond)
@@ -363,7 +371,9 @@ func TestRunsOnceReacquired(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func statusOf(g *Group, name string) Status {
@@ -430,7 +440,9 @@ func TestARestartReleasesRatherThanCloses(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 
 	if _, closes := svc.letGo(); closes != 1 {
 		t.Errorf("after stopping: %d closes, want one", closes)
@@ -465,7 +477,9 @@ func TestAServiceWithNoReleaseIsStillClosedOnARestart(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func waitFor(t *testing.T, want func() bool) {

@@ -41,7 +41,9 @@ func TestGroupCannotBeRunTwice(t *testing.T) {
 		t.Fatal("second Run accepted")
 	}
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 type reacquireProbe struct {
@@ -94,7 +96,9 @@ func TestFailedReacquisitionNeverRunsWithoutHardware(t *testing.T) {
 		t.Fatal("never reacquired")
 	}
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 type slowStart struct {

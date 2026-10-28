@@ -82,5 +82,7 @@ func TestGroupGivesUpOnAPermanentFailure(t *testing.T) {
 		t.Fatalf("permanent failure ran %d times, want 1", runs)
 	}
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }

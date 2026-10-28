@@ -48,6 +48,46 @@ func (c *Calls) Action(peers func() []discovery.Peer, video bool) actions.Action
 	}
 }
 
+func (c *Calls) ControlActions() []actions.Action {
+	return []actions.Action{
+		{
+			Name: "call_answer", Title: say.T("actions.call_answer"),
+			Args: []esphome.Arg{{Name: "video", Type: esphome.ArgBool}},
+			Triggers: []actions.Trigger{
+				{Sentence: "answer [the] (call|phone)"},
+				{Sentence: "answer"},
+				{Sentence: "answer [the] video call", Args: map[string]string{"video": "true"}},
+			},
+			Run: func(call esphome.Call) (string, error) {
+				if now, ok := c.Now(); !ok || now.State != Ringing {
+					return say.T("actions.call_answer.none"), nil
+				}
+				if call.Bool("video") {
+					c.Answer()
+				} else {
+					c.AnswerAudio()
+				}
+				return say.T("actions.call_answer.done"), nil
+			},
+		},
+		{
+			Name: "call_hangup", Title: say.T("actions.call_hangup"),
+			Triggers: []actions.Trigger{
+				{Sentence: "hang up"},
+				{Sentence: "hang up [the] (call|phone)"},
+				{Sentence: "(end|decline|reject) [the] call"},
+			},
+			Run: func(esphome.Call) (string, error) {
+				if _, ok := c.Now(); !ok {
+					return say.T("actions.call_hangup.none"), nil
+				}
+				c.Hangup()
+				return say.T("actions.call_hangup.done"), nil
+			},
+		},
+	}
+}
+
 func Find(peers []discovery.Peer, name string) (discovery.Peer, bool) {
 	candidates := make([]match.Candidate, len(peers))
 	for i, p := range peers {

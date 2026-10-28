@@ -33,7 +33,9 @@ func TestAServiceNotThereYetIsAskedForAgain(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func TestAServiceWithNoRestartIsAskedForOnce(t *testing.T) {
@@ -57,7 +59,9 @@ func TestAServiceWithNoRestartIsAskedForOnce(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
 }
 
 func TestARequiredServiceStillGivesUp(t *testing.T) {
