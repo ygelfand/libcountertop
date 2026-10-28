@@ -21,7 +21,7 @@ jobs:
           GOOS=linux GOARCH=arm CGO_ENABLED=0 go build -tags noasm ./...
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.15.0
           install-only: true
       - name: format check
         run: golangci-lint fmt --diff
