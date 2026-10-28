@@ -121,10 +121,11 @@ func (p *CameraPages[K]) makePage() *shell.Page {
 				}
 				rows = append(rows, menu.Row{
 					Label: p.options.Table().Title(g),
+					Open:  func() shell.View { return p.Section(g) },
 					Kind:  menu.Chevron,
 					Value: p.options.Table().Sums(g, &sh),
 				})
-				taps = append(taps, p.open(func() *shell.Page { return p.Section(g) }))
+				taps = append(taps, nil)
 			}
 			p.mu.Lock()
 			armed := time.Since(p.armed) < resetWindow

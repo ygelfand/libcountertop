@@ -17,6 +17,7 @@ type UI struct {
 	Editor   *Editor
 	Gestures *Gestures
 	Toolkit  Toolkit
+	Open     func(menu.View)
 }
 
 func NewUI(settings storage.Section[schema.Screen]) *UI {
@@ -54,6 +55,14 @@ func (u *UI) Input(cfg gogui.InputCfg, save func()) gogui.View {
 }
 func (u *UI) Field(id string, r menu.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) }
 func (u *UI) Row(id, page string, r menu.Row, tap func(int), glyphs bool) gogui.View {
+	if r.Open != nil && u.Open != nil {
+		r.Kind = menu.Chevron
+		tap = func(int) {
+			if next := r.Open(); next != nil {
+				u.Open(next)
+			}
+		}
+	}
 	return u.Toolkit.Row(id, page, r, tap, glyphs, RowRenderer{
 		Field:   func(id string, r menu.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) },
 		Preview: RowPreview,

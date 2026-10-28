@@ -3,7 +3,7 @@
 #define SOCKET_PATH "/dev/socket/" SOCKET_NAME
 
 #define MAGIC 0x53564e4c
-#define VERSION 5
+#define VERSION 6
 
 #define OP_HELLO 1
 #define OP_CREATE 2
@@ -42,6 +42,7 @@
 #define OP_DRM_PROVISION 35
 #define OP_DRM_PROVISIONED 36
 #define OP_DRM_PROPERTY 37
+#define OP_SCREEN_RECORD 38
 
 #define CRYPT_CLEAR 0
 #define CRYPT_CENC 1

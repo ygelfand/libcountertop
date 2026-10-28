@@ -40,12 +40,13 @@ check-ndk:
 
 surface: check-ndk
 	@mkdir -p $(dir $(SURFACE_BIN)) $(STUBS)/surface
+	$(NDK_CXX) $(FLAGS) -std=c++17 -fno-exceptions -fno-rtti -c $(SURFACE)/record.cpp -o $(STUBS)/surface/record.o
 	@for lib in $(SURFACE_LIBS); do \
 		up=$$(echo $$lib | tr a-z A-Z); \
 		$(NDK_CC) -shared -DLIB$$up -Wl,-soname,lib$$lib.so -o $(STUBS)/surface/lib$$lib.so $(SURFACE)/stubs.c || exit 1; \
 	done
-	$(NDK_CC) $(FLAGS) -o $(SURFACE_BIN) $(SURFACE)/surface.c $(SURFACE)/video.c $(SURFACE)/gl.c $(SURFACE)/ui.c $(SURFACE)/drm.c $(SURFACE)/audio.c $(SURFACE)/wire.c \
-		-L$(STUBS)/surface $(addprefix -l,$(SURFACE_LIBS)) -landroid -lmediandk -lEGL -lGLESv2 -llog -lm -Wl,--allow-shlib-undefined
+	$(NDK_CC) $(FLAGS) -o $(SURFACE_BIN) $(SURFACE)/surface.c $(SURFACE)/video.c $(SURFACE)/gl.c $(SURFACE)/ui.c $(SURFACE)/drm.c $(SURFACE)/audio.c $(SURFACE)/wire.c $(STUBS)/surface/record.o \
+		-L$(STUBS)/surface $(addprefix -l,$(SURFACE_LIBS)) -landroid -lmediandk -lEGL -lGLESv2 -llog -lm -ldl -Wl,--allow-shlib-undefined
 
 camera: check-ndk
 	@mkdir -p $(dir $(CAMERA_BIN)) $(STUBS)/camera
@@ -86,6 +87,10 @@ test:
 	@mkdir -p $(OUT)
 	$(or $(HOST_CC),cc) -O1 -g -Wall -Werror -fsanitize=undefined -fno-sanitize-recover=all -I$(NATIVE) -I$(SURFACE) -o $(OUT)/wire_test $(SURFACE)/wire.c $(SURFACE)/test/wire_test.c
 	$(OUT)/wire_test
+	$(or $(HOST_CXX),c++) -std=c++17 -O1 -g -Wall -Werror -fno-rtti -fsanitize=undefined -fno-sanitize-recover=all -I$(SURFACE) -o $(OUT)/record_refs_test $(SURFACE)/test/record_refs_test.cpp
+	$(OUT)/record_refs_test
+	$(or $(HOST_CXX),c++) -std=c++17 -O1 -g -Wall -Werror -fsanitize=undefined -fno-sanitize-recover=all -I$(SURFACE) -o $(OUT)/record_geometry_test $(SURFACE)/test/record_geometry_test.cpp
+	$(OUT)/record_geometry_test
 
 WHISTLE_MODEL_URL := https://huggingface.co/Cactus-Compute/whistle/resolve/ca5287601bef25af26dcf2e1b2bdc0843a7c19e5/whistle.cact
 WHISTLE_MODEL_SHA256 := b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb

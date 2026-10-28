@@ -49,6 +49,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/todo"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/weather"
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/input/textentry"
 	"github.com/ygelfand/libcountertop/pkg/input/touch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -138,10 +139,12 @@ type Options struct {
 	UI         *widgets.UI
 	Weather    storage.Section[schema.Weather]
 
-	Brand    func() theme.Theme
-	Logo     func() image.Image
-	Night    func() image.Image
-	Offering func() string
+	Brand        func() theme.Theme
+	Logo         func() image.Image
+	Night        func() image.Image
+	Offering     func() string
+	Input        *textentry.Controller
+	KeyboardPair func(string) (string, time.Time, error)
 
 	Display   *panel.Driver
 	GPU       *gpu.Renderer
@@ -213,6 +216,7 @@ type App struct {
 }
 
 func New(o Options) *App {
+	o.UI.Open = o.Shell.Push
 	a := &App{
 		o:       o,
 		ui:      o.UI,
@@ -367,6 +371,15 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	r.SetRotation(int(rot) / 90)
+	if a.o.Input != nil {
+		detach := a.o.Input.Attach(
+			func(f func()) { w.QueueCommand(func(*gogui.Window) { f() }) },
+			func(request textentry.Request) (textentry.View, error) {
+				return a.ui.Editor.Remote(w, request)
+			},
+		)
+		defer detach()
+	}
 
 	a.mu.Lock()
 	a.w, a.r = w, r

@@ -229,13 +229,20 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 }
 
 func (a *App) page(w *gogui.Window, p *Screen) gogui.View {
+	build := p.Build
+	foot, fixed := p.Foot, p.Fixed
+	field := a.searchField()
+	if field != nil && a.ui.Editor.Editing(w, searchFieldID) {
+		build, foot, fixed = a.searchResults, nil, false
+	}
 	return a.ui.Toolkit.PageFrame(
 		w,
 		widgets.FrameOptions{
 			Title:    p.Title,
-			Fixed:    p.Fixed,
-			Build:    p.Build,
-			Foot:     p.Foot,
+			Fixed:    fixed,
+			Build:    build,
+			Search:   field,
+			Foot:     foot,
 			Settings: p.Settings,
 			Back:     func() { a.o.Shell.Pop() },
 			Gesture:  a.ui.HoldStill,

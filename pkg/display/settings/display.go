@@ -36,6 +36,7 @@ func (p *BasicPages) Display() *shell.Page {
 				{
 					Glyph: gogui.IconPalette,
 					Label: say.T("display.theme"),
+					Open:  func() shell.View { return p.Theme() },
 					Kind:  menu.Chevron,
 					Value: ThemeSays(cfg.Screen.Theme),
 				},
@@ -54,6 +55,7 @@ func (p *BasicPages) Display() *shell.Page {
 				{
 					Glyph: gogui.IconMoon,
 					Label: say.T("display.idle"),
+					Open:  func() shell.View { return p.options.Idle.Page() },
 					Kind:  menu.Chevron,
 					Value: cfg.Idle.After.Label(),
 				},
@@ -75,6 +77,7 @@ func (p *BasicPages) Display() *shell.Page {
 				{
 					Glyph: gogui.IconPicture,
 					Label: say.T("photos.page"),
+					Open:  func() shell.View { return p.Photos() },
 					Kind:  menu.Chevron,
 					Value: PosterSays(p.options.Preferences.Poster.Read()),
 				},
@@ -82,15 +85,15 @@ func (p *BasicPages) Display() *shell.Page {
 			acts := []func(int){
 				p.options.Screen.SetBacklight,
 				func(int) { p.toggleAuto(auto) },
-				p.open(func() shell.View { return p.Theme() }),
+				nil,
 				p.open(func() shell.View { return p.Style() }),
 				func(level int) { p.setSize(config.ScreenSizes()[sizes.Index(level)]) },
-				p.open(func() shell.View { return p.options.Idle.Page() }),
+				nil,
 				SegmentPick(config.Edges(), p.options.Screen.SetDrawer),
 				func(level int) { p.options.Screen.SetDockHide(hides[dock.Index(level)]) },
 				SegmentPick(config.Sides(), p.setVolumeEdge),
 				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
-				p.open(func() shell.View { return p.Photos() }),
+				nil,
 			}
 			return rows, acts
 		},

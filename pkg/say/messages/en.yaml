@@ -589,9 +589,11 @@ ink.red: Red
 ink.theme: Theme
 ink.violet: Violet
 keyboard.cancel: Cancel
+keyboard.code_expired: Code expired
 message.close: Close
 keyboard.compact: Compact
 keyboard.large: Large
+keyboard.refresh: Refresh
 keyboard.save: Save
 keyboard.size: Keyboard size
 keyboard.standard: Standard
@@ -1084,6 +1086,9 @@ settings.power: Restart
 settings.sync: Config sync
 settings.system: System
 settings.title: Settings
+settings.search: Search settings
+settings.search.empty: Type to find a setting
+settings.search.none: No matching settings
 settings.volume: Sound
 size.large: Large
 size.medium: Medium

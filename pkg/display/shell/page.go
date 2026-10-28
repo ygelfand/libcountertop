@@ -10,7 +10,10 @@ import (
 )
 
 type Page struct {
-	Title string
+	Title  string
+	Reveal string
+	OnOpen func()
+	Search *Search
 
 	Build func() ([]menu.Row, []func(level int))
 
@@ -23,6 +26,21 @@ type Page struct {
 	Actions []Action
 
 	Busy func() (Busy, bool)
+}
+
+type Search struct {
+	Query   *string
+	Results func() *Page
+}
+
+func SettingsPage(view View) *Page {
+	if page, ok := view.(*Page); ok {
+		return page
+	}
+	if provider, ok := view.(interface{ SettingsPage() *Page }); ok {
+		return provider.SettingsPage()
+	}
+	return nil
 }
 
 type Busy struct {
@@ -63,5 +81,11 @@ const (
 )
 
 func (p *Page) Covers() bool { return true }
+
+func (p *Page) Opened() {
+	if p.OnOpen != nil {
+		p.OnOpen()
+	}
+}
 
 func (p *Page) Timeout() time.Duration { return SettingsTimeout }

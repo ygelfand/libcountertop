@@ -17,7 +17,7 @@ import (
 const (
 	Socket  = "/dev/socket/countertop-surface"
 	magic   = 0x53564e4c
-	version = 5
+	version = 6
 )
 
 const (

@@ -288,7 +288,7 @@ func (p *BasicPages) Theme() *shell.Page {
 				Label:   say.T("theme.custom"),
 				Chosen:  now == theme.CustomName,
 				Preview: p.options.Previews.Theme(p.state().Screen.Custom.Theme()),
-				Edit:    func() { p.options.Shell.Push(p.CustomTheme()) },
+				Editor:  func() shell.View { return p.CustomTheme() },
 			})
 			acts = append(acts, p.useTheme(theme.CustomName))
 			return cells, acts

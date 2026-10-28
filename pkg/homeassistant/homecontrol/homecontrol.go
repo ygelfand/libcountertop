@@ -173,17 +173,21 @@ func groupHint(n int) string {
 	return say.F("home.group.from", map[string]any{"N": n})
 }
 
-type Home struct{}
+type Home struct{ Menu *shell.Page }
 
 func (e *Engine) Page() *Home        { return e.home }
 func (*Home) Covers() bool           { return true }
 func (*Home) Timeout() time.Duration { return shell.SettingsTimeout }
 
-type Dashboard struct{}
+func (h *Home) SettingsPage() *shell.Page { return h.Menu }
+
+type Dashboard struct{ Menu *shell.Page }
 
 func (e *Engine) Dashboard() *Dashboard   { return e.dashboard }
 func (*Dashboard) Covers() bool           { return true }
 func (*Dashboard) Timeout() time.Duration { return shell.SettingsTimeout }
+
+func (d *Dashboard) SettingsPage() *shell.Page { return d.Menu }
 
 func (e *Engine) ReturnHome() bool { return e.options.Settings.Read().Return }
 

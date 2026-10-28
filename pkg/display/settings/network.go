@@ -58,12 +58,11 @@ func NetworkPage(
 			rows = append(rows, menu.Row{
 				Glyph: gogui.IconGlobe,
 				Label: say.T("webaccess.title"),
+				Open:  func() shell.View { return web.Page(func() string { return read().Address }) },
 				Kind:  menu.Chevron,
 				Value: "https://" + c.Address + "/",
 			})
-			acts = append(acts, func(int) {
-				stack.Push(web.Page(func() string { return read().Address }))
-			})
+			acts = append(acts, nil)
 		}
 		return rows, acts
 	}}

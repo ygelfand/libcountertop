@@ -35,12 +35,13 @@ func (p *Pages) Cast() *shell.Page {
 					{Label: say.T("cast.enable"), Kind: menu.Toggle, On: c.Receiver},
 					{
 						Label: say.T("youtube.skip"),
+						Open:  func() shell.View { return p.Sponsor() },
 						Kind:  menu.Chevron,
 						Value: SkipSays(c.YouTube.Skip),
 					},
 				}, []func(int){
 					func(int) { p.options.Receiver.SetReceiver(!c.Receiver) },
-					func(int) { p.options.Shell.Push(p.Sponsor()) },
+					nil,
 				}
 		},
 	}

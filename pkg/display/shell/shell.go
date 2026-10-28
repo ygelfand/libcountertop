@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 )
 
@@ -15,9 +16,7 @@ const (
 	settling = 400 * time.Millisecond
 )
 
-type View interface {
-	Covers() bool
-}
+type View = menu.View
 
 type Timeouter interface {
 	Timeout() time.Duration
@@ -131,6 +130,16 @@ func (s *Shell) Views() []View {
 	return slices.Clone(s.stack)
 }
 
+func (s *Shell) Search() *Search {
+	views := s.Views()
+	for i := len(views) - 1; i >= 0; i-- {
+		if page := SettingsPage(views[i]); page != nil && page.Search != nil {
+			return page.Search
+		}
+	}
+	return nil
+}
+
 func (s *Shell) changed() {
 	s.mu.Lock()
 	previous := s.visible
@@ -180,6 +189,9 @@ func (s *Shell) drain() {
 			}
 		}
 		if n.change != nil {
+			if opened, ok := n.change.To.(interface{ Opened() }); ok {
+				opened.Opened()
+			}
 			s.Changed.Emit(*n.change)
 		}
 		s.Redraw()

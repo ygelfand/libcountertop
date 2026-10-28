@@ -26,6 +26,7 @@
 #include "drm.h"
 #include "gl.h"
 #include "protocol.h"
+#include "record.h"
 #include "ui.h"
 #include "video.h"
 
@@ -1001,6 +1002,13 @@ static void serve(int conn) {
 		case OP_SCREEN_READ:
 			err = hdr[1] == 0 ? screen_read(conn) : -1;
 			break;
+		case OP_SCREEN_RECORD: {
+			uint32_t w = 0, h = 0;
+			int fd = hdr[1] == 12 ? record_open(buf[0], buf[1], buf[2], &w, &h) : -1;
+			err = reply(conn, OP_SCREEN_RECORD, (uint32_t[]){fd >= 0 ? OK : ERR_SURFACE, w, h}, 3, fd);
+			if (fd >= 0) close(fd);
+			break;
+		}
 		case OP_GL_QUADS:
 			if (hdr[1] >= 8) gl_fills(buf, hdr[1]);
 			else err = -1;

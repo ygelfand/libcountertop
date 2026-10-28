@@ -30,18 +30,36 @@ type RootDependencies struct {
 	Shell                                            *shell.Shell
 	NetworkPage, FeaturesPage, VolumePage, AboutPage func() shell.View
 	Sections                                         func() []Section
+	SearchQuery                                      *string
 }
 
 func RootPage(o RootDependencies) *shell.Page {
-	return &shell.Page{Title: say.T("settings.title"), Build: func() ([]menu.Row, []func(int)) {
-		rows := []menu.Row{}
-		acts := []func(int){}
+	query := o.SearchQuery
+	if query == nil {
+		query = new(string)
+	}
+	search := &shell.Search{Query: query}
+	root := &shell.Page{Title: say.T("settings.title"), Search: search}
+	var results *shell.Page
+	search.Results = func() *shell.Page {
+		if results == nil {
+			results = searchPage(root, o.Shell, search)
+		}
+		return results
+	}
+	root.Build = func() ([]menu.Row, []func(int)) {
+		var rows []menu.Row
 		add := func(glyph, label, value string, page func() shell.View) {
 			rows = append(
 				rows,
-				menu.Row{Glyph: glyph, Label: say.T(label), Kind: menu.Chevron, Value: value},
+				menu.Row{
+					Glyph: glyph,
+					Label: say.T(label),
+					Kind:  menu.Chevron,
+					Value: value,
+					Open:  page,
+				},
 			)
-			acts = append(acts, func(int) { o.Shell.Push(page()) })
 		}
 		add(gogui.IconGlobe, "settings.network", o.Network.Network(), o.NetworkPage)
 		add(gogui.IconPlug, "settings.features", "", o.FeaturesPage)
@@ -84,6 +102,7 @@ func RootPage(o RootDependencies) *shell.Page {
 		)
 		add(gogui.IconCode, "settings.debug", "", func() shell.View { return o.Basic.Debug() })
 		add(gogui.IconInfo, "settings.about", o.Version, o.AboutPage)
-		return rows, acts
-	}}
+		return rows, nil
+	}
+	return root
 }

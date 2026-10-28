@@ -64,11 +64,22 @@ func (f *fake) serve() {
 		}
 		switch op {
 		case opHello:
-			if f.ver == 5 {
+			if f.ver == version {
 				answer(c, opHello, nil, f.ver, 960, 480)
 			} else {
 				answer(c, opHello, nil, f.ver)
 			}
+		case opScreenRecord:
+			pair, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+			if err != nil {
+				f.t.Error(err)
+				return
+			}
+			file := os.NewFile(uintptr(pair[0]), "recording")
+			f.shared <- os.NewFile(uintptr(pair[1]), "encoder")
+			f.gl <- words
+			answer(c, op, syscall.UnixRights(int(file.Fd())), 0, 800, 480)
+			_ = file.Close()
 		case opCreate:
 			id, w, h := words[0], words[3], words[4]
 			file, _ := os.CreateTemp(f.t.TempDir(), "layer")
@@ -469,9 +480,9 @@ func TestClosingTwiceIsQuiet(t *testing.T) {
 	}
 }
 
-func TestVersion5ReturnsPanelDimensions(t *testing.T) {
+func TestVersion6ReturnsPanelDimensions(t *testing.T) {
 	f, path := newFake(t)
-	f.ver = 5
+	f.ver = 6
 	c, err := Dial(path)
 	if err != nil {
 		t.Fatal(err)
@@ -482,9 +493,9 @@ func TestVersion5ReturnsPanelDimensions(t *testing.T) {
 	}
 }
 
-func TestVersion5RefusesVersion4Helper(t *testing.T) {
+func TestVersion6RefusesVersion5Helper(t *testing.T) {
 	f, path := newFake(t)
-	f.ver = 4
+	f.ver = 5
 	c, err := Dial(path)
 	if c != nil {
 		_ = c.Close()

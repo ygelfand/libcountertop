@@ -168,6 +168,7 @@ func (a *App) keyboard(w *gogui.Window) gogui.View {
 		Save:    say.T("keyboard.save"),
 		Type:    r.Type,
 		Press:   r.Press,
+		Pair:    a.o.KeyboardPair,
 	})
 	return widgets.Placed(at, view)
 }
@@ -202,6 +203,13 @@ func (a *App) livePreview(w *gogui.Window, watch func(ui.Rect) shell.Feed) gogui
 }
 
 func (a *App) tileView(w *gogui.Window, id, page string, c menu.Cell, tap func(int)) gogui.View {
+	if c.Editor != nil {
+		c.Edit = func() {
+			if next := c.Editor(); next != nil {
+				a.o.Shell.Push(next)
+			}
+		}
+	}
 	t := gogui.CurrentTheme().Cfg
 	tw := int(t.SizeTextMedium * 8)
 	th := int(float32(tw) * 0.72)

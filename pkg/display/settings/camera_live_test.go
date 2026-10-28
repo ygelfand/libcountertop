@@ -54,7 +54,7 @@ func TestTheCameraPageIsTheSections(t *testing.T) {
 		t.Errorf("the last row is %+v, want the reset action", last)
 	}
 	for i, g := range shown {
-		if rows[i].Kind != menu.Chevron || acts[i] == nil {
+		if rows[i].Kind != menu.Chevron || (acts[i] == nil && rows[i].Open == nil) {
 			t.Errorf("%s does not open", g)
 		}
 	}

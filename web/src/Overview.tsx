@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Button, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import {
   IconBulb,
@@ -14,6 +13,9 @@ import {
   type Icon,
 } from "@tabler/icons-react";
 import type { Description, Device, State } from "./api";
+import { Desktop } from "./Desktop";
+import { Screen } from "./Screen";
+import { ControlPairing } from "./ControlPairing";
 
 type Props = {
   device: Device;
@@ -23,7 +25,6 @@ type Props = {
   go: (slug: string, focus?: string) => void;
 };
 
-const screenEvery = 3000;
 const adoptURL =
   "https://my.home-assistant.io/redirect/config_flow_start/?domain=esphome";
 
@@ -133,65 +134,12 @@ function lines(
   return out;
 }
 
-function Screen() {
-  const [src, setSrc] = useState<string>();
-  const [taken, setTaken] = useState<number>();
-  const [aspect, setAspect] = useState(10 / 16);
-  const timer = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    let stopped = false;
-    const take = () => {
-      window.clearTimeout(timer.current);
-      if (stopped || document.visibilityState !== "visible") return;
-      const next = new Image();
-      const url = `/api/v1/screen?t=${Date.now()}`;
-      next.onload = () => {
-        if (stopped) return;
-        if (next.naturalWidth && next.naturalHeight)
-          setAspect(next.naturalWidth / next.naturalHeight);
-        setSrc(url);
-        setTaken(Date.now());
-        timer.current = window.setTimeout(take, screenEvery);
-      };
-      next.onerror = () => {
-        timer.current = window.setTimeout(take, screenEvery * 2);
-      };
-      next.src = url;
-    };
-    const shown = () => document.visibilityState === "visible" && take();
-    take();
-    document.addEventListener("visibilitychange", shown);
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer.current);
-      document.removeEventListener("visibilitychange", shown);
-    };
-  }, []);
-
-  return (
-    <div className="ct-bezel" style={{ "--aspect": aspect } as CSSProperties}>
-      {src ? (
-        <img src={src} alt="The panel right now" className="ct-screen" />
-      ) : (
-        <div className="ct-screen" />
-      )}
-      {taken && (
-        <span
-          className="ct-screen-live"
-          title={new Date(taken).toLocaleTimeString()}
-        />
-      )}
-    </div>
-  );
-}
-
 export function Overview({ device, entities, states, adopted }: Props) {
   const list = lines(entities, states);
   return (
     <div className="ct-page">
       <div className="ct-overview" data-screen={device.screen || undefined}>
-        {device.screen && <Screen />}
+        {device.screen && <Desktop enabled={device.pages?.includes("desktop") ?? false} actions={device.pages?.includes("desktop") ? <ControlPairing /> : undefined}><Screen /></Desktop>}
         <Stack gap="lg" className="ct-status">
           <Stack gap={2}>
             <Title order={2} fw={600}>

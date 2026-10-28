@@ -24,10 +24,10 @@ func TestRootCreatesPagesOnlyWhenOpened(t *testing.T) {
 	}
 
 	rows, actions := RootPage(o).Build()
-	if created != 0 || len(rows) != len(actions) {
+	if created != 0 || len(actions) != 0 {
 		t.Fatalf("created=%d rows=%d actions=%d", created, len(rows), len(actions))
 	}
-	actions[0](0)
+	o.Shell.Push(rows[0].Open())
 	if created != 1 {
 		t.Fatalf("created=%d after opening one page", created)
 	}

@@ -25,8 +25,9 @@ import { Logo } from "./Logo";
 import { notifications } from "./notify";
 import { Overview } from "./Overview";
 import { Search, SearchButton } from "./Search";
-import { groupID, sections, type Section } from "./sections";
+import { sections, type Section } from "./sections";
 import { Settings } from "./Settings";
+import { SettingsLink } from "./SettingsLink";
 import { Theme } from "./Theme";
 
 const seenMost = 500;
@@ -242,26 +243,15 @@ export function Shell({ device, onOut }: { device: Device; onOut: () => void }) 
               Settings
             </Text>
             {all.map((s) => (
-              <NavLink
+              <SettingsLink
                 key={s.key}
-                label={s.title}
-                leftSection={<s.icon size={18} stroke={1.6} />}
-                active={current?.key === s.key && s.groups.length < 2}
-                opened={expanded.has(s.key)}
-                onChange={() => fold(s)}
-                childrenOffset={28}
-              >
-                {s.groups.length > 1
-                  ? s.groups.map((g, i) => (
-                      <NavLink
-                        key={g.title}
-                        label={g.title}
-                        active={current?.key === s.key && focus === groupID(s.slug, i)}
-                        onClick={() => go(s.slug, groupID(s.slug, i))}
-                      />
-                    ))
-                  : null}
-              </NavLink>
+                section={s}
+                active={current?.key === s.key}
+                expanded={expanded.has(s.key)}
+                focus={focus}
+                go={go}
+                fold={() => fold(s)}
+              />
             ))}
           </Stack>
         </AppShell.Section>
@@ -285,7 +275,7 @@ export function Shell({ device, onOut }: { device: Device; onOut: () => void }) 
         ) : app === broadcast ? (
           <Broadcast device={device} onSignedOut={signedOut} />
         ) : open === developer ? (
-          <Developer entities={entities} states={states} focus={focus} onSignedOut={signedOut} />
+          <Developer name={device.name} entities={entities} states={states} focus={focus} onSignedOut={signedOut} />
         ) : (
           <Overview device={device} entities={entities} states={states} adopted={adopted} go={go} />
         )}

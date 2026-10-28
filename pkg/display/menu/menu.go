@@ -13,6 +13,8 @@ type Mark struct {
 
 type Kind int
 
+type View interface{ Covers() bool }
+
 const (
 	Plain Kind = iota
 	Chevron
@@ -45,6 +47,7 @@ type Row struct {
 	Preview Preview
 
 	Save func(string)
+	Open func() View
 }
 
 type Preview interface {
@@ -56,4 +59,5 @@ type Cell struct {
 	Chosen  bool
 	Preview Preview
 	Edit    func()
+	Editor  func() View
 }

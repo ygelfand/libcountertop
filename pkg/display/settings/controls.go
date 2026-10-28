@@ -31,6 +31,7 @@ func (p *BasicPages) System() *shell.Page {
 			{
 				Glyph: gogui.IconClock,
 				Label: say.T("datetime.title"),
+				Open:  func() shell.View { return p.DateTime() },
 				Kind:  menu.Chevron,
 				Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
 			},
@@ -40,23 +41,24 @@ func (p *BasicPages) System() *shell.Page {
 				Kind:  menu.Chevron,
 				Value: c.Screen.Keyboard.Label(),
 			},
-			{Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: menu.Chevron},
-			{Glyph: gogui.IconExport, Label: say.T("settings.sync"), Kind: menu.Chevron},
+			{Glyph: gogui.IconSync, Label: say.T("settings.power"), Open: p.options.PowerPage},
+			{Glyph: gogui.IconExport, Label: say.T("settings.sync"), Open: p.options.SyncPage},
 		}, []func(int){
 			p.open(func() shell.View { return p.Language() }),
-			p.open(func() shell.View { return p.DateTime() }),
+			nil,
 			p.open(func() shell.View { return p.Keyboard() }),
-			p.open(p.options.PowerPage),
-			p.open(p.options.SyncPage),
+			nil,
+			nil,
 		}
 		if p.options.Updates != nil {
 			rows = append(rows, menu.Row{
 				Glyph: gogui.IconDownload,
 				Label: say.T("update.title"),
+				Open:  func() shell.View { return p.Update() },
 				Kind:  menu.Chevron,
 				Value: UpdateSays(p.options.Updates.Offer()),
 			})
-			acts = append(acts, p.open(func() shell.View { return p.Update() }))
+			acts = append(acts, nil)
 		}
 		if p.options.Lock != nil {
 			value := say.T("lock.off")
@@ -66,10 +68,11 @@ func (p *BasicPages) System() *shell.Page {
 			rows = append(rows, menu.Row{
 				Glyph: gogui.IconLock,
 				Label: say.T("screen.setting.lock_pin"),
+				Open:  func() shell.View { return p.Lock() },
 				Kind:  menu.Chevron,
 				Value: value,
 			})
-			acts = append(acts, p.open(func() shell.View { return p.Lock() }))
+			acts = append(acts, nil)
 		}
 		if k := p.options.HomeKey; k != nil {
 			row := menu.Row{

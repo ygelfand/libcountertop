@@ -37,6 +37,7 @@ func (view *Renderer) embeddedRows() ([]menu.Row, []func(int)) {
 		{
 			Glyph: gogui.IconLayer,
 			Label: say.T("home.tessera.turn"),
+			Open:  func() shell.View { return view.turnPage() },
 			Kind:  menu.Chevron,
 			Value: turn.Label(),
 		},
@@ -50,7 +51,7 @@ func (view *Renderer) embeddedRows() ([]menu.Row, []func(int)) {
 	taps := []func(int){
 		func(i int) { engine.SetBottom(bottoms[i]) },
 		func(int) { engine.SetThemed(!themed) },
-		func(int) { view.options.Shell.Push(view.turnPage()) },
+		nil,
 		func(int) { engine.SetFollow(!follow) },
 	}
 	return rows, taps

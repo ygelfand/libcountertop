@@ -25,53 +25,64 @@ import (
 )
 
 func (view *Renderer) Body(w *gogui.Window) gogui.View {
-	master, stop := view.gate()
-	if stop != nil {
-		return Column(stop)
+	views := []gogui.View{
+		widgets.PageBody(
+			w,
+			view.options.Engine.Page().Menu,
+			widgets.PageRenderer{Row: view.options.UI.Row},
+		),
 	}
+	if title, hint, retry := view.trouble(); title != "" {
+		views = append(views, view.card(title, hint, retry))
+	}
+	return Column(views)
+}
 
-	views := []gogui.View{master}
+func (view *Renderer) homeRows() ([]menu.Row, []func(int)) {
+	on := view.options.Engine.Enabled()
+	rows := []menu.Row{{Label: say.T("home.enabled"), Kind: menu.Toggle, On: on}}
+	taps := []func(int){func(int) { view.options.Engine.SetEnabled(!on) }}
+	if title, _, _ := view.trouble(); title != "" {
+		return rows, taps
+	}
 	says := say.T("weather.off")
 	if wc := view.options.Weather.Read(); wc.Entity != "" {
 		says = wc.Entity
 	}
-	views = append(views, widgets.Divider(), view.options.UI.Row("weather", "home",
-		menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says},
-		func(int) { view.options.Shell.Push(view.options.WeatherEntities()) }, false))
+	rows = append(rows, menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says})
+	taps = append(taps, func(int) { view.options.Shell.Push(view.options.WeatherEntities()) })
 	if t := view.options.Todo; t != nil {
 		list := say.T("todo.off")
 		if e := t.Entity(); e != "" {
 			list = t.Title(e)
 		}
-		views = append(views, view.options.UI.Row("todo", "home",
-			menu.Row{Label: say.T("todo.title"), Kind: menu.Chevron, Value: list},
-			func(int) { view.options.Shell.Push(view.TodoLists()) }, false))
+		rows = append(rows, menu.Row{Label: say.T("todo.title"), Kind: menu.Chevron, Value: list})
+		taps = append(taps, func(int) { view.options.Shell.Push(view.TodoLists()) })
 	}
 	if c := view.options.Calendar; c != nil {
 		chosen := say.T("calendar.off")
 		if n := len(c.Chosen()); n > 0 {
 			chosen = say.F("calendar.chosen", map[string]any{"N": n})
 		}
-		views = append(views, view.options.UI.Row("calendar", "home",
+		rows = append(
+			rows,
 			menu.Row{Label: say.T("calendar.app"), Kind: menu.Chevron, Value: chosen},
-			func(int) { view.options.Shell.Push(view.CalendarPage()) }, false))
+		)
+		taps = append(taps, func(int) { view.options.Shell.Push(view.CalendarPage()) })
 	}
 	if page := view.options.Cameras; page != nil {
-		views = append(views, view.options.UI.Row("cameras", "home",
-			menu.Row{Label: say.T("cameras.app"), Kind: menu.Chevron},
-			func(int) { view.options.Shell.Push(page()) }, false))
+		rows = append(rows, menu.Row{Label: say.T("cameras.app"), Kind: menu.Chevron})
+		taps = append(taps, func(int) { view.options.Shell.Push(page()) })
 	}
 	if page := view.options.Doorbell; page != nil {
-		views = append(views, view.options.UI.Row("doorbell", "home",
-			menu.Row{Label: say.T("doorbell.app"), Kind: menu.Chevron},
-			func(int) { view.options.Shell.Push(page()) }, false))
+		rows = append(rows, menu.Row{Label: say.T("doorbell.app"), Kind: menu.Chevron})
+		taps = append(taps, func(int) { view.options.Shell.Push(page()) })
 	}
 	if page := view.options.HomeAlarm; page != nil {
-		views = append(views, view.options.UI.Row("homealarm", "home",
-			menu.Row{Label: say.T("homealarm.app"), Kind: menu.Chevron},
-			func(int) { view.options.Shell.Push(page()) }, false))
+		rows = append(rows, menu.Row{Label: say.T("homealarm.app"), Kind: menu.Chevron})
+		taps = append(taps, func(int) { view.options.Shell.Push(page()) })
 	}
-	return Column(views)
+	return rows, taps
 }
 
 func (view *Renderer) CalendarPage() *shell.Page {
@@ -123,24 +134,6 @@ func (view *Renderer) Gate(w *gogui.Window) gogui.View {
 		return Column([]gogui.View{view.blocked(w, title, hint, retry)})
 	}
 	return nil
-}
-
-func (view *Renderer) gate() (gogui.View, []gogui.View) {
-	on := view.options.Engine.Enabled()
-	master := view.options.UI.Row(
-		"enabled",
-		"home",
-		menu.Row{Label: say.T("home.enabled"), Kind: menu.Toggle, On: on},
-		func(int) { view.options.Engine.SetEnabled(!on) },
-		false,
-	)
-	if !on {
-		return master, []gogui.View{master}
-	}
-	if title, hint, retry := view.trouble(); title != "" {
-		return master, []gogui.View{master, view.card(title, hint, retry)}
-	}
-	return master, nil
 }
 
 func (view *Renderer) trouble() (title, hint string, retry func(int)) {
@@ -592,8 +585,16 @@ func (d *gridDraft) shown(saved schema.TesseraGrid) schema.TesseraGrid {
 
 func (view *Renderer) Listen(l Listener) { view.tessera = l }
 
-func New(o Dependencies) *Renderer { return &Renderer{options: o} }
-func reach() float32               { return style.Reach() }
+func New(o Dependencies) *Renderer {
+	view := &Renderer{options: o}
+	o.Engine.Page().Menu = &shell.Page{Title: say.T("home.title"), Build: view.homeRows}
+	o.Engine.Dashboard().Menu = &shell.Page{
+		Title: say.T("dashboard.title"),
+		Build: view.dashboardRows,
+	}
+	return view
+}
+func reach() float32 { return style.Reach() }
 func icon(glyph string, c gogui.Color) gogui.View {
 	st := gogui.CurrentTheme().TextStyleIconMedium
 	st.Color = c
@@ -601,10 +602,37 @@ func icon(glyph string, c gogui.Color) gogui.View {
 }
 
 func (view *Renderer) Dashboard(w *gogui.Window) gogui.View {
+	render := widgets.PageRenderer{
+		Row: func(id, page string, row menu.Row, tap func(int), glyphs bool) gogui.View {
+			if row.Label == say.T("home.dashboard") {
+				return view.modeLine(id, page, row, tap, glyphs)
+			}
+			return view.options.UI.Row(id, page, row, tap, glyphs)
+		},
+	}
+	views := []gogui.View{widgets.PageBody(w, view.options.Engine.Dashboard().Menu, render)}
+	if title, hint, retry := view.trouble(); title != "" {
+		views = append(views, widgets.Divider(), view.card(title, hint, retry))
+	}
+	return Column(views)
+}
+
+func (view *Renderer) dashboardRows() ([]menu.Row, []func(int)) {
 	media, delay := view.options.Visuals.MediaRow()
-	title, hint, retry := view.trouble()
-	var rows []menu.Row
-	var taps []func(int)
+	title, _, _ := view.trouble()
+	rows := []menu.Row{media}
+	taps := []func(int){delay}
+	if title == "" {
+		row := settings.ModeRow(
+			view.options.Marks,
+			say.T("home.dashboard"),
+			schema.HomeModes(),
+			view.options.Engine.Speaks(),
+		)
+		row.Glyph = gogui.IconTablet
+		rows = append(rows, row)
+		taps = append(taps, settings.ModePick(schema.HomeModes(), view.options.Engine.SetMode))
+	}
 	add := func(r []menu.Row, t []func(int)) { rows, taps = append(rows, r...), append(taps, t...) }
 	switch {
 	case title != "":
@@ -615,34 +643,17 @@ func (view *Renderer) Dashboard(w *gogui.Window) gogui.View {
 	default:
 		add(view.nativeRows())
 	}
-	const glyphs = true
-	views := make([]gogui.View, 0, len(rows)+4)
-	views = append(views, view.options.UI.Row("media", "dashboard", media, delay, glyphs))
-	if title == "" {
-		views = append(views, view.modeLine(glyphs))
-	}
-	views = append(views, widgets.Divider())
-	for i, r := range rows {
-		views = append(views,
-			view.options.UI.Row(fmt.Sprintf("row-%d", i), "dashboard", r, taps[i], glyphs))
-	}
-	if title != "" {
-		views = append(views, widgets.Divider(), view.card(title, hint, retry))
-	}
-	return Column(views)
+	return rows, taps
 }
 
-func (view *Renderer) modeLine(glyphs bool) gogui.View {
+func (view *Renderer) modeLine(
+	id, page string,
+	row menu.Row,
+	tap func(int),
+	glyphs bool,
+) gogui.View {
 	engine := view.options.Engine
-	row := settings.ModeRow(
-		view.options.Marks,
-		say.T("home.dashboard"),
-		schema.HomeModes(),
-		engine.Speaks(),
-	)
-	row.Glyph = gogui.IconTablet
-	mode := view.options.UI.Row("mode", "dashboard", row,
-		settings.ModePick(schema.HomeModes(), engine.SetMode), glyphs)
+	mode := view.options.UI.Row(id, page, row, tap, glyphs)
 	refresh := view.options.UI.Toolkit.Pressable(gogui.Column, gogui.ContainerCfg{
 		ID:      "dashboard-refresh",
 		Padding: gogui.PaddingMedium,
@@ -707,10 +718,11 @@ func (view *Renderer) nativeRows() ([]menu.Row, []func(int)) {
 		rows = append(rows, menu.Row{
 			Glyph: selectionGlyph(s.Key),
 			Label: s.Name(),
+			Open:  func() shell.View { return engine.SelectionPage(s) },
 			Kind:  menu.Chevron,
 			Value: homecontrol.Summary(s.Pick()),
 		})
-		taps = append(taps, func(int) { view.options.Shell.Push(engine.SelectionPage(s)) })
+		taps = append(taps, nil)
 	}
 	return rows, taps
 }
@@ -767,6 +779,7 @@ func (view *Renderer) tesseraRows() ([]menu.Row, []func(int)) {
 		menu.Row{
 			Glyph: gogui.IconColumns,
 			Label: say.T("home.tessera.grid"),
+			Open:  func() shell.View { return view.gridPage() },
 			Kind:  menu.Chevron,
 			Value: strconv.Itoa(g.Columns) + " × " + strconv.Itoa(g.Rows),
 		},
@@ -778,7 +791,7 @@ func (view *Renderer) tesseraRows() ([]menu.Row, []func(int)) {
 		},
 	)
 	taps = append(taps,
-		func(int) { view.options.Shell.Push(view.gridPage()) },
+		nil,
 		func(int) { engine.SetReturnHome(!back) },
 	)
 	if t := view.tessera; t != nil && t.Turns() && !engine.Firmware() {

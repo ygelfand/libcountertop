@@ -209,6 +209,7 @@ func (p *IdlePages) Page() *shell.Page {
 			rows = append(rows,
 				menu.Row{
 					Label: say.T("weather.title"),
+					Open:  func() shell.View { return p.SaverWeather() },
 					Kind:  menu.Chevron,
 					Value: weatherShown(w.Idle, w.SaverLayout()),
 				},
@@ -219,15 +220,16 @@ func (p *IdlePages) Page() *shell.Page {
 					Save:  p.options.Visuals.SetLabel,
 				},
 			)
-			taps = append(taps, p.makePage(func() shell.View { return p.SaverWeather() }), nil)
+			taps = append(taps, nil, nil)
 			rows, taps = p.withSensors(rows, taps)
 			return append(rows, menu.Row{
 					Label: say.T("idle.night"),
+					Open:  func() shell.View { return p.Night() },
 					Hint:  say.T("idle.night.hint"),
 					Kind:  menu.Chevron,
 					Value: c.Night.Label(),
 				}),
-				append(taps, p.makePage(func() shell.View { return p.Night() }))
+				append(taps, nil)
 		},
 	}
 }

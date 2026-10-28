@@ -82,16 +82,14 @@ func (p *AssistantPages) Page() *shell.Page {
 			for slot := range p.options.Slots {
 				rows = append(rows, menu.Row{
 					Label: say.F("assistants.slot", map[string]any{"N": slot + 1}),
+					Open:  func() shell.View { return p.Slot(slot) },
 					Kind:  menu.Chevron,
 					Value: p.Listening(slot),
 
 					Hint:   p.Hearing(slot),
 					Chosen: false,
 				})
-				acts = append(acts, func(int) {
-					p.readPipeline(slot)
-					p.options.Shell.Push(p.Slot(slot))
-				})
+				acts = append(acts, nil)
 			}
 			return rows, acts
 		},
@@ -121,7 +119,8 @@ func (p *AssistantPages) Hearing(slot int) string {
 
 func (p *AssistantPages) Slot(slot int) *shell.Page {
 	return &shell.Page{
-		Title: say.F("assistants.slot", map[string]any{"N": slot + 1}),
+		OnOpen: func() { p.readPipeline(slot) },
+		Title:  say.F("assistants.slot", map[string]any{"N": slot + 1}),
 		Build: func() ([]menu.Row, []func(int)) {
 			saved := p.options.Preferences.Wake.Read().Slot(slot)
 
@@ -152,6 +151,7 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 					},
 					{
 						Label: say.T("look.title"),
+						Open:  func() shell.View { return p.options.Look.Page(slot) },
 						Kind:  menu.Chevron,
 						Value: saved.Look.Place.Label(),
 					},
@@ -162,7 +162,7 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 					p.Threshold(slot),
 					p.open(func() shell.View { return p.Tone(slot) }),
 					p.open(func() shell.View { return p.Delivery(slot) }),
-					p.open(func() shell.View { return p.options.Look.Page(slot) }),
+					nil,
 				}
 		},
 	}

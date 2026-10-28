@@ -20,8 +20,10 @@ import { IconCode, IconDownload, IconFileText, IconPlayerPlay, IconSearch } from
 import { api, SignedOut, type ActionInfo, type Description, type State } from "./api";
 import { readable, shown } from "./entities";
 import { notifications } from "./notify";
+import { SettingsTransfer } from "./SettingsTransfer";
 
 type Props = {
+  name: string;
   entities: Description[];
   states: Map<string, State["state"]>;
   focus: string;
@@ -38,7 +40,7 @@ function Heading({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Developer({ entities, states, focus, onSignedOut }: Props) {
+export function Developer({ name, entities, states, focus, onSignedOut }: Props) {
   const [actions, setActions] = useState<ActionInfo[]>([]);
   const fail = (e: Error) => (e instanceof SignedOut ? onSignedOut(e) : notifications.error(e.message));
 
@@ -61,6 +63,11 @@ export function Developer({ entities, states, focus, onSignedOut }: Props) {
           <Download href="/api/v1/logs" icon={IconFileText} title="Log" detail="Text" />
           <Download href="/api/v1/diagnostics" icon={IconDownload} title="Diagnostics" detail="JSON" />
         </SimpleGrid>
+      </Stack>
+
+      <Stack gap={6}>
+        <Heading>Settings</Heading>
+        <SettingsTransfer name={name} fail={fail} />
       </Stack>
 
       <Stack gap={6}>

@@ -22,6 +22,7 @@ type FrameOptions struct {
 	Settings func()
 	Gesture  func(gogui.EventCtx)
 	Room     []gogui.View
+	Search   gogui.View
 }
 
 func Placed(at ui.Rect, v gogui.View) gogui.View {
@@ -109,16 +110,23 @@ func (kit *Toolkit) PageFrame(w *gogui.Window, p FrameOptions) gogui.View {
 			),
 		)
 	}
-	return gogui.Column(gogui.ContainerCfg{
-		Sizing:  gogui.FillFill,
-		Padding: gogui.PaddingLarge,
+	header := []gogui.View{gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		VAlign:  gogui.VAlignMiddle,
 		Spacing: gogui.SpacingMedium,
+		Content: head,
+	})}
+	if p.Search != nil {
+		header = append(header, p.Search)
+	}
+	return gogui.Column(gogui.ContainerCfg{
+		Sizing: gogui.FillFill, Padding: gogui.PaddingLarge, Spacing: gogui.SpacingMedium,
 		Content: append([]gogui.View{
-			gogui.Row(gogui.ContainerCfg{
+			gogui.Column(gogui.ContainerCfg{
 				Sizing:  gogui.FillFit,
-				VAlign:  gogui.VAlignMiddle,
+				Padding: gogui.NoPadding,
 				Spacing: gogui.SpacingMedium,
-				Content: head,
+				Content: header,
 			}),
 			gogui.Column(
 				gogui.ContainerCfg{

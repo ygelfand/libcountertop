@@ -43,7 +43,8 @@ func FeaturesPage(read func() []Feature, push func(shell.View)) *shell.Page {
 			act := func(int) { f.Set(!f.On) }
 			if f.Page != nil {
 				row.Kind = menu.Chevron
-				act = func(int) { push(f.Page()) }
+				row.Open = f.Page
+				act = nil
 			}
 			rows = append(rows, row)
 			acts = append(acts, act)

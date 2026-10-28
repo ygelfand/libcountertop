@@ -126,10 +126,11 @@ func (p *BasicPages) Photos() *shell.Page {
 			for _, src := range p.options.Photos.Providers() {
 				rows = append(rows, menu.Row{
 					Label: src.Name(),
+					Open:  func() shell.View { return p.PhotoSource(src) },
 					Kind:  menu.Chevron,
 					Value: p.options.Photos.State(src.Key()).Says(),
 				})
-				acts = append(acts, p.open(func() shell.View { return p.PhotoSource(src) }))
+				acts = append(acts, nil)
 			}
 			return rows, acts
 		},

@@ -19,11 +19,10 @@ func (p *BasicPages) LocalRows() ([]menu.Row, []func(int)) {
 			Label: say.T("display.clock"),
 			Kind:  menu.Chevron,
 			Value: cfg.Clock.Face.Label(),
+			Open:  func() shell.View { return p.options.Clocks.Page() },
 		},
 	}
-	acts := []func(int){
-		p.open(func() shell.View { return p.options.Clocks.Page() }),
-	}
+	acts := []func(int){nil}
 	return rows, acts
 }
 
@@ -34,7 +33,8 @@ func (p *BasicPages) WeatherRow() (menu.Row, func(int)) {
 		Label: say.T("weather.title"),
 		Kind:  menu.Chevron,
 		Value: weatherShown(weather.Dashboard, weather.WeatherLayout),
-	}, p.open(func() shell.View { return p.options.Idle.DashboardWeather() })
+		Open:  func() shell.View { return p.options.Idle.DashboardWeather() },
+	}, nil
 }
 
 func (p *BasicPages) MediaRow() (menu.Row, func(int)) {

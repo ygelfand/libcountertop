@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	"github.com/ygelfand/libcountertop/pkg/input/textentry"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -63,13 +64,16 @@ type Options struct {
 	Screen   func() (image.Image, error)
 	DeviceID uint32
 	Now      func() time.Time
+	Address  func() string
+	Input    *textentry.Controller
 }
 
 type API struct {
-	o     Options
-	knobs *setting.Controls[schema.Frontend]
-	s     sessions
-	shot  screenCache
+	o       Options
+	knobs   *setting.Controls[schema.Frontend]
+	s       sessions
+	shot    screenCache
+	control controlAccess
 }
 
 func New(o Options) *API {
@@ -114,6 +118,8 @@ func (a *API) Controls() *setting.Controls[schema.Frontend] { return a.knobs }
 
 func (a *API) Password() string { return a.o.Settings.Read().Password }
 
+func (a *API) Input() *textentry.Controller { return a.o.Input }
+
 func (a *API) SetPassword(v string) error { return a.knobs.Change("password", v) }
 
 func (a *API) Entities() []esphome.Entity { return a.knobs.Entities() }
@@ -153,12 +159,25 @@ func (a *API) Routes() map[string]http.Handler {
 		"POST " + Prefix + "/buttons/{id}":            auth(a.press),
 		"GET " + Prefix + "/logs":                     auth(a.logs),
 		"GET " + Prefix + "/diagnostics":              auth(a.diagnostics),
-		"GET " + Prefix + "/screen":                   auth(a.screen),
-		"GET " + Prefix + "/devices/{board}":          auth(a.picture),
+		"GET " + Prefix + "/screen":                   a.requireControl(http.HandlerFunc(a.screen)),
+		"POST " + Prefix + "/control/pairing":         auth(a.pairControl),
+		"POST " + Prefix + "/control/pairing/redeem":  http.HandlerFunc(a.redeemControl),
+		"GET " + Prefix + "/control/session": a.requireInput(
+			http.HandlerFunc(a.controlInfo),
+		),
+		"DELETE " + Prefix + "/control/session": a.requireInput(
+			http.HandlerFunc(a.endControl),
+		),
+		"GET " + Prefix + "/control/keyboard":  a.requireInput(http.HandlerFunc(a.keyboard)),
+		"POST " + Prefix + "/control/keyboard": a.requireInput(http.HandlerFunc(a.keyboard)),
+		"GET " + Prefix + "/devices/{board}":   auth(a.picture),
 	}
 	for name, h := range a.o.Pages {
 		at := Prefix + "/" + name
 		inner := a.require(http.StripPrefix(at, h))
+		if name == "desktop" {
+			inner = a.requireControl(http.StripPrefix(at, h))
+		}
 		for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
 			routes[method+" "+at] = inner
 			routes[method+" "+at+"/*"] = inner

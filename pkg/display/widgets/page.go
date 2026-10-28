@@ -29,7 +29,12 @@ func PageBody(w *gogui.Window, p *shell.Page, render PageRenderer) gogui.View {
 			if i < len(taps) {
 				tap = taps[i]
 			}
-			views = append(views, render.Row(fmt.Sprintf("row-%d", i), p.Title, r, tap, glyphs))
+			id := fmt.Sprintf("row-%d", i)
+			view := render.Row(id, p.Title, r, tap, glyphs)
+			if r.Label == p.Reveal {
+				view = revealRow(w, p, r.Label, view)
+			}
+			views = append(views, view)
 		}
 	case p.Tiles != nil:
 		cells, taps := p.Tiles()
@@ -70,4 +75,23 @@ func PageBody(w *gogui.Window, p *shell.Page, render PageRenderer) gogui.View {
 		return render.Beside(w, render.Preview(w, p.Preview), list)
 	}
 	return list
+}
+
+func revealRow(w *gogui.Window, p *shell.Page, label string, view gogui.View) gogui.View {
+	return gogui.Column(gogui.ContainerCfg{
+		Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: []gogui.View{view},
+		AmendLayout: func(ev gogui.EventCtx) {
+			top := ev.Layout.Shape.Y
+			if p.Reveal != label {
+				return
+			}
+			p.Reveal = ""
+			w.QueueCommand(func(w *gogui.Window) {
+				if _, y, ok := w.LocalToWindow("page", 0, 0); ok {
+					w.ScrollVerticalTo("page", w.ScrollVerticalOffset("page")-top+y)
+				}
+				w.InvalidateLayout()
+			})
+		},
+	})
 }

@@ -13,6 +13,14 @@ GOLANGCI := golangci-lint
 build: ## Build every package
 	go build ./...
 
+.PHONY: web
+web:
+	npm --prefix web run build
+
+.PHONY: web-test
+web-test:
+	npm --prefix web test
+
 .PHONY: cross
 cross: ## Cross-compile every package for the device targets
 	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build ./...

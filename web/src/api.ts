@@ -26,6 +26,10 @@ export type Device = {
   screen: boolean;
 };
 
+export type ControlPair = { url: string; qr: string; expires_at: string };
+export type ControlSession = { name: string; expires_at: string; target?: string };
+export type KeyboardField = { target: string; text: string; password: boolean; revision: number };
+
 export type ActionInfo = {
   name: string;
   args: { name: string; type: "string" | "int" | "float" | "bool" }[];
@@ -97,13 +101,16 @@ export type Description = {
 type Event = { type: "states"; states: State[] } | { type: "state"; state: State };
 
 export class SignedOut extends Error {}
+export class HTTPError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
 
 const base = "/api/v1";
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(base + path, { credentials: "same-origin", ...init });
   if (r.status === 401) throw new SignedOut();
-  if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+  if (!r.ok) throw new HTTPError(r.status, (await r.text()).trim() || r.statusText);
   if (r.status === 204) return undefined as T;
   return r.json() as Promise<T>;
 }
@@ -117,6 +124,17 @@ function post(path: string, body: unknown = {}) {
 }
 
 export const api = {
+  controlPair: (url: string) => call<ControlPair>("/control/pairing", json({ url })),
+  controlRedeem: (code: string, signal?: AbortSignal) => call<ControlSession>("/control/pairing/redeem", { ...json({ code }), signal }),
+  controlSession: (signal?: AbortSignal) => call<ControlSession>("/control/session", { signal }),
+  controlEnd: () => call<void>("/control/session", { method: "DELETE" }),
+  keyboard: (signal?: AbortSignal) => call<KeyboardField>("/control/keyboard", { signal }),
+  keyboardEdit: (field: KeyboardField, action: "replace" | "save" | "cancel", text = field.text) =>
+    call<KeyboardField>("/control/keyboard", { ...json({ target: field.target, revision: field.revision, action, text }), signal: AbortSignal.timeout(10000) }),
+  desktopStart: (offer: RTCSessionDescriptionInit, signal: AbortSignal) =>
+    call<{ id: string; answer: RTCSessionDescriptionInit }>("/desktop", { ...json(offer), signal }),
+  desktopAlive: (id: string) => post(`/desktop/${id}`),
+  desktopStop: (id: string) => call<void>(`/desktop/${id}`, { method: "DELETE", keepalive: true }),
   device: () => call<Device>("/device"),
   name: () => call<{ name: string }>("/name").then((r) => r.name),
   settings: () => call<Domain[] | null>("/settings").then((d) => d ?? []),

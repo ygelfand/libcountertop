@@ -116,6 +116,80 @@
     0 18px 40px -18px rgba(0, 0, 0, 0.55);
 }
 
+.ct-desktop {
+  position: relative;
+}
+
+.ct-desktop-keyboard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ct-desktop:fullscreen {
+  display: block;
+  width: 100vw;
+  height: 100dvh;
+  padding: 0;
+  background: #000;
+}
+
+.ct-desktop:fullscreen .ct-bezel {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.ct-desktop:fullscreen .ct-screen {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: 0;
+}
+
+.ct-desktop:fullscreen .ct-desktop-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 75%);
+}
+
+.ct-desktop:fullscreen .ct-desktop-status {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  left: 16px;
+}
+
+.ct-desktop-preview {
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ct-desktop-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: rgb(0 0 0 / 25%);
+}
+
 .ct-screen {
   display: block;
   width: 100%;
@@ -123,24 +197,15 @@
   aspect-ratio: var(--aspect);
   border-radius: 9px;
   background: #000;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.ct-screen-live {
-  position: absolute;
-  right: 18px;
-  top: 18px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--mantine-color-teal-5);
-  box-shadow: 0 0 0 3px rgba(18, 19, 22, 0.7);
-  animation: ct-blink 3s ease-in-out infinite;
-}
-
-@keyframes ct-blink {
-  50% {
-    opacity: 0.35;
-  }
+img.ct-screen {
+  pointer-events: none;
 }
 
 .ct-line {

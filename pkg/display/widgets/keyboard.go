@@ -1,14 +1,18 @@
 package widgets
 
 import (
+	"slices"
 	"strings"
+	"time"
 	"unicode"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -32,6 +36,7 @@ type KeyboardOptions struct {
 	Cancel, Save string
 	Type         func(rune)
 	Press        func(gogui.KeyCode)
+	Pair         func(string) (string, time.Time, error)
 }
 
 var (
@@ -59,6 +64,11 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 		st := gogui.CurrentTheme().Cfg.TextStyleDef
 		if label == gogui.IconArrowUp || label == gogui.IconArrowLeft {
 			st = gogui.CurrentTheme().TextStyleIconMedium
+		}
+		if strings.HasPrefix(label, "mdi:") {
+			st = gogui.CurrentTheme().TextStyleIconMedium
+			st.Family = icons.Family
+			label = icons.Glyph(icons.Named(label))
 		}
 		st.Size *= textScale
 		st.Color = Color(pal.Text)
@@ -138,7 +148,53 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 	if editor.Symbols {
 		mode = "abc"
 	}
-	lines = append(lines, keyRow([]gogui.View{
+	space := unit*4 + gap*3
+	tall := int(4*high + 3*gap + pad*2.5)
+	var phone gogui.View
+	if opts.Pair != nil && editor.remote.Target != "" {
+		space = unit*3 + gap*2
+		pair := func() {
+			url, until, err := opts.Pair(editor.remote.Target)
+			editor.pairURL, editor.pairUntil, editor.pairError = url, until, ""
+			if err != nil {
+				editor.pairError = err.Error()
+			}
+			if err == nil {
+				time.AfterFunc(
+					time.Until(until),
+					func() { w.QueueCommand(func(w *gogui.Window) { w.InvalidateLayout() }) },
+				)
+			}
+		}
+		phone = key("phone", "mdi:qrcode", unit, special, pair)
+		if editor.pairURL != "" || editor.pairError != "" {
+			width := min(float32(vw), 10*unit+9*gap+2*pad)
+			side := min(width-2*pad, float32(vh)*0.72-high-gap-pad*2.5)
+			tall = int(side + high + gap + pad*2.5)
+			var qr gogui.View
+			if editor.pairError != "" {
+				qr = gogui.Label(editor.pairError, gogui.CurrentTheme().Cfg.TextStyleDef)
+			} else if time.Now().Before(editor.pairUntil) {
+				qr = QR(editor.pairURL, side, side, gogui.RGB(0, 0, 0))
+			} else {
+				qr = gogui.Label(
+					say.T("keyboard.code_expired"),
+					gogui.CurrentTheme().Cfg.TextStyleDef,
+				)
+			}
+			lines = []gogui.View{qr, keyRow([]gogui.View{
+				key(
+					"keyboard",
+					"ABC",
+					unit*3+gap*2,
+					special,
+					func() { editor.pairURL, editor.pairError = "", "" },
+				),
+				key("refresh", say.T("keyboard.refresh"), unit*3+gap*2, special, pair),
+			}, gap)}
+		}
+	}
+	bottom := []gogui.View{
 		key(
 			"mode",
 			mode,
@@ -146,15 +202,20 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 			special,
 			func() { editor.Symbols, editor.Shift = !editor.Symbols, false },
 		),
-		key("space", " ", unit*4+gap*3, plain, func() { opts.Type(' ') }),
+		key("space", " ", space, plain, func() { opts.Type(' ') }),
 		key("cancel", opts.Cancel, unit*2+gap, special, func() { w.ClearFocus() }),
 		key("save", opts.Save, unit*2+gap, special, func() {
 			editor.Save()
 			w.ClearFocus()
 		}),
-	}, gap))
+	}
+	if phone != nil {
+		bottom = slices.Insert(bottom, 2, phone)
+	}
+	if editor.pairURL == "" && editor.pairError == "" {
+		lines = append(lines, keyRow(bottom, gap))
+	}
 
-	tall := int(4*high + 3*gap + pad*2.5)
 	at := ui.Rect{Y: vh - tall, W: vw, H: tall}
 	editor.Top = float32(at.Y)
 	var corners gogui.Radius
