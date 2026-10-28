@@ -41,14 +41,14 @@ func (p *BasicPages) MediaRow() (menu.Row, func(int)) {
 	media := menu.Steps(len(config.MediaDelays()))
 	delay := p.state().Idle.Media
 	return menu.Row{
-			Glyph: gogui.IconPause,
-			Label: say.T("idle.media"),
-			Hint:  say.T("idle.media.hint"),
-			Kind:  menu.Slider,
-			Level: media.Level(slices.Index(config.MediaDelays(), delay)),
-			Snap:  media.Snap,
-			Value: delay.Label(),
-		}, func(level int) {
-			p.options.Media.SetIdle(config.MediaDelays()[media.Index(level)])
-		}
+		Glyph: gogui.IconPause,
+		Label: say.T("idle.media"),
+		Hint:  say.T("idle.media.hint"),
+		Kind:  menu.Slider,
+		Level: media.Level(slices.Index(config.MediaDelays(), delay)),
+		Snap:  media.Snap,
+		Value: delay.Label(),
+	}, func(level int) {
+		p.options.Media.SetIdle(config.MediaDelays()[media.Index(level)])
+	}
 }

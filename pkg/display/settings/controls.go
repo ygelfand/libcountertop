@@ -102,17 +102,17 @@ func (p *BasicPages) Lock() *shell.Page {
 				return []menu.Row{{Label: say.T("lock.set")}}, []func(int){func(int) { l.Change() }}
 			}
 			return []menu.Row{
-					{Label: say.T("lock.change")},
-					{Label: say.T("lock.clear"), Kind: menu.Chevron},
-				}, []func(int){
-					func(int) { l.Change() },
-					p.open(func() shell.View {
-						return ConfirmPage(say.T("lock.clear"), say.T("lock.clear.what"), func() {
-							l.Clear()
-							p.options.Shell.Pop()
-						})
-					}),
-				}
+				{Label: say.T("lock.change")},
+				{Label: say.T("lock.clear"), Kind: menu.Chevron},
+			}, []func(int){
+				func(int) { l.Change() },
+				p.open(func() shell.View {
+					return ConfirmPage(say.T("lock.clear"), say.T("lock.clear.what"), func() {
+						l.Clear()
+						p.options.Shell.Pop()
+					})
+				}),
+			}
 		},
 	}
 }
@@ -120,20 +120,20 @@ func (p *BasicPages) DateTime() *shell.Page {
 	return &shell.Page{Title: say.T("datetime.title"), Build: func() ([]menu.Row, []func(int)) {
 		c := p.state()
 		return []menu.Row{
-				{
-					Label: say.T("clock.zone"),
-					Kind:  menu.Chevron,
-					Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
-				},
-				{
-					Label: say.T("clock.hours"),
-					Kind:  menu.Toggle,
-					On:    c.Screen.Hours == config.TwentyFourHour,
-				},
-			}, []func(int){
-				p.open(func() shell.View { return p.Zone() }),
-				func(int) { p.toggleHours(c.Screen.Hours) },
-			}
+			{
+				Label: say.T("clock.zone"),
+				Kind:  menu.Chevron,
+				Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
+			},
+			{
+				Label: say.T("clock.hours"),
+				Kind:  menu.Toggle,
+				On:    c.Screen.Hours == config.TwentyFourHour,
+			},
+		}, []func(int){
+			p.open(func() shell.View { return p.Zone() }),
+			func(int) { p.toggleHours(c.Screen.Hours) },
+		}
 	}}
 }
 func (p *BasicPages) Keyboard() *shell.Page {

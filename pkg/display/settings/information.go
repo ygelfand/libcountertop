@@ -38,17 +38,17 @@ func PresencePage[K any](
 			}
 		}
 		return []menu.Row{
-				{Label: wake.Title(), Kind: menu.Toggle, On: wake.On(&c)},
-				{
-					Label: reach.Title(),
-					Kind:  menu.Slider,
-					Level: reach.Percent(reach.Level(&c)),
-					Value: reach.Read(&c),
-					Snap:  func(v int) int { return reach.Percent(reach.Raw(v)) },
-				},
-			}, []func(int){
-				func(int) { set("wake", setting.OnOff(!wake.On(&c))) },
-				func(v int) { set("range", strconv.Itoa(reach.Raw(v))) },
-			}
+			{Label: wake.Title(), Kind: menu.Toggle, On: wake.On(&c)},
+			{
+				Label: reach.Title(),
+				Kind:  menu.Slider,
+				Level: reach.Percent(reach.Level(&c)),
+				Value: reach.Read(&c),
+				Snap:  func(v int) int { return reach.Percent(reach.Raw(v)) },
+			},
+		}, []func(int){
+			func(int) { set("wake", setting.OnOff(!wake.On(&c))) },
+			func(v int) { set("range", strconv.Itoa(reach.Raw(v))) },
+		}
 	}}
 }

@@ -131,45 +131,45 @@ func (p *BasicPages) Debug() *shell.Page {
 			engine := p.options.Engine
 			lean, pageMB := engine.LowMemory(), engine.PageMemory()
 			return []menu.Row{
-					{
-						Glyph: gogui.IconTerminal,
-						Label: say.T("system.adb"),
-						Hint:  say.T("system.adb.hint"),
-						Kind:  menu.Toggle,
-						On:    adb,
-					},
-					{Label: say.T("debug.visuals"), Kind: menu.Chevron},
-					{
-						Label: say.T("debug.fps"),
-						Kind:  menu.Slider,
-						Level: FpsLevel(fps),
-						Snap:  FpsSnap,
-						Value: FpsSays(fps),
-					},
-					{
-						Label: say.T("debug.seed"),
-						Kind:  menu.Slider,
-						Level: SeedLevel(seed),
-						Value: SeedSays(seed),
-					},
-					{Label: say.T("diag.setting.low_memory"), Kind: menu.Toggle, On: lean},
-					{
-						Label: say.T("diag.setting.page_memory"),
-						Kind:  menu.Slider,
-						Level: PageMemoryLevel(pageMB),
-						Snap:  PageMemorySnap,
-						Value: PageMemorySays(pageMB),
-					},
-				}, []func(int){
-					func(int) { p.options.Access.SetADB(!adb) },
-					p.open(p.options.VisualPage),
-					func(level int) { p.options.Visuals.SetMaxFPS(config.MaxFPSSteps[FpsIndex(level)]) },
-					func(level int) { p.options.Visuals.SetSeed(SeedOf(level)) },
-					func(int) { engine.SetLowMemory(!lean) },
-					func(level int) {
-						engine.SetPageMemory(config.PageMemorySteps[PageMemoryIndex(level)])
-					},
-				}
+				{
+					Glyph: gogui.IconTerminal,
+					Label: say.T("system.adb"),
+					Hint:  say.T("system.adb.hint"),
+					Kind:  menu.Toggle,
+					On:    adb,
+				},
+				{Label: say.T("debug.visuals"), Kind: menu.Chevron},
+				{
+					Label: say.T("debug.fps"),
+					Kind:  menu.Slider,
+					Level: FpsLevel(fps),
+					Snap:  FpsSnap,
+					Value: FpsSays(fps),
+				},
+				{
+					Label: say.T("debug.seed"),
+					Kind:  menu.Slider,
+					Level: SeedLevel(seed),
+					Value: SeedSays(seed),
+				},
+				{Label: say.T("diag.setting.low_memory"), Kind: menu.Toggle, On: lean},
+				{
+					Label: say.T("diag.setting.page_memory"),
+					Kind:  menu.Slider,
+					Level: PageMemoryLevel(pageMB),
+					Snap:  PageMemorySnap,
+					Value: PageMemorySays(pageMB),
+				},
+			}, []func(int){
+				func(int) { p.options.Access.SetADB(!adb) },
+				p.open(p.options.VisualPage),
+				func(level int) { p.options.Visuals.SetMaxFPS(config.MaxFPSSteps[FpsIndex(level)]) },
+				func(level int) { p.options.Visuals.SetSeed(SeedOf(level)) },
+				func(int) { engine.SetLowMemory(!lean) },
+				func(level int) {
+					engine.SetPageMemory(config.PageMemorySteps[PageMemoryIndex(level)])
+				},
+			}
 		},
 	}
 }

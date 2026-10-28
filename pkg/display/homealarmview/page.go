@@ -142,10 +142,10 @@ func (v *View) panelsPage() *shell.Page {
 				return []menu.Row{{Label: say.T("home.loading")}}, []func(int){nil}
 			case err != nil:
 				return []menu.Row{
-						{Label: say.T("home.failed"), Hint: err.Error()},
-					}, []func(int){
-						nil,
-					}
+					{Label: say.T("home.failed"), Hint: err.Error()},
+				}, []func(int){
+					nil,
+				}
 			case len(list) == 0:
 				return []menu.Row{{Label: say.T("homealarm.none")}}, []func(int){nil}
 			}

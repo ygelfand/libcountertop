@@ -25,20 +25,20 @@ func (o Placing) Rows(sh *shell.Shell) ([]menu.Row, []func(int)) {
 	now := o.Read()
 	push := func(page *shell.Page) func(int) { return func(int) { sh.Push(page) } }
 	return []menu.Row{
-			SegmentRow(say.T("place.vertical"), o.Positions, now.Position),
-			SegmentRow(say.T("place.horizontal"), o.Aligns, now.Align),
-			{Label: say.T("place.size"), Kind: menu.Chevron, Value: now.Size.Label()},
-		}, []func(int){
-			SegmentPick(o.Positions, o.Set.SetPosition),
-			SegmentPick(o.Aligns, o.Set.SetAlign),
-			push(Choose(
-				say.T("place.size"),
-				config.Sizes(),
-				func() config.Size { return o.Read().Size },
-				o.Set.SetSize,
-				previewing(o, func(p *config.Placement, v config.Size) { p.Size = v }),
-			)),
-		}
+		SegmentRow(say.T("place.vertical"), o.Positions, now.Position),
+		SegmentRow(say.T("place.horizontal"), o.Aligns, now.Align),
+		{Label: say.T("place.size"), Kind: menu.Chevron, Value: now.Size.Label()},
+	}, []func(int){
+		SegmentPick(o.Positions, o.Set.SetPosition),
+		SegmentPick(o.Aligns, o.Set.SetAlign),
+		push(Choose(
+			say.T("place.size"),
+			config.Sizes(),
+			func() config.Size { return o.Read().Size },
+			o.Set.SetSize,
+			previewing(o, func(p *config.Placement, v config.Size) { p.Size = v }),
+		)),
+	}
 }
 
 func previewing[T any](

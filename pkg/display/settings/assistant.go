@@ -127,43 +127,43 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 			word, choose := p.wordRow(slot)
 			assistant, pick := p.pipelineRow(slot)
 			return []menu.Row{
-					{Label: say.T("assistants.talk"), Hint: say.T("assistants.talk.hint")},
+				{Label: say.T("assistants.talk"), Hint: say.T("assistants.talk.hint")},
 
-					word,
-					assistant,
+				word,
+				assistant,
 
-					{
-						Label: say.T("assistants.threshold"),
-						Kind:  menu.Slider,
-						Level: Sensitivity(saved.Threshold),
-						Hint:  say.T("assistants.threshold.hint"),
-					},
+				{
+					Label: say.T("assistants.threshold"),
+					Kind:  menu.Slider,
+					Level: Sensitivity(saved.Threshold),
+					Hint:  say.T("assistants.threshold.hint"),
+				},
 
-					{
-						Label: say.T("assistants.tone"),
-						Kind:  menu.Chevron,
-						Value: saved.Tone.Label(),
-					},
-					{
-						Label: say.T("assistants.reply"),
-						Kind:  menu.Chevron,
-						Value: saved.Delivery.Label(),
-					},
-					{
-						Label: say.T("look.title"),
-						Open:  func() shell.View { return p.options.Look.Page(slot) },
-						Kind:  menu.Chevron,
-						Value: saved.Look.Place.Label(),
-					},
-				}, []func(int){
-					func(int) { p.options.Requested.Emit(slot) },
-					choose,
-					pick,
-					p.Threshold(slot),
-					p.open(func() shell.View { return p.Tone(slot) }),
-					p.open(func() shell.View { return p.Delivery(slot) }),
-					nil,
-				}
+				{
+					Label: say.T("assistants.tone"),
+					Kind:  menu.Chevron,
+					Value: saved.Tone.Label(),
+				},
+				{
+					Label: say.T("assistants.reply"),
+					Kind:  menu.Chevron,
+					Value: saved.Delivery.Label(),
+				},
+				{
+					Label: say.T("look.title"),
+					Open:  func() shell.View { return p.options.Look.Page(slot) },
+					Kind:  menu.Chevron,
+					Value: saved.Look.Place.Label(),
+				},
+			}, []func(int){
+				func(int) { p.options.Requested.Emit(slot) },
+				choose,
+				pick,
+				p.Threshold(slot),
+				p.open(func() shell.View { return p.Tone(slot) }),
+				p.open(func() shell.View { return p.Delivery(slot) }),
+				nil,
+			}
 		},
 	}
 }

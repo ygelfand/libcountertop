@@ -12,14 +12,14 @@ func PowerPage(push func(shell.View), restart, reboot func()) *shell.Page {
 		Title: say.T("power.title"),
 		Build: func() ([]menu.Row, []func(int)) {
 			return []menu.Row{
-					{Label: say.T("power.restart"), Kind: menu.Chevron},
-					{Label: say.T("power.reboot"), Kind: menu.Chevron},
-				}, []func(int){
-					open(ConfirmPage(say.T("power.restart"),
-						say.T("power.restart.what"), restart)),
-					open(ConfirmPage(say.T("power.reboot"),
-						say.T("power.reboot.what"), reboot)),
-				}
+				{Label: say.T("power.restart"), Kind: menu.Chevron},
+				{Label: say.T("power.reboot"), Kind: menu.Chevron},
+			}, []func(int){
+				open(ConfirmPage(say.T("power.restart"),
+					say.T("power.restart.what"), restart)),
+				open(ConfirmPage(say.T("power.reboot"),
+					say.T("power.reboot.what"), reboot)),
+			}
 		},
 	}
 }
@@ -28,12 +28,12 @@ func ConfirmPage(title, what string, do func()) *shell.Page {
 		Title: title,
 		Build: func() ([]menu.Row, []func(int)) {
 			return []menu.Row{
-					{Label: what, Kind: menu.Plain},
-					{Label: title},
-				}, []func(int){
-					nil,
-					func(int) { do() },
-				}
+				{Label: what, Kind: menu.Plain},
+				{Label: title},
+			}, []func(int){
+				nil,
+				func(int) { do() },
+			}
 		},
 	}
 }

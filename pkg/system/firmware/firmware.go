@@ -3,6 +3,7 @@ package firmware
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"slices"
@@ -383,7 +384,7 @@ func (u *Firmware[M]) Install(ctx context.Context) {
 		u.found = found
 	}
 	u.mu.Unlock()
-	u.install(ctx, found)
+	_ = u.install(ctx, found)
 }
 
 func (u *Firmware[M]) Catalog() Catalog {
@@ -470,35 +471,38 @@ func (u *Firmware[M]) listed(c Catalog) {
 }
 
 func (u *Firmware[M]) InstallBuildLater(version string) {
-	safe.Go("update install build", func() { u.InstallBuild(context.Background(), version) })
+	safe.Go("update install build", func() { _ = u.InstallBuild(context.Background(), version) })
 }
 
-func (u *Firmware[M]) InstallBuild(ctx context.Context, version string) {
+func (u *Firmware[M]) InstallBuild(ctx context.Context, version string) error {
 	b, ok := u.deps.Source.(Builds[M])
 	if !ok {
-		return
+		return fmt.Errorf("installing a named release is not supported")
+	}
+	if version == "" {
+		return fmt.Errorf("version is empty")
 	}
 	if version == u.deps.Version {
-		return
+		return nil
 	}
 	found, err := b.FetchBuild(ctx, version)
 	if err != nil {
 		slog.Error("fetching a release failed", "version", version, "err", err)
 		u.Settled(EventFailed, "installing "+version+" failed: "+err.Error())
-		return
+		return err
 	}
-	u.install(ctx, found)
+	return u.install(ctx, found)
 }
 
-func (u *Firmware[M]) install(ctx context.Context, found M) {
+func (u *Firmware[M]) install(ctx context.Context, found M) error {
 	release := u.deps.Source.Describe(found)
 	if release.Version == "" || release.Version == u.deps.Version {
 		slog.Warn("an install was asked for with nothing to install", "running", u.deps.Version)
-		return
+		return fmt.Errorf("no release to install")
 	}
 	if busy := u.claim(release); busy != "" {
 		slog.Warn("an install is already under way", "installing", busy, "asked", release.Version)
-		return
+		return fmt.Errorf("already installing %s", busy)
 	}
 
 	refresh := func() {}
@@ -523,9 +527,10 @@ func (u *Firmware[M]) install(ctx context.Context, found M) {
 		if u.deps.OnFailure != nil {
 			u.deps.OnFailure()
 		}
-		return
+		return err
 	}
 	u.deps.Source.Restart("update to " + release.Version)
+	return nil
 }
 
 func (u *Firmware[M]) claim(release Release) (busy string) {

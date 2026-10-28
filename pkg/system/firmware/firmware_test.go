@@ -254,7 +254,9 @@ func TestASecondInstallIsRefusedWhileOneRuns(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 
-	u.InstallBuild(context.Background(), "0.8")
+	if err := u.InstallBuild(context.Background(), "0.8"); err == nil {
+		t.Error("a busy install returned no error")
+	}
 	if n := src.installs.Load(); n != 1 {
 		t.Errorf("%d installs ran, want only the first", n)
 	}
@@ -384,6 +386,48 @@ func TestABuildThatCannotBeFetchedIsReported(t *testing.T) {
 	}
 	if got := u.status.Get(); !strings.Contains(got, "404") {
 		t.Errorf("status = %q", got)
+	}
+}
+
+func TestInstallBuildReturnsFailures(t *testing.T) {
+	failure := errors.New("failed")
+	for _, tc := range []struct {
+		name    string
+		source  Source[manifest]
+		version string
+		want    error
+	}{
+		{"fetch", buildSource{source: &source{fetched: failure}}, "0.9", failure},
+		{"install", buildSource{source: &source{installed: failure}}, "0.9", failure},
+		{"current", buildSource{source: &source{}}, "1.0", nil},
+		{"older", buildSource{source: &source{}}, "0.9", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u := build(tc.source, &settings{})
+			if err := u.InstallBuild(context.Background(), tc.version); !errors.Is(err, tc.want) {
+				t.Fatalf("InstallBuild() = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestInstallBuildRejectsUnsupportedAndEmptyVersions(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		source  Source[manifest]
+		version string
+	}{
+		{"unsupported", &source{}, "0.9"},
+		{"empty", buildSource{source: &source{}}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := build(
+				tc.source,
+				&settings{},
+			).InstallBuild(context.Background(), tc.version); err == nil {
+				t.Fatal("InstallBuild() returned no error")
+			}
+		})
 	}
 }
 
