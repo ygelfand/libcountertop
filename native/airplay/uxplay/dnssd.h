@@ -41,6 +41,7 @@ typedef struct dnssd_s {
     int hw_addr_len;
 
     char *pk;
+    char pi[37];
 
     uint32_t features1;
     uint32_t features2;
@@ -70,6 +71,7 @@ DNSSD_API const char *dnssd_get_raop_txt(dnssd_t *dnssd, int *length);
 DNSSD_API const char *dnssd_get_airplay_txt(dnssd_t *dnssd, int *length);
 DNSSD_API const char *dnssd_get_name(dnssd_t *dnssd, int *length);
 DNSSD_API const char *dnssd_get_hw_addr(dnssd_t *dnssd, int *length);
+DNSSD_API const char *dnssd_get_pi(dnssd_t *dnssd);
 DNSSD_API void dnssd_set_airplay_features(dnssd_t *dnssd, int bit, int val);
 DNSSD_API uint64_t dnssd_get_airplay_features(dnssd_t *dnssd);
 DNSSD_API void dnssd_set_pk(dnssd_t *dnssd, char * pk_str);

@@ -3,6 +3,7 @@
 #include "third_party/alac/alac.h"
 
 #include <android/log.h>
+#include <dlfcn.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaFormat.h>
 #include <pthread.h>
@@ -20,6 +21,50 @@
 #define ALAC_FRAME 352
 #define ALAC_MOST 4096
 
+#define NDK_CALLS(X)                                                                                         \
+    X(AMediaCodec_createDecoderByType)                                                                       \
+    X(AMediaCodec_configure)                                                                                 \
+    X(AMediaCodec_start)                                                                                     \
+    X(AMediaCodec_stop)                                                                                      \
+    X(AMediaCodec_delete)                                                                                    \
+    X(AMediaCodec_dequeueInputBuffer)                                                                        \
+    X(AMediaCodec_getInputBuffer)                                                                            \
+    X(AMediaCodec_queueInputBuffer)                                                                          \
+    X(AMediaCodec_dequeueOutputBuffer)                                                                       \
+    X(AMediaCodec_getOutputBuffer)                                                                           \
+    X(AMediaCodec_releaseOutputBuffer)                                                                       \
+    X(AMediaCodec_getOutputFormat)                                                                           \
+    X(AMediaFormat_new)                                                                                      \
+    X(AMediaFormat_delete)                                                                                   \
+    X(AMediaFormat_setString)                                                                                \
+    X(AMediaFormat_setInt32)                                                                                 \
+    X(AMediaFormat_setBuffer)                                                                                \
+    X(AMediaFormat_getInt32)
+
+#define NDK_FIELD(f) __typeof__(f) *f;
+static struct {
+    NDK_CALLS(NDK_FIELD)
+} ndk;
+static int ndk_state;
+
+static int load_ndk(void) {
+    if (ndk_state) return ndk_state > 0 ? 0 : -1;
+    ndk_state = -1;
+    void *lib = dlopen("libmediandk.so", RTLD_NOW);
+    if (!lib) {
+        logw("no libmediandk, AAC is not decoded");
+        return -1;
+    }
+#define NDK_LOAD(f)                                                                                          \
+    if (!(ndk.f = (__typeof__(f) *)dlsym(lib, #f))) {                                                        \
+        logw("libmediandk has no %s", #f);                                                                   \
+        return -1;                                                                                           \
+    }
+    NDK_CALLS(NDK_LOAD)
+    ndk_state = 1;
+    return 0;
+}
+
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static AMediaCodec *codec;
 static alac_file *alac;
@@ -32,22 +77,22 @@ static uint32_t out_rate = RATE, out_channels = CHANNELS;
 static void drain(void) {
     for (;;) {
         AMediaCodecBufferInfo info;
-        ssize_t i = AMediaCodec_dequeueOutputBuffer(codec, &info, 0);
+        ssize_t i = ndk.AMediaCodec_dequeueOutputBuffer(codec, &info, 0);
         if (i == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
-            AMediaFormat *f = AMediaCodec_getOutputFormat(codec);
+            AMediaFormat *f = ndk.AMediaCodec_getOutputFormat(codec);
             int32_t v;
-            if (AMediaFormat_getInt32(f, AMEDIAFORMAT_KEY_SAMPLE_RATE, &v)) out_rate = (uint32_t)v;
-            if (AMediaFormat_getInt32(f, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &v)) out_channels = (uint32_t)v;
-            AMediaFormat_delete(f);
+            if (ndk.AMediaFormat_getInt32(f, "sample-rate", &v)) out_rate = (uint32_t)v;
+            if (ndk.AMediaFormat_getInt32(f, "channel-count", &v)) out_channels = (uint32_t)v;
+            ndk.AMediaFormat_delete(f);
             logi("audio decodes to %u Hz x%u", out_rate, out_channels);
             continue;
         }
         if (i == AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED) continue;
         if (i < 0) return;
         size_t size;
-        uint8_t *b = AMediaCodec_getOutputBuffer(codec, (size_t)i, &size);
+        uint8_t *b = ndk.AMediaCodec_getOutputBuffer(codec, (size_t)i, &size);
         if (b && info.size > 0) out(out_rate, out_channels, (const int16_t *)(b + info.offset), (uint32_t)info.size / 2);
-        AMediaCodec_releaseOutputBuffer(codec, (size_t)i, false);
+        ndk.AMediaCodec_releaseOutputBuffer(codec, (size_t)i, false);
     }
 }
 
@@ -57,8 +102,8 @@ static void drop(void) {
         alac = NULL;
     }
     if (!codec) return;
-    AMediaCodec_stop(codec);
-    AMediaCodec_delete(codec);
+    ndk.AMediaCodec_stop(codec);
+    ndk.AMediaCodec_delete(codec);
     codec = NULL;
 }
 
@@ -116,23 +161,24 @@ static int start(void) {
     default:
         return -1;
     }
-    AMediaCodec *c = AMediaCodec_createDecoderByType("audio/mp4a-latm");
+    if (load_ndk() < 0) return -1;
+    AMediaCodec *c = ndk.AMediaCodec_createDecoderByType("audio/mp4a-latm");
     if (!c) {
         logw("no AAC decoder");
         return -1;
     }
-    AMediaFormat *f = AMediaFormat_new();
-    AMediaFormat_setString(f, AMEDIAFORMAT_KEY_MIME, "audio/mp4a-latm");
-    AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_SAMPLE_RATE, RATE);
-    AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_CHANNEL_COUNT, CHANNELS);
-    AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_AAC_PROFILE, profile);
-    AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_IS_ADTS, 0);
-    AMediaFormat_setBuffer(f, "csd-0", (void *)csd, csd_len);
-    media_status_t st = AMediaCodec_configure(c, f, NULL, NULL, 0);
-    AMediaFormat_delete(f);
-    if (st == AMEDIA_OK) st = AMediaCodec_start(c);
+    AMediaFormat *f = ndk.AMediaFormat_new();
+    ndk.AMediaFormat_setString(f, "mime", "audio/mp4a-latm");
+    ndk.AMediaFormat_setInt32(f, "sample-rate", RATE);
+    ndk.AMediaFormat_setInt32(f, "channel-count", CHANNELS);
+    ndk.AMediaFormat_setInt32(f, "aac-profile", profile);
+    ndk.AMediaFormat_setInt32(f, "is-adts", 0);
+    ndk.AMediaFormat_setBuffer(f, "csd-0", (void *)csd, csd_len);
+    media_status_t st = ndk.AMediaCodec_configure(c, f, NULL, NULL, 0);
+    ndk.AMediaFormat_delete(f);
+    if (st == AMEDIA_OK) st = ndk.AMediaCodec_start(c);
     if (st != AMEDIA_OK) {
-        AMediaCodec_delete(c);
+        ndk.AMediaCodec_delete(c);
         logw("AAC decoder for type %d failed: %d", open_ct, st);
         return -1;
     }
@@ -166,13 +212,13 @@ void aac_decode(const uint8_t *data, int len, uint32_t rtp_time) {
         pthread_mutex_unlock(&lock);
         return;
     }
-    ssize_t i = AMediaCodec_dequeueInputBuffer(codec, 20000);
+    ssize_t i = ndk.AMediaCodec_dequeueInputBuffer(codec, 20000);
     if (i >= 0) {
         size_t size;
-        uint8_t *b = AMediaCodec_getInputBuffer(codec, (size_t)i, &size);
+        uint8_t *b = ndk.AMediaCodec_getInputBuffer(codec, (size_t)i, &size);
         size_t n = (size_t)len < size ? (size_t)len : size;
         if (b) memcpy(b, data, n);
-        AMediaCodec_queueInputBuffer(codec, (size_t)i, 0, n, (uint64_t)rtp_time * 1000000u / RATE, 0);
+        ndk.AMediaCodec_queueInputBuffer(codec, (size_t)i, 0, n, (uint64_t)rtp_time * 1000000u / RATE, 0);
     }
     drain();
     pthread_mutex_unlock(&lock);

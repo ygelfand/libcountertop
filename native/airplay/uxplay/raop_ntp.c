@@ -824,6 +824,7 @@ raop_ntp_thread(void *arg) {
                         uint64_t root_distance_nsec = (uint64_t) (root_distance *1e9);
                         MUTEX_LOCK(raop_ntp->sync_params_mutex);
                         raop_ntp->is_synced = is_synced;
+                        if (is_synced) raop_ntp->client_time_received = true;
                         raop_ntp->sync_offset = sync_offset;
                         raop_ntp->root_distance = root_distance_nsec;
                         raop_ntp->sync_delay = data_sorted[0].delay;

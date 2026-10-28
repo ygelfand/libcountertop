@@ -107,6 +107,12 @@ dnssd_init(const char* name, int name_len, const char* hw_addr, int hw_addr_len,
     }
 
     memcpy(dnssd->hw_addr, hw_addr, hw_addr_len);
+    {
+        const unsigned char *h = (const unsigned char *) hw_addr;
+        snprintf(dnssd->pi, sizeof(dnssd->pi), "2e388006-13ba-4041-9a67-%02x%02x%02x%02x%02x%02x",
+                 h[0], hw_addr_len > 1 ? h[1] : 0, hw_addr_len > 2 ? h[2] : 0,
+                 hw_addr_len > 3 ? h[3] : 0, hw_addr_len > 4 ? h[4] : 0, hw_addr_len > 5 ? h[5] : 0);
+    }
 
     dnssd->dnssd_private = NULL;
     dnssd->dnssd_private = dnssd_private_init(dnssd, error);
@@ -150,6 +156,12 @@ dnssd_get_hw_addr(dnssd_t *dnssd, int *length)
 {
     *length = dnssd->hw_addr_len;
     return dnssd->hw_addr;
+}
+
+const char *
+dnssd_get_pi(dnssd_t *dnssd)
+{
+    return dnssd->pi;
 }
 
 uint64_t dnssd_get_airplay_features(dnssd_t *dnssd) {

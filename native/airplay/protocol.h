@@ -1,7 +1,13 @@
 #pragma once
 #include <stdint.h>
 
-#define AIRPLAY_VERSION 2
+#define AIRPLAY_VERSION 4
+
+#define AIRPLAY_PORT 7000
+#define AIRPLAY_MIRROR_PORT 7100
+#define AIRPLAY_DATA_PORT 6000
+#define AIRPLAY_CONTROL_PORT 6001
+#define AIRPLAY_TIMING_PORT 7011
 #define AIRPLAY_FD 3
 #define AIRPLAY_MAX_PAYLOAD (4 << 20)
 
@@ -36,6 +42,7 @@ struct airplay_mirror {
 struct airplay_audio {
     uint32_t rate;
     uint32_t channels;
+    int32_t due_us;
 };
 
 struct airplay_frame {

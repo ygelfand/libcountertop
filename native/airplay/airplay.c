@@ -12,6 +12,7 @@
 #include "airplay/protocol.h"
 #include "dnssd.h"
 #include "raop.h"
+#include "raop_ntp.h"
 #include "stream.h"
 
 #define logi(...) __android_log_print(ANDROID_LOG_INFO, COUNTERTOP_PREFIX "-airplay", __VA_ARGS__)
@@ -60,14 +61,23 @@ static void video_process(void *cls, raop_ntp_t *ntp, video_decode_struct *d) {
     send_msg(MSG_FRAME, &f, sizeof(f), d->data, (uint32_t)d->data_len);
 }
 
+#define CT_ALAC 2
+
+static int32_t frame_due_us;
+
 static void send_pcm(uint32_t rate, uint32_t channels, const int16_t *pcm, uint32_t samples) {
-    struct airplay_audio a = {rate, channels};
+    struct airplay_audio a = {rate, channels, frame_due_us};
     send_msg(MSG_AUDIO, &a, sizeof(a), pcm, samples * 2);
 }
 
 static void audio_process(void *cls, raop_ntp_t *ntp, audio_decode_struct *d) {
     (void)cls;
     (void)ntp;
+    frame_due_us = 0;
+    if (d->ct == CT_ALAC && d->ntp_time_local) {
+        int64_t due = ((int64_t)d->ntp_time_local - (int64_t)raop_ntp_get_local_time()) / 1000;
+        if (due > 0 && due < INT32_MAX) frame_due_us = (int32_t)due;
+    }
     aac_decode(d->data, d->data_len, d->rtp_time);
 }
 
@@ -83,11 +93,17 @@ static void video_report_size(void *cls, float *ws, float *hs, float *w, float *
 
 static int video_set_codec(void *cls, video_codec_t codec) {
     (void)cls;
-    if (codec != VIDEO_CODEC_H264) {
+    switch (codec) {
+    case VIDEO_CODEC_H264:
+        mirror.codec = CODEC_H264;
+        break;
+    case VIDEO_CODEC_H265:
+        mirror.codec = CODEC_H265;
+        break;
+    default:
         logw("refusing codec %d", codec);
         return -1;
     }
-    mirror.codec = CODEC_H264;
     send_msg(MSG_MIRROR, &mirror, sizeof(mirror), NULL, 0);
     return 0;
 }
@@ -248,7 +264,8 @@ int main(int argc, char **argv) {
     raop_set_plist(raop, "refreshRate", 60);
     raop_set_plist(raop, "maxFPS", 30);
 
-    unsigned short tcp[2] = {0, 0}, udp[3] = {0, 0, 0};
+    unsigned short tcp[2] = {AIRPLAY_MIRROR_PORT, AIRPLAY_PORT};
+    unsigned short udp[3] = {AIRPLAY_TIMING_PORT, AIRPLAY_CONTROL_PORT, AIRPLAY_DATA_PORT};
     raop_set_tcp_ports(raop, tcp);
     raop_set_udp_ports(raop, udp);
     unsigned short port = raop_get_port(raop);
@@ -265,6 +282,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     raop_set_dnssd(raop, dnssd);
+    if (atoi(argv[4]) <= 0 || atoi(argv[5]) <= 0) {
+        dnssd_set_airplay_features(dnssd, 7, 0);
+    } else {
+        dnssd_set_airplay_features(dnssd, 42, 1);
+    }
     if ((err = dnssd_register_raop(dnssd, port))) logw("register raop %d", err);
     if ((err = dnssd_register_airplay(dnssd, port))) logw("register airplay %d", err);
     logi("listening as \"%s\" on port %d", name, port);

@@ -59,14 +59,11 @@ static void dnssd_sanitize_label(char *label)
     }
 }
 
-static void dnssd_make_host_name(char *dst, size_t dst_len)
+static void dnssd_make_host_name(char *dst, size_t dst_len, const char *name, const char *hwaddr)
 {
     char host[128];
 
-    if (gethostname(host, sizeof(host)) || !host[0]) {
-        snprintf(host, sizeof(host), "UxPlay");
-    }
-    host[sizeof(host) - 1] = '\0';
+    snprintf(host, sizeof(host), "%s-%s", name, hwaddr);
     dnssd_sanitize_label(host);
     snprintf(dst, dst_len, "%s.local", host);
 }
@@ -89,7 +86,7 @@ static int dnssd_prepare_names(dnssd_private_t *dnssd, dnssd_t *dnssd_public)
         return -1;
     }
 
-    dnssd_make_host_name(dnssd->host_name, sizeof(dnssd->host_name));
+    dnssd_make_host_name(dnssd->host_name, sizeof(dnssd->host_name), dnssd_public->name, hwaddr);
     return 0;
 }
 
@@ -163,7 +160,7 @@ static int dnssd_build_airplay_txt(dnssd_t *dnssd_public)
            mdnsd_txt_add(&dnssd->airplay_record, "flags", "0x4") ||
            mdnsd_txt_add(&dnssd->airplay_record, "model", GLOBAL_MODEL) ||
            mdnsd_txt_add(&dnssd->airplay_record, "pk", dnssd_public->pk) ||
-           mdnsd_txt_add(&dnssd->airplay_record, "pi", AIRPLAY_PI) ||
+           mdnsd_txt_add(&dnssd->airplay_record, "pi", dnssd_public->pi) ||
            mdnsd_txt_add(&dnssd->airplay_record, "srcvers", AIRPLAY_SRCVERS) ||
            mdnsd_txt_add(&dnssd->airplay_record, "vv", AIRPLAY_VV);
 }

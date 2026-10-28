@@ -139,7 +139,7 @@ raop_handler_info(raop_conn_t *conn,
     plist_t name_node = plist_new_string(name);
     plist_dict_set_item(res_node, "name", name_node);
 
-    plist_t pi_node = plist_new_string(AIRPLAY_PI);
+    plist_t pi_node = plist_new_string(dnssd_get_pi(raop->dnssd));
     plist_dict_set_item(res_node, "pi", pi_node);
 
     plist_t vv_node = plist_new_uint(strtol(AIRPLAY_VV, NULL, 10));

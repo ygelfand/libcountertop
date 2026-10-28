@@ -1,2 +1,5 @@
 https://github.com/FDH2/UxPlay 4e95a9ec013c52d8555d88dbc55abe346e94d56e
 lib/ with playfair/, llhttp/ and mdnsd/; lib/dns_sd/ and the GStreamer renderers left out
+mdnsd/dnssd_mdnsd.c names the mDNS host from the AirPlay name and hardware address, not gethostname()
+dnssd.c gives each device its own pi (AIRPLAY_PI's last group replaced by the hardware address), used by mdnsd and /info
+raop_ntp.c sets client_time_received once the clock is synced; upstream never sets it, so remote-to-local time conversion always returned 0
