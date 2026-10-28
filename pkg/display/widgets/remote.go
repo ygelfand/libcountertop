@@ -75,6 +75,7 @@ func (e *Editor) Remote(w *gui.Window, r textentry.Request) (textentry.View, err
 				e.Save()
 				w.ClearFocus()
 			case gui.KeyEscape:
+				e.Cancel()
 				w.ClearFocus()
 			default:
 				mod := gui.ModNone
@@ -105,6 +106,7 @@ func (e *Editor) Remote(w *gui.Window, r textentry.Request) (textentry.View, err
 		e.Save()
 		w.ClearFocus()
 	case "cancel":
+		e.Cancel()
 		w.ClearFocus()
 	}
 	w.InvalidateLayout()

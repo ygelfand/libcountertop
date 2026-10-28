@@ -1,5 +1,7 @@
 #include "aac.h"
 
+#include "third_party/alac/alac.h"
+
 #include <android/log.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaFormat.h>
@@ -10,13 +12,19 @@
 #define logw(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 #define logi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
+#define CT_ALAC 2
 #define CT_AAC_LC 4
 #define CT_AAC_ELD 8
 #define RATE 44100
 #define CHANNELS 2
+#define ALAC_FRAME 352
+#define ALAC_MOST 4096
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static AMediaCodec *codec;
+static alac_file *alac;
+static int16_t alac_pcm[ALAC_FRAME * CHANNELS * 2];
+static unsigned char alac_in[ALAC_MOST * 2];
 static int open_ct;
 static pcm_sink out;
 static uint32_t out_rate = RATE, out_channels = CHANNELS;
@@ -44,10 +52,52 @@ static void drain(void) {
 }
 
 static void drop(void) {
+    if (alac) {
+        alac_free(alac);
+        alac = NULL;
+    }
     if (!codec) return;
     AMediaCodec_stop(codec);
     AMediaCodec_delete(codec);
     codec = NULL;
+}
+
+static int start_alac(void) {
+    alac = alac_create(16, CHANNELS);
+    if (!alac) return -1;
+    alac->setinfo_max_samples_per_frame = ALAC_FRAME;
+    alac->setinfo_7a = 0;
+    alac->setinfo_sample_size = 16;
+    alac->setinfo_rice_historymult = 40;
+    alac->setinfo_rice_initialhistory = 10;
+    alac->setinfo_rice_kmodifier = 14;
+    alac->setinfo_7f = CHANNELS;
+    alac->setinfo_80 = 255;
+    alac->setinfo_82 = 0;
+    alac->setinfo_86 = 0;
+    alac->setinfo_8a_rate = RATE;
+    alac_allocate_buffers(alac);
+    logi("ALAC decoder open");
+    return 0;
+}
+
+static int alac_fits(const uint8_t *f, int len) {
+    if (len < 7 || len > ALAC_MOST) return 0;
+    if ((f[0] >> 5) > 1) return 0;
+    if (!((f[2] >> 4) & 1)) return 1;
+    uint32_t samples = (uint32_t)(f[2] & 0x01) << 31 | (uint32_t)f[3] << 23 | (uint32_t)f[4] << 15 |
+                       (uint32_t)f[5] << 7 | (uint32_t)f[6] >> 1;
+    return samples > 0 && samples <= ALAC_FRAME;
+}
+
+static void decode_alac(const uint8_t *data, int len) {
+    if (!alac_fits(data, len)) return;
+    if (!alac && start_alac() < 0) return;
+    memset(alac_in, 0, sizeof(alac_in));
+    memcpy(alac_in, data, (size_t)len);
+    int size = (int)sizeof(alac_pcm);
+    alac_decode_frame(alac, alac_in, alac_pcm, &size);
+    if (size > 0 && size <= (int)sizeof(alac_pcm)) out(RATE, CHANNELS, alac_pcm, (uint32_t)size / 2);
 }
 
 static int start(void) {
@@ -93,7 +143,7 @@ static int start(void) {
 }
 
 int aac_open(int ct, pcm_sink sink) {
-    if (ct != CT_AAC_ELD && ct != CT_AAC_LC) {
+    if (ct != CT_AAC_ELD && ct != CT_AAC_LC && ct != CT_ALAC) {
         logw("no decoder for audio type %d", ct);
         return -1;
     }
@@ -107,6 +157,11 @@ int aac_open(int ct, pcm_sink sink) {
 
 void aac_decode(const uint8_t *data, int len, uint32_t rtp_time) {
     pthread_mutex_lock(&lock);
+    if (len > 0 && open_ct == CT_ALAC) {
+        decode_alac(data, len);
+        pthread_mutex_unlock(&lock);
+        return;
+    }
     if (len <= 0 || (!codec && start() < 0)) {
         pthread_mutex_unlock(&lock);
         return;

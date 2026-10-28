@@ -54,6 +54,16 @@ func (e *Editor) Save() {
 	}
 }
 
+func (e *Editor) Cancel() { delete(e.drafts, e.leaf) }
+
+func (e *Editor) keep(fid string, save func(string)) {
+	s, ok := e.drafts[fid]
+	delete(e.drafts, fid)
+	if ok && save != nil {
+		save(s)
+	}
+}
+
 func (e *Editor) Clear(w *gui.Window, bottom float32) {
 	if e.Top <= 0 || bottom <= e.Top-style.Reach()*0.3 {
 		return
@@ -131,14 +141,10 @@ func (e *Editor) Row(kit FieldStyle, id string, r menu.Row) gui.View {
 			ev.Window.InvalidateLayout()
 		},
 		OnTextCommit: func(_ string, _ gui.InputCommitReason, ev gui.EventCtx) {
-			delete(e.drafts, fid)
+			e.keep(fid, r.Save)
 			ev.Window.InvalidateLayout()
 		},
-	}, func() {
-		if s, ok := e.drafts[fid]; ok && r.Save != nil {
-			r.Save(s)
-		}
-	})
+	}, func() { e.keep(fid, r.Save) })
 	if r.Kind != menu.Password {
 		return field
 	}

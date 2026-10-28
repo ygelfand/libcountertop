@@ -79,6 +79,7 @@ airplay: check-ndk
 		o=$(STUBS)/airplay/$$(echo $${f#$(UXPLAY)/} | tr / _ | sed 's/\.c$$/.o/'); \
 		$(NDK_CC) $(UXPLAY_FLAGS) -c $$f -o $$o || exit 1; \
 	done
+	$(NDK_CC) $(UXPLAY_FLAGS) -c $(AIRPLAY)/third_party/alac/alac.c -o $(STUBS)/airplay/alac.o
 	$(NDK_CC) $(FLAGS) $(UXPLAY_INCLUDES) -o $(AIRPLAY_BIN) $(AIRPLAY)/airplay.c $(AIRPLAY)/aac.c $(STUBS)/airplay/*.o \
 		$(PLIST)/android-armv7/libplist-2.0.a $(OPENSSL)/android-armv7/libcrypto.a -s \
 		-L$(STUBS)/airplay -lbinder -lmediandk -llog -lm -Wl,--allow-shlib-undefined

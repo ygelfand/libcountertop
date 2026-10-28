@@ -172,6 +172,36 @@ func TestAMirrorPlaysUntilTheSenderEndsIt(t *testing.T) {
 	}
 }
 
+func TestAudioOnlyPlaysWithoutAPicture(t *testing.T) {
+	s, out, _ := screeningRig(t)
+	ctx := context.Background()
+	s.handle(ctx, message{kind: msgClient, payload: []byte("Office Mac")})
+	s.handle(ctx, message{kind: msgSound})
+	if len(out.played) != 1 {
+		t.Fatalf("played %d sources, want 1", len(out.played))
+	}
+	src := out.played[0]
+	if _, ok := src.(playback.Pictures); ok {
+		t.Error("an audio-only session offers a picture")
+	}
+
+	p := binary.LittleEndian.AppendUint32(nil, 48000)
+	p = binary.LittleEndian.AppendUint32(p, 2)
+	for range 4 {
+		p = binary.LittleEndian.AppendUint16(p, 1000)
+	}
+	s.handle(ctx, message{kind: msgAudio, payload: p})
+	pcm := make([]int16, 8)
+	if n, err := src.Read(ctx, pcm); err != nil || n != 4 || pcm[0] != 1000 {
+		t.Errorf("Read = %d %v (%v), want the 4 samples sent", n, pcm[:n], err)
+	}
+
+	s.handle(ctx, message{kind: msgEnded})
+	if len(out.stopped) != 1 || out.stopped[0] != src {
+		t.Errorf("stopped %v, want the audio", out.stopped)
+	}
+}
+
 func TestClosingThePictureDisconnectsTheSender(t *testing.T) {
 	s, out, helper := screeningRig(t)
 	ctx := context.Background()

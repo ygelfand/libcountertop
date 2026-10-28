@@ -203,7 +203,10 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 			func() { editor.Symbols, editor.Shift = !editor.Symbols, false },
 		),
 		key("space", " ", space, plain, func() { opts.Type(' ') }),
-		key("cancel", opts.Cancel, unit*2+gap, special, func() { w.ClearFocus() }),
+		key("cancel", opts.Cancel, unit*2+gap, special, func() {
+			editor.Cancel()
+			w.ClearFocus()
+		}),
 		key("save", opts.Save, unit*2+gap, special, func() {
 			editor.Save()
 			w.ClearFocus()

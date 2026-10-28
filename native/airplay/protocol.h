@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 
-#define AIRPLAY_VERSION 1
+#define AIRPLAY_VERSION 2
 #define AIRPLAY_FD 3
 #define AIRPLAY_MAX_PAYLOAD (4 << 20)
 
@@ -12,6 +12,7 @@
 #define MSG_ENDED 'E'
 #define MSG_DISCONNECT 'X'
 #define MSG_AUDIO 'A'
+#define MSG_SOUND 'S'
 
 #define CODEC_H264 1
 #define CODEC_H265 2

@@ -16,7 +16,6 @@
 
 #define logi(...) __android_log_print(ANDROID_LOG_INFO, COUNTERTOP_PREFIX "-airplay", __VA_ARGS__)
 #define logw(...) __android_log_print(ANDROID_LOG_WARN, COUNTERTOP_PREFIX "-airplay", __VA_ARGS__)
-
 static pthread_mutex_t out = PTHREAD_MUTEX_INITIALIZER;
 static raop_t *raop;
 
@@ -126,6 +125,7 @@ static void audio_get_format(void *cls, unsigned char *ct, unsigned short *spf, 
     (void)cls;
     logi("audio format ct=%d spf=%d screen=%d media=%d format=%llx", *ct, *spf, *screen, *media, (unsigned long long)*fmt);
     aac_open(*ct, send_pcm);
+    if (!*screen) send_msg(MSG_SOUND, NULL, 0, NULL, 0);
 }
 static void audio_set_metadata(void *cls, const void *b, int n) { (void)cls; (void)b; (void)n; }
 static void audio_set_coverart(void *cls, const void *b, int n) { (void)cls; (void)b; (void)n; }

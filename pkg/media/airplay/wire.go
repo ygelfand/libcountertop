@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	version    = 1
+	version    = 2
 	maxPayload = 4 << 20
 
 	msgReady      = 'R'
@@ -18,6 +18,7 @@ const (
 	msgEnded      = 'E'
 	msgDisconnect = 'X'
 	msgAudio      = 'A'
+	msgSound      = 'S'
 
 	codecH264 = 1
 )

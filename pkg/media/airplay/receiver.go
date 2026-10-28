@@ -248,9 +248,15 @@ type screening struct {
 	write  sync.Mutex
 	client string
 
-	mu     sync.Mutex
-	shown  *mirror
-	output playback.Output
+	mu      sync.Mutex
+	playing source
+	output  playback.Output
+}
+
+type source interface {
+	playback.Source
+	hear(a audio)
+	end()
 }
 
 func (s *screening) handle(ctx context.Context, m message) {
@@ -280,42 +286,52 @@ func (s *screening) handle(ctx context.Context, m message) {
 			return
 		}
 		s.mu.Lock()
-		shown := s.shown
+		shown, ok := s.playing.(*mirror)
 		s.mu.Unlock()
-		if shown != nil {
+		if ok {
 			shown.push(ctx, f)
 		}
+	case msgSound:
+		slog.Info("airplay audio", "client", s.client)
+		s.play(newSound(s.client, s.r.opts.Rate, s.r.opts.Channels, s.disconnect))
 	case msgAudio:
 		a, err := audioOf(m.payload)
 		if err != nil {
 			slog.Warn("airplay audio dropped", "err", err)
 			return
 		}
-		s.mu.Lock()
-		shown := s.shown
-		s.mu.Unlock()
-		if shown != nil {
-			shown.hear(a)
-		}
+		s.hear(a)
 	case msgEnded:
-		slog.Info("airplay mirroring over", "client", s.client)
+		slog.Info("airplay over", "client", s.client)
 		s.over()
 	}
 }
 
+func (s *screening) hear(a audio) {
+	s.mu.Lock()
+	playing := s.playing
+	s.mu.Unlock()
+	if playing != nil {
+		playing.hear(a)
+	}
+}
+
 func (s *screening) begin(size mirroring) {
+	s.play(newMirror(s.client, size, s.r.opts.Rate, s.r.opts.Channels, s.disconnect))
+}
+
+func (s *screening) play(src source) {
 	s.over()
-	src := newMirror(s.client, size, s.r.opts.Rate, s.r.opts.Channels, s.disconnect)
 	out := s.r.opts.Output(func() { s.ended(src) })
 	s.mu.Lock()
-	s.shown, s.output = src, out
+	s.playing, s.output = src, out
 	s.mu.Unlock()
 	out.Play(src)
 }
 
-func (s *screening) ended(src *mirror) {
+func (s *screening) ended(src source) {
 	s.mu.Lock()
-	current := s.shown == src
+	current := s.playing == src
 	s.mu.Unlock()
 	src.end()
 	if current {
@@ -325,8 +341,8 @@ func (s *screening) ended(src *mirror) {
 
 func (s *screening) over() {
 	s.mu.Lock()
-	src, out := s.shown, s.output
-	s.shown, s.output = nil, nil
+	src, out := s.playing, s.output
+	s.playing, s.output = nil, nil
 	s.mu.Unlock()
 	if src == nil {
 		return
@@ -338,7 +354,7 @@ func (s *screening) over() {
 
 func (s *screening) resized() {
 	s.mu.Lock()
-	showing := s.shown != nil
+	showing := s.playing != nil
 	s.mu.Unlock()
 	if showing {
 		return
