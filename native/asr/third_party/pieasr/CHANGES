@@ -1,0 +1,15 @@
+pieasr from https://github.com/BoumedineBillal/esp32-pie-asr (Apache-2.0, see LICENSE), commit of 2026-10-26.
+
+Removed:
+  src/kernels/pie/ (RISC-V PIE assembly)
+  src/runtime/parallel_esp32.c, src/runtime/parallel_host.c
+
+Added:
+  src/kernels/neon/tile.c, src/kernels/neon/decode.c: ARMv7 NEON versions of the tile and decode kernels, bit-exact with src/kernels/c
+  src/runtime/parallel_pthread.c: a thread pool with a part count set at run time
+
+Changed:
+  src/runtime/parallel.h: up to 8 parts, pq_par_set
+  src/kernels/linear.h, src/kernels/linear_pie.c: per-part buffers sized by PQ_PAR_PARTS
+  src/encoder/attention_values.c: av_part splits by head whenever there is more than one head
+  src/kernels/kernels.h, src/math/fastmath.h: ARM rounding and min/max without libm calls

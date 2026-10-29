@@ -17,12 +17,11 @@ SURFACE_LIBS := gui utils binder $(if $(filter 28,$(API)),ui)
 CAMERA_SOURCES := $(CAMERA)/camera.c $(CAMERA)/turn.c $(CAMERA)/cam2.c $(if $(filter 25,$(API)),$(CAMERA)/still.c)
 NDK_BIN := $(NDK)/toolchains/llvm/prebuilt/$(NDK_HOST)/bin
 NDK_CXX := $(NDK_BIN)/armv7a-linux-androideabi$(API)-clang++
-VOICE_BIN ?= $(OUT)/$(PREFIX)-voice
-VOICE := $(NATIVE)/voice
-NEEDLE := $(VOICE)/third_party/needle
-WHISTLE_ENGINE := _ZN12_GLOBAL__N_19g_whistleE
-WHISTLE_DEPTH := _ZN7whistle6Engine9set_depthEi
-VOICE_FLAGS := -O2 -Wall -Werror -I$(NATIVE) -I$(VOICE) -I$(NEEDLE)
+ASR_BIN ?= $(OUT)/$(PREFIX)-asr
+ASR := $(NATIVE)/asr
+PIEASR := $(ASR)/third_party/pieasr
+PIEASR_SOURCES := $(filter-out $(PIEASR)/src/kernels/c/tile.c $(PIEASR)/src/kernels/c/decode.c,$(shell find $(PIEASR)/src -name '*.c'))
+ASR_FLAGS := -O2 -Wall -Werror -Wno-unused-function -std=gnu11 -ffp-contract=off -mfpu=neon -I$(ASR) -I$(PIEASR)/include -I$(PIEASR)/src
 AIRPLAY_BIN ?= $(OUT)/$(PREFIX)-airplay
 AIRPLAY := $(NATIVE)/airplay
 UXPLAY := $(AIRPLAY)/uxplay
@@ -32,8 +31,8 @@ UXPLAY_SOURCES := $(wildcard $(UXPLAY)/*.c $(UXPLAY)/playfair/*.c $(UXPLAY)/llht
 UXPLAY_INCLUDES := -I$(UXPLAY) -I$(UXPLAY)/playfair -I$(UXPLAY)/llhttp -I$(UXPLAY)/mdnsd -I$(OPENSSL)/include -I$(PLIST)/include
 UXPLAY_FLAGS := -O2 -fPIC -w -D_GNU_SOURCE -DPLIST_210 -DPLIST_230 $(UXPLAY_INCLUDES)
 
-.PHONY: all surface camera camshim voice airplay check-ndk test test-voice
-all: surface camera camshim voice airplay
+.PHONY: all surface camera camshim asr airplay check-ndk test
+all: surface camera camshim asr airplay
 check-ndk:
 	@test "$(API)" = 25 -o "$(API)" = 27 -o "$(API)" = 28 || { echo "supported native API levels: 25, 27, 28"; exit 1; }
 	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
@@ -61,14 +60,9 @@ camshim: check-ndk
 	@mkdir -p $(dir $(CAMSHIM_BIN))
 	$(NDK_CC) $(FLAGS) -Wno-unused-parameter -shared -fPIC -o $(CAMSHIM_BIN) $(NATIVE)/camshim/camshim.c
 
-voice: check-ndk
-	@mkdir -p $(dir $(VOICE_BIN)) $(STUBS)/voice
-	@cd $(NEEDLE) && shasum -a 256 -c --quiet SHA256SUMS
-	$(NDK_BIN)/llvm-objcopy --globalize-symbol=$(WHISTLE_ENGINE) $(NEEDLE)/android-armv7/libneedle.a $(STUBS)/voice/libneedle.a
-	@$(NDK_BIN)/llvm-nm -S $(STUBS)/voice/libneedle.a | grep -q ' 00000004 B $(WHISTLE_ENGINE)$$' || { echo "libneedle.a: $(WHISTLE_ENGINE) missing or resized"; exit 1; }
-	@$(NDK_BIN)/llvm-nm $(STUBS)/voice/libneedle.a | grep -q ' [WT] $(WHISTLE_DEPTH)$$' || { echo "libneedle.a: $(WHISTLE_DEPTH) missing"; exit 1; }
-	$(NDK_CXX) $(VOICE_FLAGS) -std=c++17 -o $(VOICE_BIN) $(VOICE)/voice.cpp $(STUBS)/voice/libneedle.a \
-		-static-libstdc++ -s -llog -lm
+asr: check-ndk
+	@mkdir -p $(dir $(ASR_BIN))
+	$(NDK_CC) $(ASR_FLAGS) -o $(ASR_BIN) $(ASR)/asr.c $(PIEASR_SOURCES) -s -lm
 
 airplay: check-ndk
 	@mkdir -p $(dir $(AIRPLAY_BIN)) $(STUBS)/airplay
@@ -92,16 +86,3 @@ test:
 	$(OUT)/record_refs_test
 	$(or $(HOST_CXX),c++) -std=c++17 -O1 -g -Wall -Werror -fsanitize=undefined -fno-sanitize-recover=all -I$(SURFACE) -o $(OUT)/record_geometry_test $(SURFACE)/test/record_geometry_test.cpp
 	$(OUT)/record_geometry_test
-
-WHISTLE_MODEL_URL := https://huggingface.co/Cactus-Compute/whistle/resolve/ca5287601bef25af26dcf2e1b2bdc0843a7c19e5/whistle.cact
-WHISTLE_MODEL_SHA256 := b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb
-
-test-voice:
-	@test "$$(uname -s)-$$(uname -m)" = Linux-x86_64 || { echo "test-voice needs linux-x86_64 with clang and libc++ 21"; exit 1; }
-	@mkdir -p $(OUT)
-	@cd $(NEEDLE) && sha256sum -c --quiet SHA256SUMS
-	@test -f $(OUT)/whistle.cact || curl -sSfL -o $(OUT)/whistle.cact $(WHISTLE_MODEL_URL)
-	@echo "$(WHISTLE_MODEL_SHA256)  $(OUT)/whistle.cact" | sha256sum -c --quiet
-	objcopy --globalize-symbol=$(WHISTLE_ENGINE) $(NEEDLE)/linux-x86_64/libneedle.a $(OUT)/libneedle.a
-	$(or $(HOST_CXX),clang++) -stdlib=libc++ -O2 -std=c++17 -Wall -Werror -I$(NEEDLE) -o $(OUT)/depth_test $(VOICE)/test/depth_test.cpp $(OUT)/libneedle.a -lpthread -lm
-	$(OUT)/depth_test $(OUT)/whistle.cact $(VOICE)/test/speech.raw
