@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,6 +47,37 @@ func TestRoutesAreKept(t *testing.T) {
 	}
 	if s.Name() != "web" {
 		t.Error(s.Name())
+	}
+}
+
+func TestPeerRoutesNeedACertificateAndOpenRoutesDoNot(t *testing.T) {
+	s := New(Options{})
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	s.HandlePeer("POST /config/pull", ok)
+	s.HandlePeerOpen("GET /setup/eureka_info", ok)
+
+	ask := func(h http.Handler, certs []*x509.Certificate) int {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.TLS = &tls.ConnectionState{PeerCertificates: certs}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		return w.Code
+	}
+	peer, open := s.peers.routes["POST /config/pull"], s.peers.open["GET /setup/eureka_info"]
+	cert := []*x509.Certificate{{Raw: []byte("peer")}}
+	for _, c := range []struct {
+		name  string
+		h     http.Handler
+		certs []*x509.Certificate
+		want  int
+	}{
+		{"peer route without a certificate", peer, nil, http.StatusForbidden},
+		{"peer route with a certificate", peer, cert, http.StatusOK},
+		{"open route without a certificate", open, nil, http.StatusOK},
+	} {
+		if got := ask(c.h, c.certs); got != c.want {
+			t.Errorf("%s answered %d, want %d", c.name, got, c.want)
+		}
 	}
 }
 

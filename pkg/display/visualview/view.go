@@ -57,8 +57,9 @@ func (w *View) Wakes() bool {
 
 func (w *View) Timeout() time.Duration { return shell.SettingsTimeout }
 
-func (w *View) Keep(width, height int) {
-	area := ui.Rect{W: width, H: height}
+func (w *View) Keep(width, height int) { w.KeepAt(ui.Rect{W: width, H: height}) }
+
+func (w *View) KeepAt(area ui.Rect) {
 	kind := w.v.Kind()
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -135,7 +136,7 @@ func (w *View) run(ctx context.Context) {
 			return
 		case now = <-t.C:
 		}
-		if !w.options.Shell.Visible(w.owner()) {
+		if !w.showing() {
 			return
 		}
 		if fps := w.options.Settings.Read().MaxFPS; fps > 0 &&
@@ -202,13 +203,17 @@ type Dependencies struct {
 	Shell    *shell.Shell
 	Settings storage.Section[schema.Visual]
 	Owner    shell.View
+	Showing  func() bool
 }
 
-func (w *View) owner() shell.View {
-	if w.options.Owner != nil {
-		return w.options.Owner
+func (w *View) showing() bool {
+	switch {
+	case w.options.Showing != nil:
+		return w.options.Showing()
+	case w.options.Owner != nil:
+		return w.options.Shell.Visible(w.options.Owner)
 	}
-	return w
+	return w.options.Shell.Visible(w)
 }
 
 type fixed struct {

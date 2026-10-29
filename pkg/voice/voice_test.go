@@ -122,6 +122,30 @@ func TestKeywordsFollowLiveHooks(t *testing.T) {
 	}
 }
 
+func TestPhraseGroupsJoinTheKeywords(t *testing.T) {
+	e := &engine{}
+	c := NewCommands(e, nil)
+	c.Listen(Hook{Keywords: []string{"radar"}, Heard: func(Heard) {}})
+	c.Phrases("home", []string{"Kitchen", " Office ", "radar"})
+	c.Phrases("peers", []string{"athena"})
+	c.Phrases("home", nil)
+
+	want := [][]string{
+		{"radar"},
+		{"Kitchen", "Office", "radar"},
+		{"Kitchen", "Office", "athena", "radar"},
+		{"athena", "radar"},
+	}
+	if len(e.pushed) != len(want) {
+		t.Fatalf("pushed %v, want %v", e.pushed, want)
+	}
+	for i := range want {
+		if !slices.Equal(e.pushed[i], want[i]) {
+			t.Errorf("push %d = %v, want %v", i, e.pushed[i], want[i])
+		}
+	}
+}
+
 func TestCanceledHookHearsNothing(t *testing.T) {
 	c := NewCommands(&engine{}, nil)
 	called := 0

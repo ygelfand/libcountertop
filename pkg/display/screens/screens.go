@@ -127,8 +127,9 @@ type Marks struct {
 }
 
 type Board struct {
-	Glyph func(dashboard.Tab) string
-	Draw  func(*gogui.Window, ui.Rect, dashboard.Tab, theme.Theme) gogui.View
+	Glyph  func(dashboard.Tab) string
+	Draw   func(*gogui.Window, ui.Rect, dashboard.Tab, theme.Theme) gogui.View
+	Ground func(dashboard.Tab, ui.Rect) bool
 }
 
 type Options struct {
@@ -176,6 +177,7 @@ type Options struct {
 	CamerasPage     func() shell.View
 	DoorbellPage    func() shell.View
 	HomeAlarmPage   func() shell.View
+	ThermostatPage  func() shell.View
 	Player          playerview.Player
 	PlayerPage      func() shell.View
 	MediaVolume     volume.Channel
@@ -268,6 +270,7 @@ func New(o Options) *App {
 		Cameras:         o.CamerasPage,
 		Doorbell:        o.DoorbellPage,
 		HomeAlarm:       o.HomeAlarmPage,
+		Thermostat:      o.ThermostatPage,
 		Shell:           o.Shell,
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},

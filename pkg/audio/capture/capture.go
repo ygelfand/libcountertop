@@ -141,3 +141,38 @@ func Write(path string, samples []int16, rate, channels int) error {
 	}
 	return os.WriteFile(path, out, 0o644)
 }
+
+func Read(path string) (samples []int16, rate, channels int, err error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	if len(raw) < 12 || string(raw[0:4]) != "RIFF" || string(raw[8:12]) != "WAVE" {
+		return nil, 0, 0, fmt.Errorf("%s is not a WAV file", path)
+	}
+	bits := 0
+	for at := 12; at+8 <= len(raw); {
+		id, n := string(raw[at:at+4]), int(binary.LittleEndian.Uint32(raw[at+4:]))
+		body := raw[at+8 : min(at+8+n, len(raw))]
+		switch id {
+		case "fmt ":
+			if len(body) < 16 || binary.LittleEndian.Uint16(body[0:]) != 1 {
+				return nil, 0, 0, fmt.Errorf("%s is not PCM", path)
+			}
+			channels = int(binary.LittleEndian.Uint16(body[2:]))
+			rate = int(binary.LittleEndian.Uint32(body[4:]))
+			bits = int(binary.LittleEndian.Uint16(body[14:]))
+		case "data":
+			if bits != 16 || channels == 0 {
+				return nil, 0, 0, fmt.Errorf("%s is not 16-bit PCM", path)
+			}
+			samples = make([]int16, len(body)/2)
+			for i := range samples {
+				samples[i] = int16(binary.LittleEndian.Uint16(body[2*i:]))
+			}
+			return samples, rate, channels, nil
+		}
+		at += 8 + n + n%2
+	}
+	return nil, 0, 0, fmt.Errorf("%s has no audio", path)
+}

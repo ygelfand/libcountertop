@@ -16,7 +16,10 @@ const (
 	CommandsGroup setting.Group = "Commands"
 )
 
-func NewTable(actions, commands []string) *setting.Table[schema.Voice] {
+func NewTable(
+	actions, commands []string,
+	labels func() []setting.Option,
+) *setting.Table[schema.Voice] {
 	rows := []Setting{setting.Flag(
 		Setting{Name: "actions", Group: ActionsGroup, Icon: "mdi:account-voice"},
 		func(v *schema.Voice) *bool { return &v.Actions },
@@ -33,7 +36,19 @@ func NewTable(actions, commands []string) *setting.Table[schema.Voice] {
 				Icon:  "mdi:microphone-message",
 			},
 			func(v *schema.Voice) *bool { return &v.Commands },
-		))
+		), Setting{
+			Name:    "label",
+			Group:   CommandsGroup,
+			Icon:    "mdi:label-outline",
+			Kind:    setting.Choice,
+			Options: []setting.Option{{Value: "", Key: "none"}},
+			More:    labels,
+			Read:    func(v *schema.Voice) string { return v.Label },
+			Write: func(v *schema.Voice, s string) error {
+				v.Label = s
+				return nil
+			},
+		})
 	}
 	for _, name := range commands {
 		rows = append(rows, item(schema.CommandKey(name), CommandsGroup, "mdi:text-to-speech"))

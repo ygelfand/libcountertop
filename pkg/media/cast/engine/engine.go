@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ const (
 	sum        = "ee70db08ab23ffa6b0b05e33dfdac769f3f729e8d213c2c3ee3e3461257d455a"
 	maxArchive = 256 << 20
 	firstToGo  = 1000
+	diskCache  = 16 << 20
 	prefix     = "engine-full-"
 )
 
@@ -102,12 +104,15 @@ func session(ctx context.Context, o Options) error {
 	if err != nil {
 		return fmt.Errorf("engine: %w", err)
 	}
+	tidy(filepath.Join(o.State, "profile"))
 	args := append([]string{
 		"--remote-debugging-address=127.0.0.1",
 		"--remote-debugging-port=" + strconv.Itoa(o.Port),
 		"--ozone-platform=wayland",
 		"--kiosk",
 		"--no-first-run",
+		"--disable-component-update",
+		"--disk-cache-size=" + strconv.Itoa(diskCache),
 	}, o.Args...)
 	p, err := payload.Start(payload.Command{
 		Path: filepath.Join(o.Root, "chromium.sh"),
@@ -169,6 +174,32 @@ func up(ctx context.Context, url string) bool {
 	}
 	resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+var (
+	profileKeeps = []string{"Default", "Local State"}
+	pageCaches   = []string{
+		"Cache",
+		"Code Cache",
+		"GPUCache",
+		"DawnWebGPUCache",
+		"DawnGraphiteCache",
+	}
+)
+
+func tidy(profile string) {
+	entries, err := os.ReadDir(profile)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !slices.Contains(profileKeeps, e.Name()) {
+			_ = os.RemoveAll(filepath.Join(profile, e.Name()))
+		}
+	}
+	for _, name := range pageCaches {
+		_ = os.RemoveAll(filepath.Join(profile, "Default", name))
+	}
 }
 
 func prune(dir, keep string) {

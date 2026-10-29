@@ -36,6 +36,7 @@ type side struct {
 	port   int
 	tls    func() *tls.Config
 	routes map[string]http.Handler
+	open   map[string]http.Handler
 }
 
 type Server struct {
@@ -53,9 +54,13 @@ type Server struct {
 
 func New(opts Options) *Server {
 	return &Server{
-		opts:   opts,
-		pages:  side{name: "pages", port: opts.Port, routes: map[string]http.Handler{}},
-		peers:  side{name: "peers", routes: map[string]http.Handler{}},
+		opts:  opts,
+		pages: side{name: "pages", port: opts.Port, routes: map[string]http.Handler{}},
+		peers: side{
+			name:   "peers",
+			routes: map[string]http.Handler{},
+			open:   map[string]http.Handler{},
+		},
 		public: side{name: "secure pages", routes: map[string]http.Handler{}},
 	}
 }
@@ -70,7 +75,15 @@ func (s *Server) Offering() string {
 
 func (s *Server) Handle(pattern string, h http.Handler) { s.add(&s.pages, pattern, h) }
 
-func (s *Server) HandlePeer(pattern string, h http.Handler) { s.add(&s.peers, pattern, h) }
+func (s *Server) HandlePeer(pattern string, h http.Handler) {
+	s.add(&s.peers, pattern, certified(h))
+}
+
+func (s *Server) HandlePeerOpen(pattern string, h http.Handler) {
+	s.mu.Lock()
+	s.peers.open[pattern] = h
+	s.mu.Unlock()
+}
 
 func (s *Server) HandlePublic(pattern string, h http.Handler) { s.add(&s.public, pattern, h) }
 
@@ -121,6 +134,9 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}
 		for pattern, h := range sd.routes {
+			route(r, pattern, h)
+		}
+		for pattern, h := range sd.open {
 			route(r, pattern, h)
 		}
 		srv := &http.Server{
@@ -183,6 +199,16 @@ func route(r chi.Router, pattern string, h http.Handler) {
 		return
 	}
 	r.Handle(pattern, h)
+}
+
+func certified(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func front(port int) http.HandlerFunc {

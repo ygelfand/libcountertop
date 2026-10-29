@@ -102,6 +102,18 @@ func TestEurekaInfoWithParamsIsOnlyThosePaths(t *testing.T) {
 	}
 }
 
+func TestDeviceInfoNamesTheMakerAndTheModel(t *testing.T) {
+	info := NewEureka(kitchen, "LANovo", "0.0.1").DeviceInfo
+	if info.Manufacturer != "LANovo" || info.ModelName != kitchen.Model {
+		t.Errorf(
+			"manufacturer %q model %q, want LANovo and %q",
+			info.Manufacturer,
+			info.ModelName,
+			kitchen.Model,
+		)
+	}
+}
+
 func TestParamsMayBeACommaSeparatedString(t *testing.T) {
 	_, data := answer(
 		t,

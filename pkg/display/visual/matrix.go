@@ -12,7 +12,12 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-func init() { register(Matrix, func() Visual { return &matrix{r: seeded(1999)} }) }
+const AmbientMatrix Kind = "ambient-matrix"
+
+func init() {
+	register(Matrix, func() Visual { return &matrix{r: seeded(1999)} })
+	register(AmbientMatrix, func() Visual { return &matrix{r: seeded(1999), rest: 0.7} })
+}
 
 const (
 	matrixCols   = 256
@@ -38,6 +43,7 @@ type matrix struct {
 	w, h  int
 	cols  [matrixLayers][]stream
 	pour  float64
+	rest  float64
 	state *image.RGBA
 	atlas *image.RGBA
 }
@@ -77,9 +83,9 @@ func (v *matrix) advance(x Input) {
 	fm := v.mic.next(Input{Mic: x.Mic, Now: x.Now, Dt: x.Dt})
 	fa := v.asst.next(Input{Speaker: x.Speaker, Replying: true, Now: x.Now, Dt: x.Dt})
 	dt := fm.dt
-	pour := 0.0
+	pour := v.rest
 	if fa.state != idle {
-		pour = fa.level
+		pour = max(fa.level, v.rest)
 	}
 	v.pour = follow(v.pour, pour, 0.5, 0.1, dt)
 	var peak float64

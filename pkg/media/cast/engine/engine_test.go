@@ -132,6 +132,38 @@ func TestPruneRemovesOnlyOtherEngineVersions(t *testing.T) {
 	}
 }
 
+func TestTidyKeepsTheSignInsAndDropsTheRest(t *testing.T) {
+	profile := filepath.Join(t.TempDir(), "profile")
+	dirs := []string{
+		"component_crx_cache/abc", "WasmTtsEngine/1", "OnDeviceHeadSuggestModel",
+		"Default/Cache", "Default/Code Cache/js", "Default/GPUCache", "Default/Local Storage",
+	}
+	for _, d := range dirs {
+		if err := os.MkdirAll(filepath.Join(profile, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range []string{"Local State", "BrowserMetrics-spare.pma", "Default/Cookies"} {
+		if err := os.WriteFile(filepath.Join(profile, f), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tidy(profile)
+	want := map[string]bool{
+		"Local State": true, "Default/Cookies": true, "Default/Local Storage": true,
+		"component_crx_cache": false, "WasmTtsEngine": false, "OnDeviceHeadSuggestModel": false,
+		"BrowserMetrics-spare.pma": false, "Default/Cache": false, "Default/Code Cache": false,
+		"Default/GPUCache": false,
+	}
+	for name, keep := range want {
+		_, err := os.Stat(filepath.Join(profile, name))
+		if (err == nil) != keep {
+			t.Errorf("%s present=%v, want %v", name, err == nil, keep)
+		}
+	}
+	tidy(filepath.Join(t.TempDir(), "missing"))
+}
+
 func TestWriteEtcListsEveryNameserver(t *testing.T) {
 	dir, err := writeEtc(filepath.Join(t.TempDir(), "etc"), []string{"10.0.0.1", "1.1.1.1"})
 	if err != nil {

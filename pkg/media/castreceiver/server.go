@@ -26,14 +26,15 @@ import (
 const describeWait = 5 * time.Second
 
 type Config struct {
-	Name     func() string
-	Model    string
-	Version  string
-	Hardware func() string
-	Host     func(name string) string
-	Logo     func() []byte
-	Address  func() string
-	Timezone func() string
+	Name         func() string
+	Manufacturer string
+	Model        string
+	Version      string
+	Hardware     func() string
+	Host         func(name string) string
+	Logo         func() []byte
+	Address      func() string
+	Timezone     func() string
 
 	CredentialsPath string
 	BundlePath      string
@@ -80,6 +81,19 @@ func (s *Server) current() *cast.Service {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.service
+}
+
+func (s *Server) Setup() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		setup := s.setup
+		s.mu.Unlock()
+		if setup == nil {
+			http.NotFound(w, r)
+			return
+		}
+		setup.Handler.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) Retarget() {
@@ -211,7 +225,7 @@ func (s *Server) Up() error {
 	}
 	started := time.Now()
 	service.Receiver.Eureka = func() cast.Eureka {
-		e := cast.NewEureka(device, s.config.Model, s.config.Version)
+		e := cast.NewEureka(device, s.config.Manufacturer, s.config.Version)
 		e.IP = s.config.Address()
 		e.Timezone = s.config.Timezone()
 		e.Uptime = time.Since(started).Seconds()

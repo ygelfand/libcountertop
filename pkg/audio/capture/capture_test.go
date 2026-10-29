@@ -72,3 +72,29 @@ func TestWAVKeepsExplicitChannelOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestReadGivesBackWhatWriteWrote(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "two.wav")
+	samples := []int16{7, -7, 32767, -32768}
+	if err := Write(path, samples, 16000, 2); err != nil {
+		t.Fatal(err)
+	}
+	got, rate, channels, err := Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rate != 16000 || channels != 2 || len(got) != len(samples) {
+		t.Fatalf("rate %d channels %d samples %d", rate, channels, len(got))
+	}
+	for i := range samples {
+		if got[i] != samples[i] {
+			t.Fatalf("sample %d = %d, want %d", i, got[i], samples[i])
+		}
+	}
+	if err := os.WriteFile(path, []byte("not audio"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := Read(path); err == nil {
+		t.Error("read a file that is not WAV")
+	}
+}

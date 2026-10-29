@@ -68,6 +68,16 @@ func (d *Discovery) Peers() []Peer {
 	return out
 }
 
+func (d *Discovery) PeerNames() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make([]string, 0, len(d.peers))
+	for _, p := range d.peers {
+		out = append(out, p.Name)
+	}
+	return out
+}
+
 func (d *Discovery) Touch(id string) {
 	d.mu.Lock()
 	if p, ok := d.peers[id]; ok {

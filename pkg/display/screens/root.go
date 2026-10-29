@@ -206,16 +206,18 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 	showing, tabbed := a.o.Tabs.Showing()
 
 	var layers []gogui.View
-	a.paper(ui.Rect{W: vw, H: vh}, box, pal.Background)
 	if kind, drawn := a.boards[showing.Kind]; tabbed && drawn {
 		below := top + margin
-		return append(layers, kind.Draw(
-			w,
-			ui.Rect{X: margin, Y: below, W: vw - 2*margin, H: vh - below - margin},
-			showing,
-			pal,
-		))
+		at := ui.Rect{X: margin, Y: below, W: vw - 2*margin, H: vh - below - margin}
+		if kind.Ground != nil && kind.Ground(showing, at) {
+			a.papering = true
+			layers = append(layers, a.around(at, vw, vh, pal.Background)...)
+		} else {
+			a.paper(ui.Rect{W: vw, H: vh}, box, pal.Background)
+		}
+		return append(layers, kind.Draw(w, at, showing, pal))
 	}
+	a.paper(ui.Rect{W: vw, H: vh}, box, pal.Background)
 	if face, ok := clockview.Of(cfg.Clock.Face); ok {
 		layers = append(layers, widgets.Placed(box, face.Draw(w, box, r, ink)))
 	}

@@ -759,6 +759,65 @@ homealarm.notready.many: "Not ready: {{.N}} zones open"
 homealarm.zones: Zones
 homealarm.faults: Faults
 homealarm.rehearsal: Rehearsal, nothing sent
+thermostat.app: Thermostat
+thermostat.group.thermostat: Thermostat
+thermostat.setting.look: Look
+thermostat.entity.look: Thermostat look
+thermostat.setting.tab: Dashboard tab
+thermostat.entity.tab: Thermostat dashboard tab
+thermostat.setting.entities: Thermostats
+thermostat.chosen: "{{.N}} of {{.Of}}"
+thermostat.full: "Up to {{.N}}; turn one off first"
+thermostat.look.minimal: Minimal
+thermostat.look.editorial: Editorial
+thermostat.look.pill: Pill
+thermostat.look.top: Top
+thermostat.look.vault: Vault (green)
+thermostat.look.vault-amber: Vault (amber)
+thermostat.pip.stat: Stat
+thermostat.pip.temp: Temp
+thermostat.pip.data: Data
+thermostat.pip.map: Map
+thermostat.pip.radio: Radio
+thermostat.pip.target: Target
+thermostat.pip.inside: Inside
+thermostat.pip.outside: Outside
+thermostat.look.shrine: Shrine
+thermostat.look.hud: HUD
+thermostat.look.grid: Grid
+thermostat.look.tars: Telemetry
+thermostat.look.hal: Red eye
+thermostat.look.matrix: Matrix
+thermostat.look.target: Targeting
+thermostat.look.lab: Lab panel
+thermostat.look.brass: Brass
+thermostat.none: No thermostats chosen
+thermostat.waiting: Waiting for Home Assistant
+thermostat.unavailable: Unavailable
+thermostat.off: "Off"
+thermostat.between: Keeping between
+thermostat.heating: Heating to
+thermostat.cooling: Cooling to
+thermostat.drying: Drying
+thermostat.fanning: Fan running
+thermostat.holding: Holding at
+thermostat.in: In
+thermostat.out: Out
+thermostat.humidity: Humidity
+thermostat.fan: Fan
+thermostat.temperature: Temperature
+thermostat.target: Target
+thermostat.status: Status
+thermostat.temp: Temp
+thermostat.dial: Setting
+thermostat.refused: Home Assistant refused that
+thermostat.mode.off: "Off"
+thermostat.mode.heat: Heat
+thermostat.mode.cool: Cool
+thermostat.mode.heat_cool: Auto
+thermostat.mode.auto: Auto
+thermostat.mode.dry: Dry
+thermostat.mode.fan_only: Fan
 homealarm.zones.count: "{{.Secure}} secure / {{.Open}} open"
 homealarm.setting.zones: Zones shown
 homealarm.zones.shown: "{{.N}} of {{.Of}}"
@@ -1445,6 +1504,8 @@ voice.setting.actions: All actions
 voice.setting.command.mirror: Mirror
 voice.setting.command.radar: Radar
 voice.setting.commands: All commands
+voice.setting.label: Home Assistant names to listen for
+voice.option.label.none: Areas only
 voice.title: Voice triggers
 volume.chime: Notification sound
 wake.ember: Ember

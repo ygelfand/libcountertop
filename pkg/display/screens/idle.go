@@ -170,6 +170,22 @@ func (a *App) paper(area, box ui.Rect, bg theme.Color) bool {
 	return true
 }
 
+func (a *App) around(hole ui.Rect, vw, vh int, bg theme.Color) []gogui.View {
+	bands := []ui.Rect{
+		{W: vw, H: hole.Y},
+		{Y: hole.Y + hole.H, W: vw, H: vh - hole.Y - hole.H},
+		{Y: hole.Y, W: hole.X, H: hole.H},
+		{X: hole.X + hole.W, Y: hole.Y, W: vw - hole.X - hole.W, H: hole.H},
+	}
+	out := make([]gogui.View, 0, len(bands))
+	for _, b := range bands {
+		if b.W > 0 && b.H > 0 {
+			out = append(out, widgets.Placed(b, a.ground(bg)))
+		}
+	}
+	return out
+}
+
 func (a *App) ground(bg theme.Color) gogui.View {
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFill,

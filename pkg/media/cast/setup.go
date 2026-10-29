@@ -51,6 +51,7 @@ type OptIn struct {
 type DeviceInfo struct {
 	CloudDeviceID string       `json:"cloud_device_id"`
 	Manufacturer  string       `json:"manufacturer"`
+	ModelName     string       `json:"model_name"`
 	ProductName   string       `json:"product_name"`
 	UDN           string       `json:"ssdp_udn"`
 	Capabilities  Capabilities `json:"capabilities"`
@@ -94,6 +95,7 @@ func NewEureka(d Device, manufacturer, system string) Eureka {
 		DeviceInfo: DeviceInfo{
 			CloudDeviceID: d.CloudID(),
 			Manufacturer:  manufacturer,
+			ModelName:     d.Model,
 			ProductName:   d.Model,
 			UDN:           d.UDN(),
 			Capabilities:  Capabilities{DisplaySupported: d.Profile.Display},

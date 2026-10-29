@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net/http"
 	"strings"
 	"sync/atomic"
 
@@ -177,6 +178,8 @@ func (r *Receiver) credentials(c *cast.Credentials) {
 func (r *Receiver) Enabled() bool { return r.settings.Read().Receiver }
 
 func (r *Receiver) Listening() bool { return r.server.Listening() }
+
+func (r *Receiver) Setup() http.Handler { return r.server.Setup() }
 
 func (r *Receiver) Start(context.Context) error {
 	if !r.Enabled() {

@@ -3,35 +3,36 @@ package voice
 import (
 	"context"
 	"log/slog"
-	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/fetch"
-	"github.com/ygelfand/libcountertop/pkg/inference/whistle"
+	"github.com/ygelfand/libcountertop/pkg/inference/asr"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-const depth = 3
+const namesEvery = 10 * time.Minute
 
 type Options struct {
 	Helper   string
 	Binary   []byte
 	ModelDir string
-	Client   *http.Client
-	Source   whistle.Source
+	Source   asr.Source
 	Paused   func() bool
 	Settings storage.Section[schema.Voice]
-	Clips    string
+	Home     Home
+	Peers    func() []string
+	Retired  []string
 }
 
 type Listener struct {
 	*Commands
 
 	opts   Options
-	engine *whistle.Client
+	engine *asr.Client
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -39,25 +40,23 @@ type Listener struct {
 }
 
 func NewListener(o Options) *Listener {
-	if o.Client == nil {
-		o.Client = fetch.Client(10 * time.Minute)
-	}
-	engine := whistle.New(whistle.Options{
-		Helper: o.Helper,
-		Model:  whistle.Whistle.Path(o.ModelDir),
-		Depth:  depth,
-		Source: o.Source,
-		Paused: o.Paused,
-		Clips:  o.Clips,
+	engine := asr.New(asr.Options{
+		Helper:  o.Helper,
+		Weights: asr.Weights(o.ModelDir),
+		Threads: asr.Threads(),
+		Source:  o.Source,
+		Paused:  o.Paused,
 	})
 	l := &Listener{opts: o, engine: engine}
 	l.Commands = NewCommands(
 		engine,
 		func(name string) bool { return o.Settings.Read().Command(name) },
 	)
-	engine.Text.Listen(func(t whistle.Transcript) { l.Hear(t.Text) })
+	engine.Final.Listen(func(t asr.Transcript) { l.Hear(t.Text) })
 	return l
 }
+
+func (l *Listener) Engine() *asr.Client { return l.engine }
 
 func (l *Listener) Name() string { return "voice" }
 
@@ -76,6 +75,12 @@ func (l *Listener) Apply() {
 		l.Start()
 	} else {
 		l.Stop()
+	}
+	l.mu.Lock()
+	running := l.cancel != nil
+	l.mu.Unlock()
+	if running {
+		go l.names()
 	}
 }
 
@@ -103,19 +108,25 @@ func (l *Listener) Stop() {
 
 func (l *Listener) run(ctx context.Context) {
 	if err := payload.Install(l.opts.Helper, l.opts.Binary); err != nil {
-		slog.Error("voice helper not installed", "path", l.opts.Helper, "err", err)
+		slog.Error("speech helper not installed", "path", l.opts.Helper, "err", err)
 		return
+	}
+	for _, pattern := range l.opts.Retired {
+		retired, _ := filepath.Glob(pattern)
+		for _, p := range retired {
+			_ = os.Remove(p)
+		}
 	}
 	backoff := 5 * time.Second
 	for {
-		_, err := whistle.Whistle.Fetch(ctx, l.opts.Client, l.opts.ModelDir)
+		_, err := asr.Fetch(ctx, l.opts.ModelDir)
 		if err == nil {
 			break
 		}
 		if ctx.Err() != nil {
 			return
 		}
-		slog.Warn("voice model not fetched", "err", err, "retry_in", backoff)
+		slog.Warn("speech weights not fetched", "err", err, "retry_in", backoff)
 		select {
 		case <-ctx.Done():
 			return
@@ -123,7 +134,38 @@ func (l *Listener) run(ctx context.Context) {
 		}
 		backoff = min(2*backoff, 10*time.Minute)
 	}
+	l.wg.Go(func() { l.keepNames(ctx) })
 	if err := l.engine.Run(ctx); err != nil {
 		slog.Error("voice commands stopped", "err", err)
 	}
+}
+
+func (l *Listener) keepNames(ctx context.Context) {
+	tick := time.NewTicker(namesEvery)
+	defer tick.Stop()
+	for {
+		l.names()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+func (l *Listener) names() {
+	if l.opts.Peers != nil {
+		l.Phrases("peers", l.opts.Peers())
+	}
+	if l.opts.Home == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), homeAsk)
+	defer cancel()
+	names, err := HomeNames(ctx, l.opts.Home, l.opts.Settings.Read().Label)
+	if err != nil {
+		slog.Debug("voice names from Home Assistant not read", "err", err)
+		return
+	}
+	l.Phrases("home", names)
 }

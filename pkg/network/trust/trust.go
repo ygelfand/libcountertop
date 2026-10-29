@@ -202,7 +202,7 @@ func (t *Trust) Identity() *tls.Certificate { return &t.o.Identity }
 func (t *Trust) ServerConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{t.o.Identity},
-		ClientAuth:   tls.RequireAnyClientCert,
+		ClientAuth:   tls.RequestClientCert,
 		MinVersion:   tls.VersionTLS13,
 	}
 }

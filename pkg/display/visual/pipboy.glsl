@@ -16,7 +16,7 @@ float screen(highp vec2 p) {
 
 void main() {
 	highp vec2 c = vtex * 2.0 - 1.0;
-	highp vec2 q = c * (1.0 + u[2] * dot(c, c));
+	highp vec2 q = crtBend(c, u[2]);
 	highp vec2 uv = q * 0.5 + 0.5;
 	vec2 edge = vec2(min(uv, 1.0 - uv));
 	if (edge.x < 0.0 || edge.y < 0.0) {
@@ -29,11 +29,7 @@ void main() {
 #ifdef LIGHT
 	gl_FragColor = vec4(tint * lum * 0.8, 1.0);
 #else
-	float sl = float(abs(fract(p.y / u[3]) - 0.5)) * 2.0;
-	float rb = clamp(1.0 - abs(float(fract(uv.y - u[5] * 0.06)) - 0.08) * 12.5, 0.0, 1.0);
-	vec2 vc = vec2(c);
-	float k = (1.0 - u[4] * sl) * (1.0 + 0.07 * u[23] * rb) * u[9];
-	k *= clamp(edge.x * 83.0, 0.0, 1.0) * clamp(edge.y * 83.0, 0.0, 1.0) * (1.0 - 0.28 * dot(vc, vc));
+	float k = crtLight(c, uv, p, u[3], u[4], u[5], u[23]) * u[9];
 	gl_FragColor = vec4(min((tint * (lum + 0.05) + glow() * tint) * k, 1.0), 1.0);
 #endif
 }

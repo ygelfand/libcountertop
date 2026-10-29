@@ -12,7 +12,7 @@ import (
 
 func speech(t testing.TB) []int16 {
 	t.Helper()
-	raw, err := os.ReadFile("../../../native/voice/test/speech.raw")
+	raw, err := os.ReadFile("testdata/speech.raw")
 	if err != nil {
 		t.Fatal(err)
 	}

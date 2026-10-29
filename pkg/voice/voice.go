@@ -28,9 +28,10 @@ type Commands struct {
 	engine Engine
 	allow  func(name string) bool
 
-	mu    sync.Mutex
-	next  int
-	hooks map[int]listener
+	mu      sync.Mutex
+	next    int
+	hooks   map[int]listener
+	phrases map[string][]string
 
 	push sync.Mutex
 	sent []string
@@ -45,7 +46,23 @@ func NewCommands(engine Engine, allow func(name string) bool) *Commands {
 	if allow == nil {
 		allow = func(string) bool { return true }
 	}
-	return &Commands{engine: engine, allow: allow, hooks: map[int]listener{}}
+	return &Commands{
+		engine:  engine,
+		allow:   allow,
+		hooks:   map[int]listener{},
+		phrases: map[string][]string{},
+	}
+}
+
+func (c *Commands) Phrases(group string, phrases []string) {
+	c.mu.Lock()
+	if len(phrases) == 0 {
+		delete(c.phrases, group)
+	} else {
+		c.phrases[group] = slices.Clone(phrases)
+	}
+	c.mu.Unlock()
+	c.publish()
 }
 
 func (c *Commands) Live() bool {
@@ -146,6 +163,17 @@ func (c *Commands) publish() {
 	c.push.Lock()
 	defer c.push.Unlock()
 	words := c.Keywords()
+	c.mu.Lock()
+	for _, group := range c.phrases {
+		for _, p := range group {
+			if p = strings.TrimSpace(p); p != "" {
+				words = append(words, p)
+			}
+		}
+	}
+	c.mu.Unlock()
+	slices.Sort(words)
+	words = slices.Compact(words)
 	if slices.Equal(words, c.sent) {
 		return
 	}

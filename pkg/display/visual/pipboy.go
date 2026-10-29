@@ -109,6 +109,20 @@ var pipStyles = map[Kind]pipStyle{
 	},
 }
 
+type CRT struct {
+	Tint             [3]float64
+	Warp, Scan, Deep float64
+	Roll             float64
+}
+
+func CRTOf(k Kind) (CRT, bool) {
+	s, ok := pipStyles[k]
+	if !ok {
+		return CRT{}, false
+	}
+	return CRT{Tint: s.tint, Warp: s.warp, Scan: s.scan, Deep: s.scanDeep, Roll: s.roll}, true
+}
+
 func init() {
 	for k := range pipStyles {
 		register(k, func() Visual { return &pipboy{kind: k, active: -1} })
@@ -348,8 +362,13 @@ func waveOf(a analysis.Analysis) (w [analysis.WavePoints]float64) {
 	return w
 }
 
-//go:embed pipboy.glsl
-var pipboyShader string
+var (
+	//go:embed crt.glsl
+	crtShader string
+	//go:embed pipboy.glsl
+	pipboyBody   string
+	pipboyShader = crtShader + pipboyBody
+)
 
 func (v *pipboy) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	if !v.st.measure(in) {
