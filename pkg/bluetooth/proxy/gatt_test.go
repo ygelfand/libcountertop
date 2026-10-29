@@ -62,6 +62,7 @@ type device struct {
 	value    []byte
 	writes   [][]byte
 	pairing  chan struct{}
+	timing   [4]uint16
 }
 
 func newDevice() *device {
@@ -140,6 +141,16 @@ func (d *device) Encrypt(ctx context.Context, ltk [16]byte, ediv uint16, random 
 func (d *device) Reason() byte {
 	<-d.done
 	return d.reason
+}
+
+func (d *device) Update(minInterval, maxInterval, latency, timeout uint16) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.timing = [4]uint16{minInterval, maxInterval, latency, timeout}
+	if minInterval > maxInterval {
+		return hci.Status(0x12)
+	}
+	return nil
 }
 
 type radio struct {
@@ -255,6 +266,33 @@ func TestAProxiedLinkReadsWritesInOrderAndReportsItsEnd(t *testing.T) {
 	}
 	_, _ = g.handle(ha, &api.BluetoothGATTReadRequest{Address: peer, Handle: 3})
 	ha.expect(t, &api.BluetoothGATTErrorResponse{Address: peer, Handle: 3, Error: errNoConnection})
+}
+
+func TestHomeAssistantCanRetimeALink(t *testing.T) {
+	r := &radio{device: newDevice()}
+	g := r.connections(t)
+	ha := &homeAssistant{got: make(chan proto.Message, 64)}
+
+	ask := func(min, max uint32) {
+		_, _ = g.handle(ha, &api.BluetoothSetConnectionParamsRequest{
+			Address: peer, MinInterval: min, MaxInterval: max, Latency: 0, Timeout: 70000,
+		})
+	}
+	ask(6, 12)
+	ha.expect(t, &api.BluetoothSetConnectionParamsResponse{Address: peer, Error: errNotConnected})
+
+	connected(t, g, ha)
+	ask(6, 12)
+	ha.expect(t, &api.BluetoothSetConnectionParamsResponse{Address: peer})
+	r.device.mu.Lock()
+	got := r.device.timing
+	r.device.mu.Unlock()
+	if got != [4]uint16{6, 12, 0, 0xffff} {
+		t.Fatalf("link was asked for %v, want 6 12 0 and the timeout clamped to 0xffff", got)
+	}
+
+	ask(12, 6)
+	ha.expect(t, &api.BluetoothSetConnectionParamsResponse{Address: peer, Error: 0x12})
 }
 
 func TestAProxyHoldsOnlyItsSlots(t *testing.T) {

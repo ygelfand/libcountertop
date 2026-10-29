@@ -419,6 +419,20 @@ func (l *Link) Send(ctx context.Context, cid uint16, payload []byte) error {
 	return nil
 }
 
+// Intervals in 1.25 ms units, latency in connection events, timeout in 10 ms units.
+func (l *Link) Update(minInterval, maxInterval, latency, timeout uint16) error {
+	if l.life.Err() != nil {
+		return ErrClosed
+	}
+	params := make([]byte, 14)
+	binary.LittleEndian.PutUint16(params, uint16(l.Handle))
+	binary.LittleEndian.PutUint16(params[2:], minInterval)
+	binary.LittleEndian.PutUint16(params[4:], maxInterval)
+	binary.LittleEndian.PutUint16(params[6:], latency)
+	binary.LittleEndian.PutUint16(params[8:], timeout)
+	return l.s.Start(hciLEConnectionUpdate, params...)
+}
+
 func (l *Link) Disconnect() error {
 	if l.life.Err() != nil {
 		return nil

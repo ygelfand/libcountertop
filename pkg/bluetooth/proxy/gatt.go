@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ const (
 	errConnCancel   = 0x0100
 	errNoConnection = 0x0101
 	errNoSlot       = 0x09
+	errNotConnected = -1
 )
 
 type Connector interface {
@@ -49,6 +51,7 @@ type link interface {
 	gatt.Link
 	smp.Link
 	Reason() byte
+	Update(minInterval, maxInterval, latency, timeout uint16) error
 }
 
 type connections struct {
@@ -116,6 +119,8 @@ func (g *connections) handle(conn sender, msg proto.Message) (bool, error) {
 		)
 	case *api.BluetoothGATTNotifyRequest:
 		return true, g.subscribe(conn, m.GetAddress(), m.GetHandle(), m.GetEnable())
+	case *api.BluetoothSetConnectionParamsRequest:
+		return true, g.timing(conn, m)
 	default:
 		return false, nil
 	}
@@ -487,6 +492,39 @@ func (g *connections) subscribe(conn sender, address uint64, handle uint32, enab
 	}
 	g.mu.Unlock()
 	return conn.Send(&api.BluetoothGATTNotifyResponse{Address: address, Handle: handle})
+}
+
+func (g *connections) timing(conn sender, m *api.BluetoothSetConnectionParamsRequest) error {
+	address := m.GetAddress()
+	s := g.up(address)
+	if s == nil {
+		return conn.Send(
+			&api.BluetoothSetConnectionParamsResponse{Address: address, Error: errNotConnected},
+		)
+	}
+	short := func(v uint32) uint16 { return uint16(min(v, math.MaxUint16)) }
+	err := s.link.Update(
+		short(m.GetMinInterval()),
+		short(m.GetMaxInterval()),
+		short(m.GetLatency()),
+		short(m.GetTimeout()),
+	)
+	return conn.Send(
+		&api.BluetoothSetConnectionParamsResponse{Address: address, Error: timingError(err)},
+	)
+}
+
+func timingError(err error) int32 {
+	switch {
+	case err == nil:
+		return 0
+	case closed(err):
+		return errNotConnected
+	}
+	if status, ok := errors.AsType[hci.Status](err); ok {
+		return int32(status)
+	}
+	return errGATT
 }
 
 func (g *connections) closeAll() {

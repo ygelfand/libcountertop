@@ -178,6 +178,26 @@ func TestALinkCarriesItsChannelsAndEndsOnDisconnection(t *testing.T) {
 	}
 }
 
+func TestALinkAsksTheControllerForNewTiming(t *testing.T) {
+	p, chip := paired(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s := Reader(ctx, p)
+	l := connecting(t, s, chip, 0x0042)
+
+	back := make(chan error, 1)
+	go func() { back <- l.Update(6, 12, 0, 500) }()
+	op, params := takeCommand(t, chip)
+	want := []byte{0x42, 0x00, 6, 0, 12, 0, 0, 0, 0xf4, 0x01, 0, 0, 0, 0}
+	if op != hciLEConnectionUpdate || !bytes.Equal(params, want) {
+		t.Fatalf("got %#04x % x, want LE Connection Update % x", op, params, want)
+	}
+	write(t, chip, commandStatus(hciLEConnectionUpdate, 0x12))
+	if err := <-back; err != Status(0x12) {
+		t.Fatalf("got %v, want the controller's refusal 0x12", err)
+	}
+}
+
 func TestAConnectionThatFailsReportsItsStatus(t *testing.T) {
 	p, chip := paired(t)
 	ctx, cancel := context.WithCancel(context.Background())

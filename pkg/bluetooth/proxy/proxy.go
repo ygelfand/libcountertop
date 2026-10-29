@@ -24,7 +24,7 @@ import (
 const Features = esphome.BluetoothPassiveScan | esphome.BluetoothRawAdvertisements | esphome.BluetoothStateAndMode
 
 const Connections = esphome.BluetoothActiveConnections | esphome.BluetoothRemoteCaching |
-	esphome.BluetoothPairing | esphome.BluetoothCacheClearing
+	esphome.BluetoothPairing | esphome.BluetoothCacheClearing | esphome.BluetoothConnectionParams
 
 const queued = 512
 const batch = 16
