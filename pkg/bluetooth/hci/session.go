@@ -33,6 +33,11 @@ type Session struct {
 
 	dropped uint64
 
+	acl    wire
+	le     leSide
+	scan   scanState
+	quirks Quirks
+
 	err  error
 	done chan struct{}
 }
@@ -76,6 +81,10 @@ func (s *Session) serve(ctx context.Context) {
 
 func (s *Session) route(got packet) {
 	if got.kind == typeEvent {
+		if got.event.Code == eventCompletedPackets {
+			s.completed(got.event)
+			return
+		}
 		if op, ok := addressed(got.event); ok {
 			s.mu.Lock()
 			waiter := s.answers[op]
@@ -86,6 +95,9 @@ func (s *Session) route(got packet) {
 				waiter <- got.event
 				return
 			}
+		}
+		if after := s.track(got.event); after != nil {
+			defer after()
 		}
 	}
 
@@ -260,26 +272,23 @@ func (s *Session) Events() (<-chan packet, func()) {
 	})
 }
 
-func (s *Session) Sniff(within time.Duration) []string {
+func (s *Session) Sniff(ctx context.Context, saw func(string)) {
 	got, done := s.Take(func(packet) bool { return true })
 	defer done()
-
-	var out []string
-	until := time.After(within)
 
 	for {
 		select {
 		case g, ok := <-got:
 			if !ok {
-				return out
+				return
 			}
 			if g.kind == typeACL {
-				out = append(out, fmt.Sprintf("data handle %#04x  % x", g.acl.Handle, g.acl.Data))
+				saw(fmt.Sprintf("data handle %#04x  % x", g.acl.Handle, g.acl.Data))
 				continue
 			}
-			out = append(out, fmt.Sprintf("event %#02x  % x", g.event.Code, g.event.Params))
-		case <-until:
-			return out
+			saw(fmt.Sprintf("event %#02x  % x", g.event.Code, g.event.Params))
+		case <-ctx.Done():
+			return
 		}
 	}
 }

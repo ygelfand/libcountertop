@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
+	"sync"
 )
 
 const (
@@ -47,15 +49,21 @@ func (a Advertisement) Addr() uint64 {
 	return v
 }
 
+type scanState struct {
+	mu     sync.Mutex
+	on     *Scanning
+	paused int
+}
+
 func Scan(ctx context.Context, s *Session, sc Scanning, found func(Advertisement)) error {
 	got, done := s.Reports()
 	defer done()
 
-	if err := scanning(s, sc, true); err != nil {
+	if err := s.startScan(sc); err != nil {
 		return err
 	}
 
-	defer scanning(s, sc, false)
+	defer s.stopScan(sc)
 
 	for {
 		select {
@@ -67,6 +75,53 @@ func Scan(ctx context.Context, s *Session, sc Scanning, found func(Advertisement
 			}
 			reports(g.event.Params, found)
 		}
+	}
+}
+
+func (s *Session) startScan(sc Scanning) error {
+	s.scan.mu.Lock()
+	defer s.scan.mu.Unlock()
+	if s.scan.paused == 0 {
+		if err := scanning(s, sc, true); err != nil {
+			return err
+		}
+	}
+	s.scan.on = &sc
+	return nil
+}
+
+func (s *Session) stopScan(sc Scanning) {
+	s.scan.mu.Lock()
+	defer s.scan.mu.Unlock()
+	s.scan.on = nil
+	if s.scan.paused == 0 {
+		_ = scanning(s, sc, false)
+	}
+}
+
+// This controller accepts a connection while it scans, but the link then fails to establish (0x3e).
+func (s *Session) Pause() func() {
+	s.scan.mu.Lock()
+	if s.scan.paused == 0 && s.scan.on != nil {
+		if err := scanning(s, *s.scan.on, false); err != nil {
+			slog.Warn("bluetooth scan did not pause", "err", err)
+		}
+	}
+	s.scan.paused++
+	s.scan.mu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.scan.mu.Lock()
+			defer s.scan.mu.Unlock()
+			s.scan.paused--
+			if s.scan.paused == 0 && s.scan.on != nil {
+				if err := scanning(s, *s.scan.on, true); err != nil {
+					slog.Warn("bluetooth scan did not resume", "err", err)
+				}
+			}
+		})
 	}
 }
 

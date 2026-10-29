@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -27,9 +28,10 @@ func socket(t *testing.T) string {
 
 func TestCloseRevokesExistingClientsAndCanRestart(t *testing.T) {
 	var calls atomic.Int32
-	s := NewServer(socket(t), func(context.Context, []string) (string, error) {
+	s := NewServer(socket(t), func(_ context.Context, _ []string, out io.Writer) error {
 		calls.Add(1)
-		return "answered", nil
+		_, err := io.WriteString(out, "answered")
+		return err
 	})
 	t.Cleanup(s.Close)
 	for range 2 {
@@ -64,11 +66,11 @@ func TestCloseRevokesExistingClientsAndCanRestart(t *testing.T) {
 func TestCloseCancelsCommandContext(t *testing.T) {
 	started := make(chan struct{})
 	stopped := make(chan struct{})
-	s := NewServer(socket(t), func(ctx context.Context, _ []string) (string, error) {
+	s := NewServer(socket(t), func(ctx context.Context, _ []string, _ io.Writer) error {
 		close(started)
 		<-ctx.Done()
 		close(stopped)
-		return "", ctx.Err()
+		return ctx.Err()
 	})
 	if err := s.Start(); err != nil {
 		t.Fatal(err)
@@ -96,9 +98,10 @@ func TestCloseCancelsCommandContext(t *testing.T) {
 
 func TestSendStopsAfterFailureAndKeepsPartialOutput(t *testing.T) {
 	var calls atomic.Int32
-	s := NewServer(socket(t), func(context.Context, []string) (string, error) {
+	s := NewServer(socket(t), func(_ context.Context, _ []string, out io.Writer) error {
 		calls.Add(1)
-		return "step completed", errors.New("later step failed")
+		_, _ = io.WriteString(out, "step completed")
+		return errors.New("later step failed")
 	})
 	if err := s.Start(); err != nil {
 		t.Fatal(err)
@@ -118,6 +121,33 @@ func TestSendStopsAfterFailureAndKeepsPartialOutput(t *testing.T) {
 	}
 }
 
+func TestALineReachesTheClientBeforeTheCommandEnds(t *testing.T) {
+	release := make(chan struct{})
+	ours, theirs := net.Pipe()
+	t.Cleanup(func() { _ = ours.Close() })
+	go Serve(
+		context.Background(),
+		theirs,
+		func(_ context.Context, _ []string, out io.Writer) error {
+			_, _ = io.WriteString(out, "first\nhal")
+			<-release
+			_, _ = io.WriteString(out, "f")
+			return nil
+		},
+	)
+	_ = ours.SetDeadline(time.Now().Add(2 * time.Second))
+	go func() { _, _ = fmt.Fprintln(ours, "go") }()
+	in := bufio.NewScanner(ours)
+	if !in.Scan() || in.Text() != markOutput+"first" {
+		t.Fatalf("first line %q, want it before the command ends", in.Text())
+	}
+	close(release)
+	var out bytes.Buffer
+	if err := Answer(in, &out); err != nil || out.String() != "half\n" {
+		t.Fatalf("rest %q, %v; want the partial line finished", out.String(), err)
+	}
+}
+
 func TestOutputThatLooksLikeATerminatorStaysOutput(t *testing.T) {
 	answers := map[string]struct {
 		out string
@@ -129,10 +159,15 @@ func TestOutputThatLooksLikeATerminatorStaysOutput(t *testing.T) {
 	}
 	ours, theirs := net.Pipe()
 	t.Cleanup(func() { _ = ours.Close() })
-	go Serve(context.Background(), theirs, func(_ context.Context, args []string) (string, error) {
-		a := answers[args[0]]
-		return a.out, a.err
-	})
+	go Serve(
+		context.Background(),
+		theirs,
+		func(_ context.Context, args []string, out io.Writer) error {
+			a := answers[args[0]]
+			_, _ = io.WriteString(out, a.out)
+			return a.err
+		},
+	)
 	_ = ours.SetDeadline(time.Now().Add(2 * time.Second))
 	in := bufio.NewScanner(ours)
 	for _, tc := range []struct{ cmd, out, err string }{

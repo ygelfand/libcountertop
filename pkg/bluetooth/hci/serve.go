@@ -34,26 +34,19 @@ type outbound struct {
 }
 
 func Serve(ctx context.Context, s *Session, on Classic) error {
-	got, release := s.Events()
+	got, release := s.Take(s.classicWants)
 	defer release()
 
-	size, total, err := buffers(s)
-	if err != nil {
-		return fmt.Errorf("ble: asking what the controller holds: %w", err)
-	}
-
-	room, err := newCredit(size, total)
-	if err != nil {
+	if _, _, err := s.pools(); err != nil {
 		return err
 	}
-	slog.Debug("bluetooth link", "packet", size, "buffers", total)
 
 	ctx, stop := context.WithCancel(ctx)
 	var workers sync.WaitGroup
 	defer func() { stop(); workers.Wait() }()
 
 	out := make(chan outbound, queued)
-	workers.Go(func() { writing(ctx, s, room, size, out) })
+	workers.Go(func() { writing(ctx, s, out) })
 
 	if speaks, ok := on.(Sends); ok {
 		speaks.Sending(func(handle uint16, pdu []byte) error {
@@ -83,13 +76,13 @@ func Serve(ctx context.Context, s *Session, on Classic) error {
 			continue
 		}
 
-		if err := answer(ctx, on, parts, room, out, g.event); err != nil {
+		if err := answer(ctx, on, parts, out, g.event); err != nil {
 			slog.Warn("bluetooth event", "code", g.event.Code, "err", err)
 		}
 	}
 }
 
-func writing(ctx context.Context, s *Session, room *credit, size int, out <-chan outbound) {
+func writing(ctx context.Context, s *Session, out <-chan outbound) {
 	for {
 		var o outbound
 
@@ -106,20 +99,11 @@ func writing(ctx context.Context, s *Session, room *credit, size int, out <-chan
 			continue
 		}
 
-		frames, err := aclFrames(o.handle, o.pdu, size)
-		if err != nil {
-			slog.Warn("bluetooth framing data", "err", err)
-			continue
-		}
-
-		for _, f := range frames {
-			if err := room.take(ctx); err != nil {
+		if err := s.Send(ctx, o.handle, o.pdu); err != nil {
+			if ctx.Err() != nil {
 				return
 			}
-			if _, err := s.Write(f); err != nil {
-				slog.Warn("bluetooth writing data", "err", err)
-				break
-			}
+			slog.Warn("bluetooth writing data", "err", err)
 		}
 	}
 }
@@ -135,21 +119,13 @@ func post(ctx context.Context, out chan<- outbound, o outbound) error {
 	}
 }
 
-func answer(ctx context.Context, on Classic, parts *reassembler, room *credit,
-	out chan<- outbound, e event) error {
-	if e.Code == eventCompletedPackets {
-		done, err := parseCompletedPackets(e)
-		if err != nil {
-			return err
-		}
-		for _, d := range done {
-			if err := room.give(d.Count); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
+func answer(
+	ctx context.Context,
+	on Classic,
+	parts *reassembler,
+	out chan<- outbound,
+	e event,
+) error {
 	if e.Code == pair.EventDisconnectionComplete {
 		if h, ok := pair.Handle(e.Params); ok {
 			parts.forget(Handle(h))

@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -116,30 +117,33 @@ func (t *Tree) Root() *cobra.Command {
 }
 
 func Executes(makeTree func() *cobra.Command) Dispatch {
-	return func(ctx context.Context, args []string) (string, error) {
-		return Execute(ctx, makeTree, args)
+	return func(ctx context.Context, args []string, out io.Writer) error {
+		return Run(ctx, makeTree, args, out)
 	}
 }
 
 func Execute(ctx context.Context, makeTree func() *cobra.Command, args []string) (string, error) {
-	root := makeTree()
 	var out strings.Builder
-	root.SetOut(&out)
-	root.SetErr(&out)
+	err := Run(ctx, makeTree, args, &out)
+	return out.String(), err
+}
+
+func Run(ctx context.Context, makeTree func() *cobra.Command, args []string, out io.Writer) error {
+	root := makeTree()
+	root.SetOut(out)
+	root.SetErr(out)
 	if len(args) > 0 && (args[len(args)-1] == "--help" || args[len(args)-1] == "-h") {
 		cmd, rest, err := root.Find(args[:len(args)-1])
 		if err != nil {
-			return "", err
+			return err
 		}
 		if len(rest) > 0 && cmd.HasAvailableSubCommands() {
-			return "", fmt.Errorf("%s: unknown command %q", cmd.Name(), rest[0])
+			return fmt.Errorf("%s: unknown command %q", cmd.Name(), rest[0])
 		}
-		err = cmd.Help()
-		return out.String(), err
+		return cmd.Help()
 	}
 	root.SetArgs(args)
-	err := root.ExecuteContext(ctx)
-	return out.String(), err
+	return root.ExecuteContext(ctx)
 }
 
 func WaitCommand() *cobra.Command {

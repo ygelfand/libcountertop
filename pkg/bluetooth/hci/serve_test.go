@@ -74,6 +74,15 @@ func bufferSize(size, total int) []byte {
 	return binary.LittleEndian.AppendUint16(out, 0)
 }
 
+// Status, LE ACL length, LE ACL count.
+func leBufferSize(size, total int) []byte {
+	out := []byte{typeEvent, eventCommandComplete, 0x07, 0x01}
+	out = binary.LittleEndian.AppendUint16(out, hciLEReadBufferSize)
+	out = append(out, 0x00)
+	out = binary.LittleEndian.AppendUint16(out, uint16(size))
+	return append(out, byte(total))
+}
+
 func serving(t *testing.T, d *deciding, size, total int) (chip *os.File, stop func()) {
 	t.Helper()
 
@@ -89,6 +98,10 @@ func serving(t *testing.T, d *deciding, size, total int) (chip *os.File, stop fu
 
 	asked(t, chip, hciReadBufferSize)
 	if _, err := chip.Write(bufferSize(size, total)); err != nil {
+		t.Fatal(err)
+	}
+	asked(t, chip, hciLEReadBufferSize)
+	if _, err := chip.Write(leBufferSize(0, 0)); err != nil {
 		t.Fatal(err)
 	}
 

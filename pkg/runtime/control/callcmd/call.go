@@ -74,20 +74,3 @@ func State(controller *call.Calls, _ []string) (string, error) {
 	}
 	return out, nil
 }
-
-func Peers(peers []peer.Peer) string {
-	var out strings.Builder
-	for _, p := range peers {
-		addrs := make([]string, 0, len(p.Addrs))
-		for _, a := range p.Addrs {
-			addrs = append(addrs, a.String())
-		}
-		fmt.Fprintf(&out, "%s\t%s\t%s\t%s\t%s:%d\t%s\t%s\tv%s\t%s ago\n",
-			p.ID, p.Name, p.Model, p.Board, strings.Join(addrs, ","), p.Port, p.Standing,
-			strings.Join(p.Caps, ","), p.Version, time.Since(p.Seen).Round(time.Second))
-	}
-	if out.Len() == 0 {
-		return "none"
-	}
-	return out.String()
-}

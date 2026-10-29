@@ -22,6 +22,10 @@ import (
 )
 
 const Features = esphome.BluetoothPassiveScan | esphome.BluetoothRawAdvertisements | esphome.BluetoothStateAndMode
+
+const Connections = esphome.BluetoothActiveConnections | esphome.BluetoothRemoteCaching |
+	esphome.BluetoothPairing | esphome.BluetoothCacheClearing
+
 const queued = 512
 const batch = 16
 const hold = 250 * time.Millisecond
@@ -40,11 +44,14 @@ type Dependencies struct {
 	Settings  storage.Section[schema.Bluetooth]
 	Reconnect func()
 	Beacon    func() []byte
+	Links     Connector
+	Bonds     string
 }
 
 type Proxy struct {
 	options        Dependencies
 	proxy          *esphome.BluetoothProxy
+	links          *connections
 	knobs          *setting.Controls[schema.Bluetooth]
 	wanted         chan struct{}
 	reports        chan hci.Advertisement
@@ -66,7 +73,15 @@ func New(options Dependencies) *Proxy {
 		Read:  options.Settings.Read,
 		Save:  b.store,
 	}
-	b.proxy.OnSubscribed = func(bool) { b.apply() }
+	if options.Links != nil {
+		b.links = newConnections(options.Links, options.Bonds)
+	}
+	b.proxy.OnSubscribed = func(subscribed bool) {
+		if !subscribed && b.links != nil {
+			go b.links.closeAll()
+		}
+		b.apply()
+	}
 	b.proxy.OnMode = func(bool) { b.apply() }
 	return b
 }
@@ -102,6 +117,11 @@ func (b *Proxy) Name() string                                  { return "bluetoo
 func (b *Proxy) Entities() []esphome.Entity                    { return b.knobs.Entities() }
 func (b *Proxy) Controls() *setting.Controls[schema.Bluetooth] { return b.knobs }
 func (b *Proxy) Handle(ctx context.Context, conn *esphome.Conn, msg proto.Message) error {
+	if b.links != nil && b.Enabled() {
+		if handled, err := b.links.handle(conn, msg); handled {
+			return err
+		}
+	}
 	return b.proxy.Handle(ctx, conn, msg)
 }
 func (b *Proxy) Enabled() bool { return b.options.Settings.Read().Proxy }
@@ -129,10 +149,13 @@ func (b *Proxy) store(s setting.Setting[schema.Bluetooth], v string) error {
 func (b *Proxy) Reports() uint64 { return b.heard.Load() }
 func (b *Proxy) Dropped() uint64 { return b.dropped.Load() }
 func (b *Proxy) Features() esphome.BluetoothFeature {
-	if b.Enabled() {
-		return Features
+	switch {
+	case !b.Enabled():
+		return 0
+	case b.links != nil:
+		return Features | Connections
 	}
-	return 0
+	return Features
 }
 
 func (b *Proxy) Start(parent context.Context) error {
@@ -227,6 +250,9 @@ func (b *Proxy) run(ctx context.Context) {
 		}
 		halt()
 		if !want {
+			if b.links != nil {
+				b.links.closeAll()
+			}
 			_ = b.proxy.Report(esphome.ScannerStopped)
 			return true
 		}

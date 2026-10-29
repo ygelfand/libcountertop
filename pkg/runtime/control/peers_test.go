@@ -1,4 +1,4 @@
-package callcmd
+package control
 
 import (
 	"net"

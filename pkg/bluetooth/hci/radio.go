@@ -29,7 +29,14 @@ type Radio struct {
 type RadioOptions struct {
 	BringUp func() (*Port, Version, error)
 	Power   func(bool) (bool, error)
+	Quirks  Quirks
 }
+
+type Quirks uint32
+
+const (
+	ControllerSetsParams Quirks = 1 << iota
+)
 
 func NewRadio(options RadioOptions) *Radio { return &Radio{options: options} }
 
@@ -60,6 +67,7 @@ func (r *Radio) Start(parent context.Context) error {
 
 	ctx, stop := context.WithCancel(parent)
 	sess := Reader(ctx, p)
+	sess.quirks = r.options.Quirks
 
 	r.mu.Lock()
 	r.port, r.version, r.local, r.can, r.err = p, v, local, can, nil
@@ -137,19 +145,24 @@ func (r *Radio) Ask(cmd []byte, within time.Duration) (byte, []byte, error) {
 	return e.Code, e.Params, nil
 }
 
-func (r *Radio) Sniff(within time.Duration) ([]string, error) {
+func (r *Radio) Sniff(ctx context.Context, saw func(string)) error {
 	s, err := r.Line()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	r.mu.Lock()
 	p := r.port
 	r.mu.Unlock()
 
-	return append([]string{fmt.Sprintf("the chip is marked %s",
-		map[bool]string{true: "asleep", false: "awake"}[p.Asleep()])},
-		s.Sniff(within)...), nil
+	saw(
+		fmt.Sprintf(
+			"the chip is marked %s",
+			map[bool]string{true: "asleep", false: "awake"}[p.Asleep()],
+		),
+	)
+	s.Sniff(ctx, saw)
+	return nil
 }
 
 func (r *Radio) Line() (*Session, error) {
@@ -171,6 +184,22 @@ func (r *Radio) Scan(ctx context.Context, sc Scanning, found func(Advertisement)
 		return err
 	}
 	return Scan(ctx, s, sc, found)
+}
+
+func (r *Radio) Connect(ctx context.Context, address [6]byte, addressType byte) (*Link, error) {
+	s, err := r.Line()
+	if err != nil {
+		return nil, err
+	}
+	return s.Connect(ctx, address, addressType)
+}
+
+func (r *Radio) Pause() func() {
+	s, err := r.Line()
+	if err != nil {
+		return func() {}
+	}
+	return s.Pause()
 }
 
 func (r *Radio) Speaker(ctx context.Context, name string, on Classic) error {

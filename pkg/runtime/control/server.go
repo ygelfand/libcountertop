@@ -14,7 +14,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-type Dispatch func(context.Context, []string) (string, error)
+type Dispatch func(ctx context.Context, args []string, out io.Writer) error
 
 type Server struct {
 	mu       sync.Mutex
@@ -120,28 +120,58 @@ func Serve(ctx context.Context, conn net.Conn, dispatch Dispatch) {
 		if ctx.Err() != nil {
 			return
 		}
-		args, parseErr := arguments(in.Text())
-		var out string
-		err := parseErr
+		args, err := arguments(in.Text())
+		out := &framed{w: conn}
 		if err == nil && len(args) > 0 {
-			out, err = dispatch(ctx, args)
+			err = dispatch(ctx, args, out)
 		}
-		if reply(conn, out, err) != nil {
+		if out.close() != nil || reply(conn, err) != nil {
 			return
 		}
 	}
 	if err := in.Err(); err != nil && ctx.Err() == nil {
-		_ = reply(conn, "", fmt.Errorf("reading command: %w", err))
+		_ = reply(conn, fmt.Errorf("reading command: %w", err))
 	}
 }
 
-func reply(w io.Writer, out string, failed error) error {
-	var b strings.Builder
-	if out = strings.TrimRight(out, "\n"); out != "" {
-		for line := range strings.SplitSeq(out, "\n") {
-			b.WriteString(markOutput + line + "\n")
-		}
+type framed struct {
+	mu      sync.Mutex
+	w       io.Writer
+	partial []byte
+	err     error
+}
+
+func (f *framed) Write(p []byte) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return 0, f.err
 	}
+	f.partial = append(f.partial, p...)
+	for {
+		i := strings.IndexByte(string(f.partial), '\n')
+		if i < 0 {
+			return len(p), nil
+		}
+		if _, f.err = io.WriteString(f.w, markOutput+string(f.partial[:i])+"\n"); f.err != nil {
+			return 0, f.err
+		}
+		f.partial = f.partial[i+1:]
+	}
+}
+
+func (f *framed) close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err == nil && len(f.partial) > 0 {
+		_, f.err = io.WriteString(f.w, markOutput+string(f.partial)+"\n")
+		f.partial = nil
+	}
+	return f.err
+}
+
+func reply(w io.Writer, failed error) error {
+	var b strings.Builder
 	if failed == nil {
 		b.WriteString(endOK + "\n")
 	} else {
