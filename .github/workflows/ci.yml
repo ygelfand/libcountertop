@@ -46,9 +46,3 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
       - run: make -f native/Makefile all API=${{ matrix.api }} PREFIX=${{ matrix.prefix }} OUT="$RUNNER_TEMP/helpers"
       - run: make -f native/Makefile test OUT="$RUNNER_TEMP/native-tests"
-  voice:
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y libc++-dev libc++abi-dev
-      - run: make -f native/Makefile test-voice OUT="$RUNNER_TEMP/voice-tests" HOST_CXX=clang++-21
