@@ -395,8 +395,12 @@ func (l *session) build(w *gogui.Window) gogui.View {
 			l.v.spinAgain(w)
 		}
 	}
+	level := l.v.o.Shell.Controls()
+	if !shown {
+		level = 1
+	}
 	content = append(content,
-		widgets.CloseCorner(l.v.presses, "doorbell-live-close", l.close),
+		widgets.CloseCorner(l.v.presses, "doorbell-live-close", level, l.close),
 		banner(vw, name, why),
 		l.controls(vw, vh, audible, talking),
 	)

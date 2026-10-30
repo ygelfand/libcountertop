@@ -64,6 +64,7 @@ const (
 type Limits struct {
 	Modes    []Mode
 	FanModes []string
+	Presets  []string
 	Min, Max float64
 	Step     float64
 	features int
@@ -75,6 +76,7 @@ type State struct {
 	Mode     Mode
 	Action   Action
 	Fan      string
+	Preset   string
 	Current  *float64
 	Target   *float64
 	Low      *float64
@@ -143,7 +145,7 @@ type climate struct {
 }
 
 type attributes struct {
-	mode, name, action, fan, current, target, low, high, humidity *states.Value
+	mode, name, action, fan, preset, current, target, low, high, humidity *states.Value
 }
 
 func New(o Options) *Thermostats {
@@ -232,6 +234,14 @@ func (t *Thermostats) SetTemperature(ctx context.Context, entity string, v float
 	return t.call(ctx, entity, "set_temperature", map[string]string{"temperature": number(v)})
 }
 
+func (t *Thermostats) SetPreset(ctx context.Context, entity, preset string) error {
+	return t.call(ctx, entity, "set_preset_mode", map[string]string{"preset_mode": preset})
+}
+
+func (t *Thermostats) SetFan(ctx context.Context, entity, fan string) error {
+	return t.call(ctx, entity, "set_fan_mode", map[string]string{"fan_mode": fan})
+}
+
 func (t *Thermostats) SetRange(ctx context.Context, entity string, low, high float64) error {
 	return t.call(ctx, entity, "set_temperature", map[string]string{
 		"target_temp_low":  number(low),
@@ -281,6 +291,7 @@ func (t *Thermostats) follow() {
 			name:     t.o.States.Follow(e, "friendly_name"),
 			action:   t.o.States.Follow(e, "hvac_action"),
 			fan:      t.o.States.Follow(e, "fan_mode"),
+			preset:   t.o.States.Follow(e, "preset_mode"),
 			current:  t.o.States.Follow(e, "current_temperature"),
 			target:   t.o.States.Follow(e, "temperature"),
 			low:      t.o.States.Follow(e, "target_temp_low"),
@@ -302,7 +313,7 @@ const limitsTemplate = `{%- set ns = namespace(out={}) -%}
 {%- for e in ENTITIES -%}
 {%- set s = states[e] -%}
 {%- if s -%}
-{%- set ns.out = dict(ns.out, **{e: {'modes': s.attributes.get('hvac_modes') or [], 'fans': s.attributes.get('fan_modes') or [], 'min': s.attributes.get('min_temp'), 'max': s.attributes.get('max_temp'), 'step': s.attributes.get('target_temp_step'), 'features': s.attributes.get('supported_features') or 0}}) -%}
+{%- set ns.out = dict(ns.out, **{e: {'modes': s.attributes.get('hvac_modes') or [], 'fans': s.attributes.get('fan_modes') or [], 'presets': s.attributes.get('preset_modes') or [], 'min': s.attributes.get('min_temp'), 'max': s.attributes.get('max_temp'), 'step': s.attributes.get('target_temp_step'), 'features': s.attributes.get('supported_features') or 0}}) -%}
 {%- endif -%}
 {%- endfor -%}
 {{ ns.out | tojson }}`
@@ -310,6 +321,7 @@ const limitsTemplate = `{%- set ns = namespace(out={}) -%}
 type limits struct {
 	Modes    []string `json:"modes"`
 	Fans     []string `json:"fans"`
+	Presets  []string `json:"presets"`
 	Min      *float64 `json:"min"`
 	Max      *float64 `json:"max"`
 	Step     *float64 `json:"step"`
@@ -358,7 +370,7 @@ func fetchLimits(ctx context.Context, c Controller, entities []string) (map[stri
 }
 
 func (l limits) read(unit string) Limits {
-	out := Limits{FanModes: l.Fans, features: l.Features}
+	out := Limits{FanModes: l.Fans, Presets: l.Presets, features: l.Features}
 	for _, m := range l.Modes {
 		out.Modes = append(out.Modes, Mode(m))
 	}
@@ -393,6 +405,9 @@ func (c *climate) read() State {
 	if v, ok := c.values.fan.Get(); ok && !missing(v) {
 		s.Fan = strings.TrimSpace(v)
 	}
+	if v, ok := c.values.preset.Get(); ok && !missing(v) {
+		s.Preset = strings.TrimSpace(v)
+	}
 	s.Current = float(c.values.current)
 	s.Target = float(c.values.target)
 	s.Low = float(c.values.low)
@@ -416,6 +431,15 @@ func float(v *states.Value) *float64 {
 
 func (at attributes) all() []*states.Value {
 	return []*states.Value{
-		at.mode, at.name, at.action, at.fan, at.current, at.target, at.low, at.high, at.humidity,
+		at.mode,
+		at.name,
+		at.action,
+		at.fan,
+		at.preset,
+		at.current,
+		at.target,
+		at.low,
+		at.high,
+		at.humidity,
 	}
 }

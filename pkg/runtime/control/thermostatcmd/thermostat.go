@@ -93,15 +93,16 @@ func Command(
 
 func State(s thermostat.State) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s (%s): mode %s action %s fan %q\n", s.Entity, s.Name, orNone(string(s.Mode)),
-		orNone(string(s.Action)), s.Fan)
+	fmt.Fprintf(&b, "%s (%s): mode %s action %s fan %q preset %q\n", s.Entity, s.Name,
+		orNone(string(s.Mode)), orNone(string(s.Action)), s.Fan, s.Preset)
 	fmt.Fprintf(&b, "  current %s target %s low %s high %s humidity %s\n", value(s.Current),
 		value(s.Target), value(s.Low), value(s.High), value(s.Humidity))
 	fmt.Fprintf(
 		&b,
-		"  modes %v fans %v range %v..%v step %v ranged %v\n",
+		"  modes %v fans %v presets %v range %v..%v step %v ranged %v\n",
 		s.Modes,
 		s.FanModes,
+		s.Presets,
 		s.Min,
 		s.Max,
 		s.Step,

@@ -48,6 +48,9 @@ type Shell struct {
 	dockTimer *time.Timer
 	dockGen   uint64
 
+	controlsAt    time.Time
+	controlsTimer *time.Timer
+
 	Changed hook.Hook[Change]
 	Redrawn hook.Hook[struct{}]
 }
@@ -452,9 +455,57 @@ func (s *Shell) idled(generation uint64) {
 	s.changed()
 }
 
+const (
+	controlsFor  = 3 * time.Second
+	controlsFade = 300 * time.Millisecond
+	controlsStep = 33 * time.Millisecond
+)
+
+func (s *Shell) Controls() float32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return controlsLevel(time.Since(s.controlsAt))
+}
+
+func controlsLevel(since time.Duration) float32 {
+	gone := since - controlsFor
+	switch {
+	case gone <= 0:
+		return 1
+	case gone >= controlsFade:
+		return 0
+	}
+	return 1 - float32(gone)/float32(controlsFade)
+}
+
+func (s *Shell) showControlsLocked() {
+	s.controlsAt = time.Now()
+	if s.controlsTimer != nil {
+		s.controlsTimer.Stop()
+	}
+	at := s.controlsAt
+	s.controlsTimer = time.AfterFunc(controlsFor, func() { s.fadeControls(at) })
+}
+
+func (s *Shell) fadeControls(at time.Time) {
+	s.mu.Lock()
+	if !s.controlsAt.Equal(at) {
+		s.mu.Unlock()
+		return
+	}
+	if time.Since(at) < controlsFor+controlsFade {
+		s.controlsTimer = time.AfterFunc(controlsStep, func() { s.fadeControls(at) })
+	} else {
+		s.controlsTimer = nil
+	}
+	s.mu.Unlock()
+	s.Redraw()
+}
+
 func (s *Shell) wake() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.showControlsLocked()
 	s.generation++
 	if s.timer != nil {
 		s.timer.Stop()

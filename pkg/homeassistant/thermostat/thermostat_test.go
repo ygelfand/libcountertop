@@ -186,6 +186,43 @@ func TestSettingARangeSendsBothEnds(t *testing.T) {
 	}
 }
 
+func TestPresetAndFanAreReadAndSent(t *testing.T) {
+	th, s, h := setup("climate.hall")
+	report(s, "climate.hall", "", "heat")
+	report(s, "climate.hall", "preset_mode", "eco")
+	report(s, "climate.hall", "fan_mode", "low")
+	st := th.States()[0]
+	if st.Preset != "eco" || st.Fan != "low" {
+		t.Errorf("preset %q fan %q, want eco and low", st.Preset, st.Fan)
+	}
+	if err := th.SetPreset(context.Background(), "climate.hall", "away"); err != nil {
+		t.Fatal(err)
+	}
+	if err := th.SetFan(context.Background(), "climate.hall", "high"); err != nil {
+		t.Fatal(err)
+	}
+	sent := h.sent()
+	if len(sent) != 2 {
+		t.Fatalf("sent %d calls, want 2", len(sent))
+	}
+	if p := sent[0]; p.action != "climate.set_preset_mode" || p.data["preset_mode"] != "away" {
+		t.Errorf("preset call = %+v", p)
+	}
+	if f := sent[1]; f.action != "climate.set_fan_mode" || f.data["fan_mode"] != "high" {
+		t.Errorf("fan call = %+v", f)
+	}
+	got := map[string]limits{}
+	if err := json.Unmarshal(
+		[]byte(`{"climate.hall": {"presets": ["none", "eco"]}}`),
+		&got,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if l := got["climate.hall"].read("°F"); len(l.Presets) != 2 || l.Presets[1] != "eco" {
+		t.Errorf("presets %v, want none and eco", l.Presets)
+	}
+}
+
 func TestOnlyChosenThermostatsAreChanged(t *testing.T) {
 	th, _, h := setup("climate.hall")
 	if err := th.SetTemperature(context.Background(), "climate.garage", 60); err != ErrUnknown {

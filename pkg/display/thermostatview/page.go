@@ -151,12 +151,13 @@ func (p preview) View(w *gogui.Window, width, height float32) gogui.View {
 		v: p.v, w: w, vw: width, vh: height, st: st, unit: p.v.o.Thermostats.Unit(),
 		still: true, now: time.Now(),
 	}
-	body, sk := lookOf(p.look).draw(f)
+	lk := lookOf(p.look)
+	body := f.render(lk, false)
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   width,
 		Height:  height,
 		Sizing:  gogui.FixedFixed,
-		Color:   sk.back,
+		Color:   lk.back,
 		Radius:  gogui.RadiusMedium,
 		Padding: gogui.NoPadding,
 		Clip:    true,

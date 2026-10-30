@@ -404,7 +404,7 @@ func (c *Cameras) collage(w *gogui.Window, at ui.Rect, full bool) gogui.View {
 			Sizing:  gogui.FillFill,
 			Padding: gogui.NoPadding,
 			Color:   gogui.RGB(0, 0, 0),
-			Content: append(c.corners(vw), c.note(c.emptyNote())),
+			Content: append(c.corners(vw, 1), c.note(c.emptyNote())),
 		})
 	}
 	target := RowHeight(c.o.Settings.Read().Scale, float64(vw))
@@ -473,7 +473,7 @@ func (c *Cameras) collage(w *gogui.Window, at ui.Rect, full bool) gogui.View {
 		OnGesture: c.swipe,
 	}
 	if full {
-		views = append(views, c.corners(vw)...)
+		views = append(views, c.corners(vw, c.o.Shell.Controls())...)
 		cfg.Color = gogui.RGB(0, 0, 0)
 	}
 	cfg.Content = views
@@ -782,7 +782,14 @@ func (c *Cameras) buildLive(w *gogui.Window) gogui.View {
 			widgets.Placed(ui.Rect{W: vw, H: vh}, widgets.Spinner(vw, vh, time.Since(began))))
 		c.spinAgain(w)
 	}
-	content = append(content, widgets.CloseCorner(c.presses, "camera-live-close", c.closeLive))
+	level := c.o.Shell.Controls()
+	if video == nil {
+		level = 1
+	}
+	content = append(
+		content,
+		widgets.CloseCorner(c.presses, "camera-live-close", level, c.closeLive),
+	)
 	if video != nil || f.src != "" {
 		content = append(content, mode(vw, video != nil))
 	}
@@ -930,13 +937,14 @@ func (c *Cameras) emptyNote() string {
 	return say.T("cameras.none")
 }
 
-func (c *Cameras) corners(vw int) []gogui.View {
+func (c *Cameras) corners(vw int, level float32) []gogui.View {
 	return []gogui.View{
-		widgets.CloseCorner(c.presses, "cameras-close", func() { c.o.Shell.Remove(c.grid) }),
+		widgets.CloseCorner(c.presses, "cameras-close", level, func() { c.o.Shell.Remove(c.grid) }),
 		widgets.SettingsCorner(
 			c.presses,
 			"cameras-settings",
 			vw,
+			level,
 			func() { c.o.Shell.Push(c.Page()) },
 		),
 	}

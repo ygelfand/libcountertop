@@ -768,29 +768,49 @@ thermostat.entity.tab: Thermostat dashboard tab
 thermostat.setting.entities: Thermostats
 thermostat.chosen: "{{.N}} of {{.Of}}"
 thermostat.full: "Up to {{.N}}; turn one off first"
-thermostat.look.minimal: Minimal
-thermostat.look.editorial: Editorial
-thermostat.look.pill: Pill
-thermostat.look.top: Top
-thermostat.look.vault: Vault (green)
-thermostat.look.vault-amber: Vault (amber)
-thermostat.pip.stat: Stat
-thermostat.pip.temp: Temp
-thermostat.pip.data: Data
-thermostat.pip.map: Map
-thermostat.pip.radio: Radio
-thermostat.pip.target: Target
-thermostat.pip.inside: Inside
-thermostat.pip.outside: Outside
-thermostat.look.shrine: Shrine
-thermostat.look.hud: HUD
-thermostat.look.grid: Grid
-thermostat.look.tars: Telemetry
-thermostat.look.hal: Red eye
-thermostat.look.matrix: Matrix
-thermostat.look.target: Targeting
-thermostat.look.lab: Lab panel
+thermostat.look.dial: Dial
+thermostat.look.column: Column
+thermostat.look.wheel: Wheel
+thermostat.look.bars: Bars
+thermostat.look.split: Split
+thermostat.look.terminal: Terminal
 thermostat.look.brass: Brass
+thermostat.look.mission: Mission
+thermostat.choose.mode: Mode
+thermostat.choose.preset: Preset
+thermostat.choose.fan: Fan
+thermostat.inside: Inside
+thermostat.outside: Outside
+thermostat.set: Set
+thermostat.setpoint: Set point
+thermostat.low: Low
+thermostat.high: High
+thermostat.no-preset: No preset
+thermostat.action.heating: Heating
+thermostat.action.cooling: Cooling
+thermostat.action.drying: Drying
+thermostat.action.fan: Fan
+thermostat.action.idle: Idle
+thermostat.action.off: "Off"
+thermostat.lamp.fan: Fan run
+thermostat.environment: Environmental control
+thermostat.preset.none: None
+thermostat.preset.away: Away
+thermostat.preset.eco: Eco
+thermostat.preset.home: Home
+thermostat.preset.sleep: Sleep
+thermostat.preset.comfort: Comfort
+thermostat.preset.boost: Boost
+thermostat.preset.activity: Activity
+thermostat.fanmode.auto: Auto
+thermostat.fanmode.on: "On"
+thermostat.fanmode.off: "Off"
+thermostat.fanmode.low: Low
+thermostat.fanmode.medium: Medium
+thermostat.fanmode.middle: Middle
+thermostat.fanmode.high: High
+thermostat.fanmode.focus: Focus
+thermostat.fanmode.diffuse: Diffuse
 thermostat.none: No thermostats chosen
 thermostat.waiting: Waiting for Home Assistant
 thermostat.unavailable: Unavailable

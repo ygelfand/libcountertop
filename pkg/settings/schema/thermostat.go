@@ -9,40 +9,26 @@ import (
 type ThermostatLook string
 
 const (
-	ThermostatMinimal   ThermostatLook = "minimal"
-	ThermostatEditorial ThermostatLook = "editorial"
-	ThermostatPill      ThermostatLook = "pill"
-	ThermostatVault     ThermostatLook = "vault"
-	ThermostatVaultNV   ThermostatLook = "vault-amber"
-	ThermostatShrine    ThermostatLook = "shrine"
-	ThermostatHUD       ThermostatLook = "hud"
-	ThermostatMatrix    ThermostatLook = "matrix"
-	ThermostatTarget    ThermostatLook = "target"
-	ThermostatLab       ThermostatLook = "lab"
-	ThermostatGrid      ThermostatLook = "grid"
-	ThermostatHAL       ThermostatLook = "hal"
-	ThermostatTop       ThermostatLook = "top"
-	ThermostatTARS      ThermostatLook = "tars"
-	ThermostatBrass     ThermostatLook = "brass"
+	ThermostatDial     ThermostatLook = "dial"
+	ThermostatColumn   ThermostatLook = "column"
+	ThermostatWheel    ThermostatLook = "wheel"
+	ThermostatBars     ThermostatLook = "bars"
+	ThermostatSplit    ThermostatLook = "split"
+	ThermostatTerminal ThermostatLook = "terminal"
+	ThermostatBrass    ThermostatLook = "brass"
+	ThermostatMission  ThermostatLook = "mission"
 )
 
 func ThermostatLooks() []ThermostatLook {
 	return []ThermostatLook{
-		ThermostatEditorial,
-		ThermostatPill,
-		ThermostatTop,
-		ThermostatVault,
-		ThermostatVaultNV,
-		ThermostatShrine,
-		ThermostatHUD,
-		ThermostatGrid,
-		ThermostatTARS,
-		ThermostatHAL,
-		ThermostatMatrix,
-		ThermostatTarget,
-		ThermostatLab,
+		ThermostatDial,
+		ThermostatColumn,
+		ThermostatWheel,
+		ThermostatBars,
+		ThermostatSplit,
+		ThermostatTerminal,
 		ThermostatBrass,
-		ThermostatMinimal,
+		ThermostatMission,
 	}
 }
 
@@ -61,4 +47,4 @@ func (t Thermostat) Clone() Thermostat {
 	return t
 }
 
-func DefaultThermostat() Thermostat { return Thermostat{Look: ThermostatEditorial} }
+func DefaultThermostat() Thermostat { return Thermostat{Look: ThermostatDial} }

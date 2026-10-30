@@ -9,22 +9,34 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-func CloseCorner(p *interaction.Presses, id string, tap func()) gogui.View {
-	return CloseCornerAt(p, id, int(gogui.PadLarge), tap)
+func CloseCorner(p *interaction.Presses, id string, level float32, tap func()) gogui.View {
+	return CloseCornerAt(p, id, int(gogui.PadLarge), level, tap)
 }
 
-func CloseCornerAt(p *interaction.Presses, id string, x int, tap func()) gogui.View {
-	return corner(p, id, gogui.IconClose, cornerStyle(), x, tap)
+func CloseCornerAt(p *interaction.Presses, id string, x int, level float32, tap func()) gogui.View {
+	return corner(p, id, gogui.IconClose, cornerStyle(), x, level, tap)
 }
 
-func SettingsCorner(p *interaction.Presses, id string, vw int, tap func()) gogui.View {
-	return SettingsCornerAt(p, id, vw-int(gogui.PadLarge)-CornerSide(), tap)
+func SettingsCorner(
+	p *interaction.Presses,
+	id string,
+	vw int,
+	level float32,
+	tap func(),
+) gogui.View {
+	return SettingsCornerAt(p, id, vw-int(gogui.PadLarge)-CornerSide(), level, tap)
 }
 
-func SettingsCornerAt(p *interaction.Presses, id string, x int, tap func()) gogui.View {
+func SettingsCornerAt(
+	p *interaction.Presses,
+	id string,
+	x int,
+	level float32,
+	tap func(),
+) gogui.View {
 	st := cornerStyle()
 	st.Family = icons.Family
-	return corner(p, id, icons.Glyph(icons.Named("mdi:cog")), st, x, tap)
+	return corner(p, id, icons.Glyph(icons.Named("mdi:cog")), st, x, level, tap)
 }
 
 func CornerSide() int { return int(cornerStyle().Size * 2) }
@@ -41,12 +53,23 @@ func corner(
 	id, glyph string,
 	st gogui.TextStyle,
 	x int,
+	level float32,
 	tap func(),
 ) gogui.View {
+	if level <= 0 {
+		return Placed(ui.Rect{}, gogui.Column(gogui.ContainerCfg{Padding: gogui.NoPadding}))
+	}
 	side := int(st.Size * 2)
 	pad := int(gogui.PadLarge)
+	st.Color = st.Color.WithOpacity(min(level, 1))
 	return Placed(
 		ui.Rect{X: x, Y: pad, W: side, H: side},
-		p.Button(id, glyph, st, gogui.RGBA(0, 0, 0, 0x99), func(gogui.EventCtx) { tap() }),
+		p.Button(
+			id,
+			glyph,
+			st,
+			gogui.RGBA(0, 0, 0, uint8(0x99*min(level, 1))),
+			func(gogui.EventCtx) { tap() },
+		),
 	)
 }

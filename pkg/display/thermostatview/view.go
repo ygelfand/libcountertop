@@ -15,8 +15,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/apps"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/thermostat"
@@ -31,7 +29,7 @@ const (
 	sendWait  = 15 * time.Second
 	keepFor   = 10 * time.Second
 	lingerFor = 3 * time.Minute
-	frame     = 50 * time.Millisecond
+	frame     = 33 * time.Millisecond
 )
 
 type Options struct {
@@ -41,13 +39,6 @@ type Options struct {
 	Settings    storage.Section[schema.Thermostat]
 	Clock24     func() bool
 	Outside     func() (float64, bool)
-	Backdrop    func(kind visual.Kind, showing func() bool) Backdrop
-	Tabbed      func() bool
-}
-
-type Backdrop interface {
-	KeepAt(area ui.Rect)
-	Close()
 }
 
 type App struct{}
@@ -67,6 +58,7 @@ const (
 type pending struct {
 	target, low, high *float64
 	mode              thermostat.Mode
+	preset, fan       string
 	at                time.Time
 	send              *time.Timer
 }
@@ -80,27 +72,25 @@ type View struct {
 	pending   map[string]*pending
 	ends      map[string]End
 	notes     map[string]string
-	shuffles  map[string]shuffle
+	eases     map[string]*ease
+	choosing  *chooser
+	dragging  drag
 	rehearsed []thermostat.State
-	screen    slot
-	tab       slot
 }
 
 func New(o Options) *View {
 	v := &View{
-		o:        o,
-		app:      &App{},
-		pending:  map[string]*pending{},
-		ends:     map[string]End{},
-		notes:    map[string]string{},
-		shuffles: map[string]shuffle{},
+		o:       o,
+		app:     &App{},
+		pending: map[string]*pending{},
+		ends:    map[string]End{},
+		notes:   map[string]string{},
+		eases:   map[string]*ease{},
 	}
-	v.screen.showing = func() bool { return o.Shell.Visible(v.app) }
-	v.tab.showing = o.Tabbed
 	o.Thermostats.Updated.Listen(func(struct{}) { o.Shell.Redraw() })
 	o.Shell.Changed.Listen(func(shell.Change) {
 		if !o.Shell.Visible(v.app) {
-			v.drop(&v.screen)
+			v.close()
 		}
 	})
 	return v
@@ -165,6 +155,12 @@ func (p *pending) over(s thermostat.State) thermostat.State {
 	if p.mode != "" {
 		s.Mode = p.mode
 	}
+	if p.preset != "" {
+		s.Preset = p.preset
+	}
+	if p.fan != "" {
+		s.Fan = p.fan
+	}
 	return s
 }
 
@@ -173,7 +169,8 @@ func (p *pending) settled(s thermostat.State) bool {
 		return want == nil || got != nil && math.Abs(*want-*got) < 0.01
 	}
 	return same(p.target, s.Target) && same(p.low, s.Low) && same(p.high, s.High) &&
-		(p.mode == "" || p.mode == s.Mode)
+		(p.mode == "" || p.mode == s.Mode) && (p.preset == "" || p.preset == s.Preset) &&
+		(p.fan == "" || p.fan == s.Fan)
 }
 
 func (v *View) find(entity string) (thermostat.State, bool) {
@@ -188,6 +185,10 @@ func (v *View) find(entity string) (thermostat.State, bool) {
 func (v *View) end(entity string) End {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	return v.endLocked(entity)
+}
+
+func (v *View) endLocked(entity string) End {
 	if e, ok := v.ends[entity]; ok {
 		return e
 	}
@@ -206,10 +207,25 @@ func (v *View) nudge(entity string, steps int) {
 	if !ok || !s.Settable() {
 		return
 	}
-	move := func(at float64) *float64 {
-		n := s.Clamp(math.Round((at+float64(steps)*s.Step)/s.Step) * s.Step)
-		return &n
+	at := s.Target
+	if s.Ranged() {
+		at = s.Low
+		if v.end(entity) == High {
+			at = s.High
+		}
 	}
+	if at == nil {
+		return
+	}
+	v.place(entity, *at+float64(steps)*s.Step)
+}
+
+func (v *View) place(entity string, to float64) {
+	s, ok := v.find(entity)
+	if !ok || !s.Settable() {
+		return
+	}
+	to = s.Clamp(math.Round(to/s.Step) * s.Step)
 	v.mu.Lock()
 	p, ok := v.pending[entity]
 	if !ok {
@@ -219,13 +235,13 @@ func (v *View) nudge(entity string, steps int) {
 	if s.Ranged() {
 		low, high := *s.Low, *s.High
 		if v.endLocked(entity) == High {
-			high = max(*move(high), low+s.Step)
+			high = max(to, low+s.Step)
 		} else {
-			low = min(*move(low), high-s.Step)
+			low = min(to, high-s.Step)
 		}
 		p.low, p.high = &low, &high
 	} else {
-		p.target = move(*s.Target)
+		p.target = &to
 	}
 	p.at = time.Now()
 	if p.send != nil {
@@ -235,13 +251,6 @@ func (v *View) nudge(entity string, steps int) {
 	delete(v.notes, entity)
 	v.mu.Unlock()
 	v.o.Shell.Redraw()
-}
-
-func (v *View) endLocked(entity string) End {
-	if e, ok := v.ends[entity]; ok {
-		return e
-	}
-	return Low
 }
 
 func (v *View) flush(entity string) {
@@ -255,11 +264,7 @@ func (v *View) flush(entity string) {
 	target, low, high := p.target, p.low, p.high
 	rehearsing := v.rehearsed != nil
 	if rehearsing {
-		for i, s := range v.rehearsed {
-			if s.Entity == entity {
-				v.rehearsed[i] = p.over(s)
-			}
-		}
+		v.rehearseLocked(entity, p.over)
 		delete(v.pending, entity)
 	}
 	v.mu.Unlock()
@@ -276,14 +281,41 @@ func (v *View) flush(entity string) {
 }
 
 func (v *View) setMode(entity string, m thermostat.Mode) {
+	v.choose(entity, func(p *pending) { p.mode = m }, func(s thermostat.State) thermostat.State {
+		s.Mode, s.Action = m, rehearsedAction(m)
+		return s
+	}, func(ctx context.Context) error { return v.o.Thermostats.SetMode(ctx, entity, m) })
+}
+
+func (v *View) setPreset(entity, preset string) {
+	v.choose(
+		entity,
+		func(p *pending) { p.preset = preset },
+		func(s thermostat.State) thermostat.State {
+			s.Preset = preset
+			return s
+		},
+		func(ctx context.Context) error { return v.o.Thermostats.SetPreset(ctx, entity, preset) },
+	)
+}
+
+func (v *View) setFan(entity, fan string) {
+	v.choose(entity, func(p *pending) { p.fan = fan }, func(s thermostat.State) thermostat.State {
+		s.Fan = fan
+		return s
+	}, func(ctx context.Context) error { return v.o.Thermostats.SetFan(ctx, entity, fan) })
+}
+
+func (v *View) choose(
+	entity string,
+	mark func(*pending),
+	rehearse func(thermostat.State) thermostat.State,
+	do func(context.Context) error,
+) {
 	v.mu.Lock()
+	v.choosing = nil
 	if v.rehearsed != nil {
-		for i, s := range v.rehearsed {
-			if s.Entity == entity {
-				v.rehearsed[i].Mode = m
-				v.rehearsed[i].Action = rehearsedAction(m)
-			}
-		}
+		v.rehearseLocked(entity, rehearse)
 		v.mu.Unlock()
 		v.o.Shell.Redraw()
 		return
@@ -293,13 +325,20 @@ func (v *View) setMode(entity string, m thermostat.Mode) {
 		p = &pending{}
 		v.pending[entity] = p
 	}
-	p.mode, p.at = m, time.Now()
+	mark(p)
+	p.at = time.Now()
 	delete(v.notes, entity)
 	v.mu.Unlock()
 	v.o.Shell.Redraw()
-	v.send(entity, func(ctx context.Context) error {
-		return v.o.Thermostats.SetMode(ctx, entity, m)
-	})
+	v.send(entity, do)
+}
+
+func (v *View) rehearseLocked(entity string, change func(thermostat.State) thermostat.State) {
+	for i, s := range v.rehearsed {
+		if s.Entity == entity {
+			v.rehearsed[i] = change(s)
+		}
+	}
 }
 
 func (v *View) send(entity string, do func(context.Context) error) {
@@ -340,43 +379,4 @@ func (v *View) again(w *gogui.Window) {
 		v.animating.Store(false)
 		w.QueueCommand(func(w *gogui.Window) { w.InvalidateLayout() })
 	})
-}
-
-type slot struct {
-	shown   Backdrop
-	kind    visual.Kind
-	showing func() bool
-}
-
-func (v *View) keep(s *slot, kind visual.Kind, at ui.Rect) bool {
-	if v.o.Backdrop == nil || s.showing == nil {
-		return false
-	}
-	v.mu.Lock()
-	old := s.shown
-	if old != nil && s.kind != kind {
-		s.shown = nil
-	} else {
-		old = nil
-	}
-	if s.shown == nil {
-		s.shown, s.kind = v.o.Backdrop(kind, s.showing), kind
-	}
-	b := s.shown
-	v.mu.Unlock()
-	if old != nil {
-		old.Close()
-	}
-	b.KeepAt(at)
-	return true
-}
-
-func (v *View) drop(s *slot) {
-	v.mu.Lock()
-	b := s.shown
-	s.shown = nil
-	v.mu.Unlock()
-	if b != nil {
-		b.Close()
-	}
 }

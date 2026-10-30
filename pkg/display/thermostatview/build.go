@@ -9,7 +9,6 @@ import (
 	kit "github.com/ygelfand/libcountertop/pkg/display/panelkit"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/thermostat"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -19,33 +18,30 @@ import (
 const TabKind = "thermostat"
 
 type look struct {
-	draw     func(f *face) (gogui.View, skin)
-	backdrop visual.Kind
+	id    schema.ThermostatLook
+	back  gogui.Color
+	sheet sheet
+	draw  func(f *face)
 }
 
 var looks = map[schema.ThermostatLook]look{
-	schema.ThermostatMinimal:   {draw: minimalLook},
-	schema.ThermostatEditorial: {draw: editorialLook},
-	schema.ThermostatPill:      {draw: pillLook},
-	schema.ThermostatTop:       {draw: topLook, backdrop: visual.AmbientRipple},
-	schema.ThermostatVault:     {draw: pipGreen, backdrop: visual.AmbientPip3},
-	schema.ThermostatVaultNV:   {draw: pipAmber, backdrop: visual.AmbientPipNV},
-	schema.ThermostatShrine:    {draw: shrineLook, backdrop: visual.AmbientShrine},
-	schema.ThermostatHUD:       {draw: hudLook, backdrop: visual.AmbientRings},
-	schema.ThermostatGrid:      {draw: gridLook, backdrop: visual.AmbientGrid},
-	schema.ThermostatTARS:      {draw: tarsLook},
-	schema.ThermostatHAL:       {draw: halLook, backdrop: visual.AmbientEye},
-	schema.ThermostatMatrix:    {draw: matrixLook, backdrop: visual.AmbientMatrix},
-	schema.ThermostatTarget:    {draw: targetLook, backdrop: visual.AmbientReticle},
-	schema.ThermostatLab:       {draw: labLook},
-	schema.ThermostatBrass:     {draw: brassLook},
+	schema.ThermostatDial:     dialLook,
+	schema.ThermostatColumn:   columnLook,
+	schema.ThermostatWheel:    wheelLook,
+	schema.ThermostatBars:     barsLook,
+	schema.ThermostatSplit:    splitLook,
+	schema.ThermostatTerminal: terminalLook,
+	schema.ThermostatBrass:    brassLook,
+	schema.ThermostatMission:  missionLook,
 }
 
 func lookOf(l schema.ThermostatLook) look {
-	if lk, ok := looks[l]; ok {
-		return lk
+	lk, ok := looks[l]
+	if !ok {
+		l, lk = schema.ThermostatDial, looks[schema.ThermostatDial]
 	}
-	return looks[schema.ThermostatEditorial]
+	lk.id = l
+	return lk
 }
 
 func tiles(n int, w, h, gap float32) []rect {
@@ -62,9 +58,10 @@ func tiles(n int, w, h, gap float32) []rect {
 	case 3:
 		hw, hh := (w-gap)/2, (h-gap)/2
 		if w >= h {
-			return []rect{{0, 0, hw, hh}, {hw + gap, 0, hw, hh}, {0, hh + gap, w, hh}}
+			return []rect{{0, 0, hw, h}, {hw + gap, 0, hw, hh}, {hw + gap, hh + gap, hw, hh}}
 		}
-		return []rect{{0, 0, w, hh}, {0, hh + gap, hw, hh}, {hw + gap, hh + gap, hw, hh}}
+		th := (h - 2*gap) / 3
+		return []rect{{0, 0, w, th}, {0, th + gap, w, th}, {0, 2 * (th + gap), w, th}}
 	}
 	hw, hh := (w-gap)/2, (h-gap)/2
 	return []rect{
@@ -77,15 +74,10 @@ func (v *View) build(w *gogui.Window) gogui.View {
 	ww, wh := w.WindowSize()
 	vw, vh := float32(ww), float32(wh)
 	lk := lookOf(v.look())
-	animated := lk.backdrop != "" && v.keep(&v.screen, lk.backdrop, ui.Rect{W: ww, H: wh})
-	if lk.backdrop == "" {
-		v.drop(&v.screen)
-	}
-	body, back := v.grid(w, rect{0, 0, vw, vh}, lk, animated, false)
-	content := []gogui.View{body}
+	content := []gogui.View{v.grid(w, rect{0, 0, vw, vh}, lk, false)}
 	content = append(content, v.corners(vw)...)
-	if animated {
-		back = gogui.RGBA(0, 0, 0, 0)
+	if c := v.sheetView(w, vw, vh, lk); c != nil {
+		content = append(content, c)
 	}
 	return gogui.Stack(gogui.ContainerCfg{
 		ID:      "thermostat",
@@ -93,68 +85,58 @@ func (v *View) build(w *gogui.Window) gogui.View {
 		Height:  vh,
 		Sizing:  gogui.FixedFixed,
 		Padding: gogui.NoPadding,
-		Color:   back,
+		Color:   hex(0x0b0d0f),
 		Clip:    true,
 		Content: content,
 	})
 }
 
-func (v *View) grid(
-	w *gogui.Window,
-	at rect,
-	lk look,
-	animated, board bool,
-) (gogui.View, gogui.Color) {
+func (v *View) grid(w *gogui.Window, at rect, lk look, board bool) gogui.View {
 	list := v.shown()
 	if len(list) == 0 {
 		list = []thermostat.State{{}}
 	}
 	gap := float32(0)
 	if len(list) > 1 {
-		gap = min(at.w, at.h) * 0.02
+		gap = min(at.w, at.h) * 0.015
 	}
 	unit := v.o.Thermostats.Unit()
 	now := time.Now()
-	reserve := float32(0)
-	if !board {
-		reserve = float32(2*(widgets.CornerSide()+int(gogui.PadLarge)) + int(gogui.PadLarge))
-	}
-	var back gogui.Color
 	views := make([]gogui.View, 0, len(list))
 	for i, r := range tiles(len(list), at.w, at.h, gap) {
 		f := &face{
 			v: v, w: w, vw: r.w, vh: r.h, st: list[i], unit: unit, now: now, board: board,
 		}
-		if r.y == 0 && r.x+r.w >= at.w-1 {
-			f.reserve = reserve
-		}
-		body, sk := lk.draw(f)
-		if i == 0 {
-			back = sk.back
-		}
-		fill := sk.back
-		if animated {
-			fill = gogui.RGBA(0, 0, 0, 0)
-		}
-		radius := float32(0)
-		if len(list) > 1 {
-			radius = min(r.w, r.h) * 0.04
-		}
-		views = append(views, r.place(gogui.Stack(gogui.ContainerCfg{
-			Width: r.w, Height: r.h, Sizing: gogui.FixedFixed, Padding: gogui.NoPadding,
-			Color: fill, Radius: gogui.RadiusPx(radius), Clip: true, Content: []gogui.View{body},
-		})))
+		views = append(views, r.place(f.render(lk, len(list) > 1)))
 	}
-	return kit.Stack(at.w, at.h, views...), back
+	return kit.Stack(at.w, at.h, views...)
+}
+
+func (f *face) render(lk look, rounded bool) gogui.View {
+	f.frame()
+	f.look = lk.id
+	lk.draw(f)
+	body := f.view(lk.back)
+	if !rounded {
+		return body
+	}
+	return gogui.Stack(gogui.ContainerCfg{
+		Width: f.vw, Height: f.vh, Sizing: gogui.FixedFixed, Padding: gogui.NoPadding,
+		Radius: gogui.RadiusPx(min(f.vw, f.vh) * 0.035), Clip: true, Content: []gogui.View{body},
+	})
 }
 
 func (v *View) corners(vw float32) []gogui.View {
 	p := v.o.UI.Presses
 	side, pad := widgets.CornerSide(), int(gogui.PadLarge)
 	x := int(vw) - pad - side
+	level := v.o.Shell.Controls()
+	if list := v.shown(); len(list) == 0 || !list[0].Available() {
+		level = 1
+	}
 	return []gogui.View{
-		widgets.CloseCornerAt(p, "thermostat-close", x, func() { v.o.Shell.Remove(v.app) }),
-		widgets.SettingsCornerAt(p, "thermostat-settings", x-pad-side,
+		widgets.CloseCornerAt(p, "thermostat-close", x, level, func() { v.o.Shell.Remove(v.app) }),
+		widgets.SettingsCornerAt(p, "thermostat-settings", x-pad-side, level,
 			func() { v.o.Shell.Push(v.Page()) }),
 	}
 }
@@ -169,27 +151,12 @@ func (v *View) DashboardTabs() []dashboard.Tab {
 
 func (*View) Glyph(dashboard.Tab) string { return gogui.IconSunnyO }
 
-func (v *View) Ground(_ dashboard.Tab, at ui.Rect) bool {
-	lk := lookOf(v.look())
-	if lk.backdrop == "" || !v.keep(&v.tab, lk.backdrop, at) {
-		v.drop(&v.tab)
-		return false
-	}
-	return true
-}
-
-func (v *View) grounded(lk look) bool {
-	return lk.backdrop != "" && v.o.Backdrop != nil && v.o.Tabbed != nil
-}
-
 func (v *View) Board(w *gogui.Window, at ui.Rect, _ dashboard.Tab, _ theme.Theme) gogui.View {
 	r := rect{0, 0, float32(at.W), float32(at.H)}
 	lk := lookOf(v.look())
-	animated := v.grounded(lk)
-	body, back := v.grid(w, r, lk, animated, true)
-	radius := gogui.RadiusMedium
-	if animated {
-		back, radius = gogui.RGBA(0, 0, 0, 0), gogui.RadiusPx(0)
+	content := []gogui.View{v.grid(w, r, lk, true)}
+	if c := v.sheetView(w, r.w, r.h, lk); c != nil {
+		content = append(content, c)
 	}
 	return widgets.Placed(at, gogui.Stack(gogui.ContainerCfg{
 		ID:      "thermostat-board",
@@ -197,9 +164,8 @@ func (v *View) Board(w *gogui.Window, at ui.Rect, _ dashboard.Tab, _ theme.Theme
 		Height:  r.h,
 		Sizing:  gogui.FixedFixed,
 		Padding: gogui.NoPadding,
-		Color:   back,
-		Radius:  radius,
+		Radius:  gogui.RadiusMedium,
 		Clip:    true,
-		Content: []gogui.View{body},
+		Content: content,
 	}))
 }

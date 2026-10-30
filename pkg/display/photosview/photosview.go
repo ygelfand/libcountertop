@@ -133,11 +133,15 @@ func (v *View) build(w *gogui.Window) gogui.View {
 		}
 		v.frame.Previous(time.Now())
 	})...)
+	level := v.o.Shell.Controls()
+	if _, ok := v.frame.Current(); !ok {
+		level = 1
+	}
 	content = append(content,
-		widgets.CloseCorner(v.presses, "photos-close", func() { v.o.Shell.Remove(v.app) }),
+		widgets.CloseCorner(v.presses, "photos-close", level, func() { v.o.Shell.Remove(v.app) }),
 	)
 	if v.o.Page != nil {
-		content = append(content, widgets.SettingsCorner(v.presses, "photos-settings", vw,
+		content = append(content, widgets.SettingsCorner(v.presses, "photos-settings", vw, level,
 			func() { v.o.Shell.Push(v.o.Page()) }))
 	}
 	return gogui.Column(gogui.ContainerCfg{

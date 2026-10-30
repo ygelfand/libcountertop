@@ -351,3 +351,25 @@ func TestAHoldRefusedByASleepingTopIsNotRecorded(t *testing.T) {
 		t.Error("a refused hold is still recorded")
 	}
 }
+
+func TestControlsShowThenFade(t *testing.T) {
+	for _, c := range []struct {
+		since time.Duration
+		want  float32
+	}{
+		{0, 1},
+		{controlsFor, 1},
+		{controlsFor + controlsFade/2, 0.5},
+		{controlsFor + controlsFade, 0},
+		{time.Minute, 0},
+	} {
+		if got := controlsLevel(c.since); got != c.want {
+			t.Errorf("after %v level %v, want %v", c.since, got, c.want)
+		}
+	}
+	s := New()
+	s.Push(&view{covers: true})
+	if got := s.Controls(); got != 1 {
+		t.Errorf("right after opening %v, want 1", got)
+	}
+}

@@ -453,11 +453,12 @@ func (f *face) corners() []gogui.View {
 	p := f.v.o.UI.Presses
 	side, pad := widgets.CornerSide(), int(gogui.PadLarge)
 	x := int(f.vw) - pad - side
+	level := f.v.o.Shell.Controls()
 	out := []gogui.View{
-		widgets.CloseCornerAt(p, "homealarm-close", x, func() { f.v.close(f.current()) }),
+		widgets.CloseCornerAt(p, "homealarm-close", x, level, func() { f.v.close(f.current()) }),
 	}
 	if !f.popup {
-		out = append(out, widgets.SettingsCornerAt(p, "homealarm-settings", x-pad-side,
+		out = append(out, widgets.SettingsCornerAt(p, "homealarm-settings", x-pad-side, level,
 			func() { f.v.o.Shell.Push(f.v.Page()) }))
 	}
 	return out
