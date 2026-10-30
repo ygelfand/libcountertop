@@ -42,6 +42,21 @@ type Engine struct {
 	Load func() error
 
 	Paused func() bool
+
+	// Optional synchronous observation hooks. Set before Start/Run and leave them
+	// unchanged until Close. They must return promptly, never re-enter Engine,
+	// and must not change the supplied audio. Nil hooks leave behavior unchanged.
+	// OnFrame receives borrowed PCM before scoring (also while paused); copy
+	// samples before retaining them. dropped is the source's cumulative counter.
+	OnFrame func(frame []int16, paused bool, dropped uint64)
+	// OnScore runs for every fresh score, including hold and refractory frames.
+	// crossing means the frame starts a detection; suppressed means refractory.
+	OnScore func(slot int, score, cutoff float64, crossing, suppressed bool, dropped uint64)
+	// OnPeak reports the completed hold peak, not another detection.
+	OnPeak func(slot int, peak float64)
+	// OnModel runs after a successful model load, under the engine lock.
+	// It may perform setup work but must not call Engine methods.
+	OnModel func(slot int, model wake.Model)
 }
 
 type slot struct {
@@ -136,6 +151,9 @@ func (e *Engine) Use(n int, m wake.Model) error {
 		return err
 	}
 
+	if e.OnModel != nil {
+		e.OnModel(n, m)
+	}
 	old := e.slots[n]
 	e.slots[n] = slot{model: m, loaded: true}
 	e.drop(old)
@@ -249,7 +267,11 @@ func (e *Engine) Run(ctx context.Context) error {
 			if !ok {
 				return errors.New("wake: the microphones stopped")
 			}
-			if e.Paused != nil && e.Paused() {
+			paused := e.Paused != nil && e.Paused()
+			if e.OnFrame != nil {
+				e.OnFrame(frame, paused, e.Dropped())
+			}
+			if paused {
 				continue
 			}
 
@@ -328,6 +350,16 @@ func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
 		cutoff = e.Threshold(n)
 	}
 
+	if e.OnScore != nil {
+		e.OnScore(
+			n,
+			score,
+			cutoff,
+			!now.Before(s.quiet) && !s.holding && score >= cutoff,
+			now.Before(s.quiet),
+			e.Dropped(),
+		)
+	}
 	if now.Before(s.quiet) {
 		s.suppressed++
 		return
@@ -347,6 +379,9 @@ func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
 
 		slog.Info("wake detected", "slot", n+1, "id", s.model.ID, "peak", s.peak,
 			"crossing", s.crossing, "cutoff", cutoff, "dropped", e.Dropped())
+		if e.OnPeak != nil {
+			e.OnPeak(n, s.peak)
+		}
 		s.holding, s.peak = false, 0
 		s.quiet = now.Add(Refractory)
 		return

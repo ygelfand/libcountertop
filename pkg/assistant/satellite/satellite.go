@@ -44,6 +44,10 @@ type Player interface {
 }
 
 type Options struct {
+	// OnTrace observes subscription and accepted-turn categories only: no text
+	// or audio. Set before New; callbacks may run concurrently and must not
+	// block or re-enter the satellite. Slots are zero-based, or -1 for API events.
+	OnTrace func(kind string, slot int)
 	Slots   int
 	Initial []string
 	Timers  Timers
@@ -68,9 +72,17 @@ func New(vs *esphome.VoiceSatellite, deps turn.Dependencies, options Options) *S
 
 	deps.Word = s.selection.ID
 	s.turn = turn.NewConversation(vs, deps)
+	s.turn.OnTrace = options.OnTrace
 
 	vs.OnTimer = options.Timers.Event
 	vs.OnSubscribed = func(subscribed bool) {
+		if options.OnTrace != nil {
+			kind := "api_unsubscribed"
+			if subscribed {
+				kind = "api_subscribed"
+			}
+			options.OnTrace(kind, -1)
+		}
 		if !subscribed {
 			options.Timers.Forget()
 		}
