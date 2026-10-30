@@ -22,6 +22,7 @@ ASR := $(NATIVE)/asr
 PIEASR := $(ASR)/third_party/pieasr
 PIEASR_SOURCES := $(filter-out $(PIEASR)/src/kernels/c/tile.c $(PIEASR)/src/kernels/c/decode.c,$(shell find $(PIEASR)/src -name '*.c'))
 ASR_FLAGS := -O2 -Wall -Werror -Wno-unused-function -std=gnu11 -ffp-contract=off -mfpu=neon -I$(ASR) -I$(PIEASR)/include -I$(PIEASR)/src
+PRYON_BIN ?= $(OUT)/$(PREFIX)-pryon
 AIRPLAY_BIN ?= $(OUT)/$(PREFIX)-airplay
 AIRPLAY := $(NATIVE)/airplay
 UXPLAY := $(AIRPLAY)/uxplay
@@ -31,8 +32,8 @@ UXPLAY_SOURCES := $(wildcard $(UXPLAY)/*.c $(UXPLAY)/playfair/*.c $(UXPLAY)/llht
 UXPLAY_INCLUDES := -I$(UXPLAY) -I$(UXPLAY)/playfair -I$(UXPLAY)/llhttp -I$(UXPLAY)/mdnsd -I$(OPENSSL)/include -I$(PLIST)/include
 UXPLAY_FLAGS := -O2 -fPIC -w -D_GNU_SOURCE -DPLIST_210 -DPLIST_230 $(UXPLAY_INCLUDES)
 
-.PHONY: all surface camera camshim asr airplay check-ndk test
-all: surface camera camshim asr airplay
+.PHONY: all surface camera camshim asr pryon airplay check-ndk test
+all: surface camera camshim asr pryon airplay
 check-ndk:
 	@test "$(API)" = 25 -o "$(API)" = 27 -o "$(API)" = 28 || { echo "supported native API levels: 25, 27, 28"; exit 1; }
 	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
@@ -63,6 +64,10 @@ camshim: check-ndk
 asr: check-ndk
 	@mkdir -p $(dir $(ASR_BIN))
 	$(NDK_CC) $(ASR_FLAGS) -o $(ASR_BIN) $(ASR)/asr.c $(PIEASR_SOURCES) -s -lm
+
+pryon: check-ndk
+	@mkdir -p $(dir $(PRYON_BIN))
+	$(NDK_CC) $(FLAGS) -o $(PRYON_BIN) $(NATIVE)/pryon/pryon.c -s -ldl
 
 airplay: check-ndk
 	@mkdir -p $(dir $(AIRPLAY_BIN)) $(STUBS)/airplay

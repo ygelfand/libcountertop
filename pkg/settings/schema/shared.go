@@ -215,4 +215,6 @@ func (w SharedWriter[C]) Update() UpdateWriter       { return NewUpdateWriter(w.
 func (w SharedWriter[C]) Visual() VisualWriter       { return NewVisualWriter(w.s.Visual) }
 func (w SharedWriter[C]) Wake(slot int) WakeWriter   { return NewWakeWriter(w.s.Wake, slot) }
 func (w SharedWriter[C]) Stop() StopWriter           { return NewStopWriter(w.s.Wake) }
+func (w SharedWriter[C]) Pryon() PryonWriter         { return NewPryonWriter(w.s.Wake) }
+func (w SharedWriter[C]) Gemini() GeminiWriter       { return NewGeminiWriter(w.s.Wake) }
 func (w SharedWriter[C]) Weather() WeatherWriter     { return NewWeatherWriter(w.s.Weather) }

@@ -118,6 +118,13 @@ func (v vector) len() int { return v.n }
 
 func (v vector) i32(i int) int32 { return v.b.i32(v.pos + 4*uint32(i)) }
 
+func (v vector) f32(i int) float32 { return math.Float32frombits(v.b.u32(v.pos + 4*uint32(i))) }
+
+func (v vector) i64(i int) int64 {
+	p := v.pos + 8*uint32(i)
+	return int64(uint64(v.b.u32(p)) | uint64(v.b.u32(p+4))<<32)
+}
+
 func (v vector) table(i int) table {
 	p := v.pos + 4*uint32(i)
 	return table{v.b, p + v.b.u32(p)}

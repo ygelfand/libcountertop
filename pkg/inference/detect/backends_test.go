@@ -13,12 +13,12 @@ type fake struct {
 	closed bool
 }
 
-func (f *fake) load(m wake.Model) error {
-	f.loaded[m.ID] = 0
+func (f *fake) load(key string, _ wake.Model, _ int) error {
+	f.loaded[key] = 0
 	return nil
 }
 
-func (f *fake) unload(id string) { delete(f.loaded, id) }
+func (f *fake) unload(key string) { delete(f.loaded, key) }
 
 func (f *fake) feed([]int16) (map[string]float64, bool) {
 	f.fed++
@@ -143,6 +143,102 @@ func TestOneModelInTwoSlots(t *testing.T) {
 	}
 	if !f.closed {
 		t.Error("the engine stayed up with nothing loaded")
+	}
+}
+
+func TestOnePryonWordInTwoSlotsLoadsTwice(t *testing.T) {
+	f := &fake{loaded: map[string]float64{}}
+	e := New(2, nil)
+	e.backends[wake.KindPryon] = f
+
+	fired := make(chan int, 2)
+	e.OnDetect = func(slot int) { fired <- slot }
+
+	for slot := range 2 {
+		if err := e.Use(slot, model("en-US/ALEXA", wake.KindPryon)); err != nil {
+			t.Fatalf("Use(%d): %v", slot, err)
+		}
+	}
+	if len(f.loaded) != 2 {
+		t.Fatalf("loaded %v, want one per slot", f.loaded)
+	}
+
+	f.loaded[e.slots[1].key] = 0.3
+	e.score([]int16{0})
+	select {
+	case slot := <-fired:
+		if slot != 1 {
+			t.Errorf("slot %d fired, want 2", slot+1)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("nothing fired")
+	}
+	select {
+	case slot := <-fired:
+		t.Errorf("slot %d fired too, want only the slot whose decoder accepted", slot+1)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	kept := e.slots[1].key
+	e.Clear(0)
+	if len(f.loaded) != 1 {
+		t.Errorf("loaded %v after clearing slot 1, want only slot 2's", f.loaded)
+	}
+	if _, ok := f.loaded[kept]; !ok {
+		t.Error("clearing slot 1 unloaded slot 2's decoder")
+	}
+}
+
+func TestThresholdsMapOntoPryonSensitivity(t *testing.T) {
+	cases := []struct {
+		slot      int
+		threshold float64
+		want      int
+	}{
+		{0, wake.DefaultThreshold, 0},
+		{0, 0.5, -10},
+		{0, 0.99, 10},
+		{0, 0.92, 5},
+		{0, 0.675, -5},
+		{0, 0.2, -10},
+		{StopSlot, 0.7, 0},
+		{StopSlot, 0.5, -10},
+		{StopSlot, 0.99, 10},
+	}
+	for _, c := range cases {
+		e := New(StopSlot+1, nil)
+		e.Threshold = func(int) float64 { return c.threshold }
+		if got := e.sensitivity(c.slot); got != c.want {
+			t.Errorf("slot %d at %v: sensitivity %d, want %d", c.slot+1, c.threshold, got, c.want)
+		}
+	}
+}
+
+func TestMovingAPryonSliderReloadsItsSlot(t *testing.T) {
+	f := &fake{loaded: map[string]float64{}}
+	e := New(1, nil)
+	e.backends[wake.KindPryon] = f
+	threshold := wake.DefaultThreshold
+	e.Threshold = func(int) float64 { return threshold }
+
+	if err := e.Use(0, model("pryon_alexa", wake.KindPryon)); err != nil {
+		t.Fatalf("Use: %v", err)
+	}
+	before := e.slots[0].key
+
+	e.score([]int16{0})
+	if e.slots[0].key != before || len(f.loaded) != 1 {
+		t.Fatalf("an unchanged slider reloaded: %v", f.loaded)
+	}
+
+	threshold = 0.99
+	e.score([]int16{0})
+	after := e.slots[0].key
+	if after == before {
+		t.Fatal("the slot kept its decoder after the slider moved")
+	}
+	if _, ok := f.loaded[before]; ok || len(f.loaded) != 1 {
+		t.Errorf("loaded %v, want only %s", f.loaded, after)
 	}
 }
 

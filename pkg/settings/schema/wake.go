@@ -4,10 +4,16 @@ type Wake struct {
 	Words []WakeWord `json:"words"`
 
 	Stop Stop `json:"stop"`
+
+	Pryon bool `json:"pryon"`
+
+	Gemini bool `json:"gemini"`
 }
 
 type Stop struct {
 	Threshold float64 `json:"threshold"`
+
+	Pryon bool `json:"pryon"`
 }
 
 const (

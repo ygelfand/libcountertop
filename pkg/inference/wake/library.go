@@ -9,10 +9,25 @@ import (
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
+	"github.com/ygelfand/libcountertop/pkg/hook"
 )
+
+type Provider interface {
+	Models() []Model
+	Ensure(ctx context.Context, id string, progress func(float32)) error
+}
+
+type Preparation struct {
+	Phrase string
+	At     float32
+}
+
+func (p Preparation) Active() bool { return p.Phrase != "" }
 
 type Library struct {
 	dir        string
+	providers  []Provider
 	operations sync.Mutex
 
 	muOurs sync.Mutex
@@ -20,12 +35,20 @@ type Library struct {
 
 	muOffers sync.Mutex
 	offers   map[string]esphome.ExternalWakeWord
+
+	muPreparing sync.Mutex
+	preparing   Preparation
+
+	Preparing hook.Hook[Preparation]
 }
 
-const adoptTimeout = 20 * time.Second
+const (
+	adoptTimeout   = 20 * time.Second
+	provideTimeout = 5 * time.Minute
+)
 
-func NewLibrary(dir string) *Library {
-	l := &Library{dir: dir, offers: map[string]esphome.ExternalWakeWord{}}
+func NewLibrary(dir string, providers ...Provider) *Library {
+	l := &Library{dir: dir, providers: providers, offers: map[string]esphome.ExternalWakeWord{}}
 	l.Reload()
 	return l
 }
@@ -43,6 +66,9 @@ func (l *Library) Reload() {
 	if err != nil {
 		slog.Error("listing wake words failed", "dir", l.dir, "err", err)
 		return
+	}
+	for _, p := range l.providers {
+		models = append(models, p.Models()...)
 	}
 
 	l.muOurs.Lock()
@@ -145,6 +171,11 @@ func (l *Library) Ensure(ids []string) []Model {
 		if id == "" {
 			continue
 		}
+		if p := l.provider(id); p != nil {
+			l.provide(p, id)
+			fetched = true
+			continue
+		}
 		o := l.offer(id)
 		if o.URL == "" || Have(l.dir, o) {
 			continue
@@ -157,6 +188,45 @@ func (l *Library) Ensure(ids []string) []Model {
 		l.Reload()
 	}
 	return l.Ours()
+}
+
+func (l *Library) Preparation() Preparation {
+	l.muPreparing.Lock()
+	defer l.muPreparing.Unlock()
+	return l.preparing
+}
+
+func (l *Library) provide(p Provider, id string) {
+	m, _ := Find(p.Models(), id)
+	ctx, cancel := context.WithTimeout(context.Background(), provideTimeout)
+	defer cancel()
+	defer l.prepare(Preparation{})
+	l.prepare(Preparation{Phrase: m.Phrase})
+	shown := 0
+	if err := p.Ensure(ctx, id, func(at float32) {
+		if percent := int(at * 100); percent != shown {
+			shown = percent
+			l.prepare(Preparation{Phrase: m.Phrase, At: at})
+		}
+	}); err != nil {
+		slog.Error("preparing a wake word failed", "id", id, "err", err)
+	}
+}
+
+func (l *Library) prepare(p Preparation) {
+	l.muPreparing.Lock()
+	l.preparing = p
+	l.muPreparing.Unlock()
+	l.Preparing.Emit(p)
+}
+
+func (l *Library) provider(id string) Provider {
+	for _, p := range l.providers {
+		if _, ok := Find(p.Models(), id); ok {
+			return p
+		}
+	}
+	return nil
 }
 
 func (l *Library) offer(id string) esphome.ExternalWakeWord {

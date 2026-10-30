@@ -7,14 +7,15 @@ import (
 
 	"github.com/zserge/microwakeword"
 
+	"github.com/ygelfand/libcountertop/pkg/inference/gemini"
 	"github.com/ygelfand/libcountertop/pkg/inference/oww"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 )
 
 type backend interface {
-	load(m wake.Model) error
+	load(key string, m wake.Model, sensitivity int) error
 
-	unload(id string)
+	unload(key string)
 
 	feed(frame []int16) (map[string]float64, bool)
 
@@ -22,6 +23,12 @@ type backend interface {
 }
 
 func newBackend(k wake.Kind) (backend, error) {
+	if k == wake.KindGemini {
+		return &geminiBackend{
+			dets:   map[string]*gemini.Detector{},
+			scores: map[string]float64{},
+		}, nil
+	}
 	if k == wake.KindOpenWakeWord {
 		front, err := oww.New()
 		if err != nil {
@@ -42,7 +49,7 @@ type microBackend struct {
 
 const neverFires = 1.1
 
-func (b *microBackend) load(m wake.Model) error {
+func (b *microBackend) load(key string, m wake.Model, _ int) error {
 	cfg := m.Config
 	cfg.ProbabilityCutoff = neverFires
 
@@ -50,13 +57,13 @@ func (b *microBackend) load(m wake.Model) error {
 	if err != nil {
 		return fmt.Errorf("wake: loading %s: %w", m.Path, err)
 	}
-	b.dets[m.ID] = det
+	b.dets[key] = det
 	return nil
 }
 
-func (b *microBackend) unload(id string) {
-	delete(b.dets, id)
-	delete(b.scores, id)
+func (b *microBackend) unload(key string) {
+	delete(b.dets, key)
+	delete(b.scores, key)
 }
 
 func (b *microBackend) feed(frame []int16) (map[string]float64, bool) {
@@ -74,18 +81,18 @@ type owwBackend struct {
 	scores map[string]float64
 }
 
-func (b *owwBackend) load(m wake.Model) error {
+func (b *owwBackend) load(key string, m wake.Model, _ int) error {
 	model, err := os.ReadFile(m.Path)
 	if err != nil {
 		return fmt.Errorf("wake: reading %s: %w", m.Path, err)
 	}
-	_, err = b.front.Load(m.ID, model)
+	_, err = b.front.Load(key, model)
 	return err
 }
 
-func (b *owwBackend) unload(id string) {
-	b.front.Unload(id)
-	delete(b.scores, id)
+func (b *owwBackend) unload(key string) {
+	b.front.Unload(key)
+	delete(b.scores, key)
 }
 
 func (b *owwBackend) feed(frame []int16) (map[string]float64, bool) {

@@ -75,6 +75,20 @@ func On[T any](h *hook.Hook[T]) Watch {
 	return func(changed func()) func() { return h.Listen(func(T) { changed() }) }
 }
 
+func All(watches ...Watch) Watch {
+	return func(changed func()) func() {
+		stops := make([]func(), 0, len(watches))
+		for _, w := range watches {
+			stops = append(stops, w(changed))
+		}
+		return func() {
+			for _, stop := range stops {
+				stop()
+			}
+		}
+	}
+}
+
 type Settings struct {
 	Screen  schema.Screen
 	Clock   schema.Clock

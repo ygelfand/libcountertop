@@ -203,6 +203,83 @@ func fullyConnected(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
+func svdf(o *OpDesc, in, out []*Tensor) error {
+	if len(in) < 5 || in[4] == nil {
+		return fmt.Errorf("expected input, feature and time weights, bias and state")
+	}
+	x, feature, time, state, y := in[0], in[1], in[2], in[4], out[0]
+	if len(feature.Shape) != 2 || len(time.Shape) != 2 || o.rank <= 0 {
+		return fmt.Errorf("feature %v, time %v, rank %d", feature.Shape, time.Shape, o.rank)
+	}
+	filters, inSize, memory := feature.Shape[0], feature.Shape[1], time.Shape[1]
+	if time.Shape[0] != filters || filters%o.rank != 0 || x.Count()%inSize != 0 {
+		return fmt.Errorf(
+			"feature %v, time %v, rank %d, input %v",
+			feature.Shape,
+			time.Shape,
+			o.rank,
+			x.Shape,
+		)
+	}
+	units := filters / o.rank
+	batch := x.Count() / inSize
+	if state.Count() != batch*filters*memory {
+		return fmt.Errorf("state of %d values, want %d", state.Count(), batch*filters*memory)
+	}
+	var bias []float32
+	if in[3] != nil {
+		bias = in[3].F32
+	}
+
+	y.resize([]int{batch, units})
+	for b := 0; b < batch; b++ {
+		row := x.F32[b*inSize : (b+1)*inSize]
+		s := state.F32[b*filters*memory : (b+1)*filters*memory]
+		copy(s, s[1:])
+		for f := 0; f < filters; f++ {
+			s[f*memory+memory-1] = vec.Dot(row, feature.F32[f*inSize:(f+1)*inSize])
+		}
+		for u := 0; u < units; u++ {
+			var acc float32
+			for r := 0; r < o.rank; r++ {
+				f := u*o.rank + r
+				acc += vec.Dot(s[f*memory:(f+1)*memory], time.F32[f*memory:(f+1)*memory])
+			}
+			if bias != nil {
+				acc += bias[u]
+			}
+			y.F32[b*units+u] = activate(acc, o.act)
+		}
+	}
+	return nil
+}
+
+func softmax(o *OpDesc, in, out []*Tensor) error {
+	x, y := in[0], out[0]
+	n := x.Dim(-1)
+	if n == 0 || x.Count()%n != 0 {
+		return fmt.Errorf("input %v", x.Shape)
+	}
+	y.resize(x.Shape)
+	for at := 0; at < x.Count(); at += n {
+		row, dst := x.F32[at:at+n], y.F32[at:at+n]
+		top := row[0]
+		for _, v := range row {
+			top = max(top, v)
+		}
+		var sum float64
+		for i, v := range row {
+			e := math.Exp(float64(o.beta * (v - top)))
+			dst[i] = float32(e)
+			sum += e
+		}
+		for i := range dst {
+			dst[i] = float32(float64(dst[i]) / sum)
+		}
+	}
+	return nil
+}
+
 func batchMatMul(o *OpDesc, in, out []*Tensor) error {
 	a, b, y := in[0], in[1], out[0]
 	adjX, adjY := o.adjX, o.adjY

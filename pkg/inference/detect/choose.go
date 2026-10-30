@@ -48,5 +48,7 @@ func Choose(
 func LogInstalled(ours []wake.Model) {
 	slog.Info("wake words installed", "count", len(ours),
 		"openwakeword", len(wake.OfKind(ours, wake.KindOpenWakeWord)),
-		"microwakeword", len(wake.OfKind(ours, wake.KindMicroWakeWord)))
+		"microwakeword", len(wake.OfKind(ours, wake.KindMicroWakeWord)),
+		"pryon", len(wake.OfKind(ours, wake.KindPryon)),
+		"gemini", len(wake.OfKind(ours, wake.KindGemini)))
 }

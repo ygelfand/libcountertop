@@ -1,0 +1,867 @@
+{
+  "library": {
+    "name": "pryon-lib-armv7.tar.xz",
+    "sum": "eaef0d02403702a45fac346689f1da9e20fea07887c9302374b850ce5dce4f65",
+    "size": 6681260
+  },
+  "words": [
+    {
+      "word": "ALEXA",
+      "locale": "en-US",
+      "keyword": "ALEXA",
+      "dir": "en-US/ALEXA",
+      "archive": {
+        "name": "pryon-en-us-alexa.tar.xz",
+        "sum": "dd8bb90e5a094acccd0e1e9db2f433b43df069bce3bf0506c970e2c2e7d9e7d9",
+        "size": 4633692
+      }
+    },
+    {
+      "word": "ALEXA_COMPACT",
+      "locale": "en-US",
+      "keyword": "ALEXA",
+      "dir": "en-US/ALEXA_COMPACT",
+      "archive": {
+        "name": "pryon-en-us-alexa_compact.tar.xz",
+        "sum": "daf46e8f02c39667df15862c3524f257d8c8fd122c14768332335b5d9a57201f",
+        "size": 903372
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "en-US",
+      "keyword": "AMAZON",
+      "dir": "en-US/AMAZON-COMPUTER-ZIGGY",
+      "archive": {
+        "name": "pryon-en-us-amazon-computer-ziggy.tar.xz",
+        "sum": "f670db93ceae77b4dbb5cc9d7d08dfccb656aa49a223115e8a5ab93d040dddfb",
+        "size": 5187248
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "en-US",
+      "keyword": "COMPUTER",
+      "dir": "en-US/AMAZON-COMPUTER-ZIGGY",
+      "archive": {
+        "name": "pryon-en-us-amazon-computer-ziggy.tar.xz",
+        "sum": "f670db93ceae77b4dbb5cc9d7d08dfccb656aa49a223115e8a5ab93d040dddfb",
+        "size": 5187248
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "en-US",
+      "keyword": "ECHO",
+      "dir": "en-US/ECHO",
+      "archive": {
+        "name": "pryon-en-us-echo.tar.xz",
+        "sum": "5b480707929b42e2702384be801b980543b0c7d56b5dadc7eb0c38bdb972fa37",
+        "size": 5178556
+      }
+    },
+    {
+      "word": "HEY_DISNEY",
+      "locale": "en-US",
+      "keyword": "HEY_DISNEY",
+      "dir": "en-US/ALEXA",
+      "archive": {
+        "name": "pryon-en-us-alexa.tar.xz",
+        "sum": "dd8bb90e5a094acccd0e1e9db2f433b43df069bce3bf0506c970e2c2e7d9e7d9",
+        "size": 4633692
+      }
+    },
+    {
+      "word": "HEY_MELISSA",
+      "locale": "en-US",
+      "keyword": "HEY_MELISSA",
+      "dir": "en-US/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-us-celebrity.tar.xz",
+        "sum": "1ee0147fc784ee630dcb91ef4bd37acc7fe6c2dadbc92b91fbba17b988ce3262",
+        "size": 1966196
+      }
+    },
+    {
+      "word": "HEY_SAMUEL",
+      "locale": "en-US",
+      "keyword": "HEY_SAMUEL",
+      "dir": "en-US/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-us-celebrity.tar.xz",
+        "sum": "1ee0147fc784ee630dcb91ef4bd37acc7fe6c2dadbc92b91fbba17b988ce3262",
+        "size": 1966196
+      }
+    },
+    {
+      "word": "HEY_SHAQ",
+      "locale": "en-US",
+      "keyword": "HEY_SHAQ",
+      "dir": "en-US/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-us-celebrity.tar.xz",
+        "sum": "1ee0147fc784ee630dcb91ef4bd37acc7fe6c2dadbc92b91fbba17b988ce3262",
+        "size": 1966196
+      }
+    },
+    {
+      "word": "ZIGGY",
+      "locale": "en-US",
+      "keyword": "ZIGGY",
+      "dir": "en-US/AMAZON-COMPUTER-ZIGGY",
+      "archive": {
+        "name": "pryon-en-us-amazon-computer-ziggy.tar.xz",
+        "sum": "f670db93ceae77b4dbb5cc9d7d08dfccb656aa49a223115e8a5ab93d040dddfb",
+        "size": 5187248
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "ar-SA",
+      "keyword": "ALEXA",
+      "dir": "ar-SA/ALEXA",
+      "archive": {
+        "name": "pryon-ar-sa-alexa.tar.xz",
+        "sum": "38720479800c38fe9524ec1890e740fa414d2981cd82e064ea1cd89aa0bad158",
+        "size": 4027416
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "ar-SA",
+      "keyword": "AMAZON",
+      "dir": "ar-SA/AMAZON",
+      "archive": {
+        "name": "pryon-ar-sa-amazon.tar.xz",
+        "sum": "d458ad9e8971310a31dd9a687399647cf0b98571b5664b7b3481a54549f755f5",
+        "size": 1256804
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "ar-SA",
+      "keyword": "ECHO",
+      "dir": "ar-SA/ECHO",
+      "archive": {
+        "name": "pryon-ar-sa-echo.tar.xz",
+        "sum": "1e3900bc62ef92f7738135372d54397b594df0936fd9e7e7de51a313e12c0c12",
+        "size": 1257568
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "de-DE",
+      "keyword": "ALEXA",
+      "dir": "de-DE/ALEXA",
+      "archive": {
+        "name": "pryon-de-de-alexa.tar.xz",
+        "sum": "558a80578f067f4617bff9e005c07d73e43fb0d780e17d0d5a12bb3912e84917",
+        "size": 4018300
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "de-DE",
+      "keyword": "AMAZON",
+      "dir": "de-DE/AMAZON",
+      "archive": {
+        "name": "pryon-de-de-amazon.tar.xz",
+        "sum": "7b1c131d9749c4bec26d505af6eb621d9cfad3f8370d0285afdfd04a4f137841",
+        "size": 1246084
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "de-DE",
+      "keyword": "COMPUTER",
+      "dir": "de-DE/COMPUTER",
+      "archive": {
+        "name": "pryon-de-de-computer.tar.xz",
+        "sum": "21f5d87f0d871b141d6fb878f633caddf54d191a4149029cfa8b43311170fb68",
+        "size": 1244752
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "de-DE",
+      "keyword": "ECHO",
+      "dir": "de-DE/ECHO",
+      "archive": {
+        "name": "pryon-de-de-echo.tar.xz",
+        "sum": "40e132fd3a688ba5ff321ddbff226cfaf6a0b2edce3d4bb93a14923b1e6ea5be",
+        "size": 1245304
+      }
+    },
+    {
+      "word": "ZIGGY",
+      "locale": "de-DE",
+      "keyword": "ZIGGY",
+      "dir": "de-DE/ZIGGY",
+      "archive": {
+        "name": "pryon-de-de-ziggy.tar.xz",
+        "sum": "371c1ff2b7f3025de36724a55c0785fa24d18283a9fa5c2001d5e1d7a8ff139e",
+        "size": 11646788
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "en-AU",
+      "keyword": "ALEXA",
+      "dir": "en-AU/ALEXA",
+      "archive": {
+        "name": "pryon-en-au-alexa.tar.xz",
+        "sum": "ea05fa8565f757a2ab0c84d572887849b58e1c3ffdfb04c775a93abd382bf23e",
+        "size": 4026404
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "en-AU",
+      "keyword": "AMAZON",
+      "dir": "en-AU/AMAZON",
+      "archive": {
+        "name": "pryon-en-au-amazon.tar.xz",
+        "sum": "15f7908a175289322d13bf70f2fcbc764636864b8711b3cdf63a4fd4fb2a78cd",
+        "size": 11613172
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "en-AU",
+      "keyword": "COMPUTER",
+      "dir": "en-AU/COMPUTER",
+      "archive": {
+        "name": "pryon-en-au-computer.tar.xz",
+        "sum": "517011b86287a94f0ec9d6d7acf73050bcd60c23190adc3bfcca066790e5e825",
+        "size": 11613468
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "en-AU",
+      "keyword": "ECHO",
+      "dir": "en-AU/ECHO",
+      "archive": {
+        "name": "pryon-en-au-echo.tar.xz",
+        "sum": "c1c8d7bf541b62d457d52ee4b9663f420769b97a43883d60a7a651878d7eeb30",
+        "size": 11610428
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "en-CA",
+      "keyword": "ALEXA",
+      "dir": "en-CA/ALEXA",
+      "archive": {
+        "name": "pryon-en-ca-alexa.tar.xz",
+        "sum": "c3f3d07441e12e540f405d5059f12c6f061c53d3cedf5d9a980993d0a16a1bd5",
+        "size": 4633552
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "en-CA",
+      "keyword": "AMAZON",
+      "dir": "en-US/AMAZON-COMPUTER-ZIGGY",
+      "archive": {
+        "name": "pryon-en-us-amazon-computer-ziggy.tar.xz",
+        "sum": "f670db93ceae77b4dbb5cc9d7d08dfccb656aa49a223115e8a5ab93d040dddfb",
+        "size": 5187248
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "en-CA",
+      "keyword": "COMPUTER",
+      "dir": "en-US/AMAZON-COMPUTER-ZIGGY",
+      "archive": {
+        "name": "pryon-en-us-amazon-computer-ziggy.tar.xz",
+        "sum": "f670db93ceae77b4dbb5cc9d7d08dfccb656aa49a223115e8a5ab93d040dddfb",
+        "size": 5187248
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "en-CA",
+      "keyword": "ECHO",
+      "dir": "en-US/ECHO",
+      "archive": {
+        "name": "pryon-en-us-echo.tar.xz",
+        "sum": "5b480707929b42e2702384be801b980543b0c7d56b5dadc7eb0c38bdb972fa37",
+        "size": 5178556
+      }
+    },
+    {
+      "word": "HEY_DISNEY",
+      "locale": "en-CA",
+      "keyword": "HEY_DISNEY",
+      "dir": "en-CA/ALEXA",
+      "archive": {
+        "name": "pryon-en-ca-alexa.tar.xz",
+        "sum": "c3f3d07441e12e540f405d5059f12c6f061c53d3cedf5d9a980993d0a16a1bd5",
+        "size": 4633552
+      }
+    },
+    {
+      "word": "HEY_MELISSA",
+      "locale": "en-CA",
+      "keyword": "HEY_MELISSA",
+      "dir": "en-US/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-us-celebrity.tar.xz",
+        "sum": "1ee0147fc784ee630dcb91ef4bd37acc7fe6c2dadbc92b91fbba17b988ce3262",
+        "size": 1966196
+      }
+    },
+    {
+      "word": "HEY_SAMUEL",
+      "locale": "en-CA",
+      "keyword": "HEY_SAMUEL",
+      "dir": "en-US/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-us-celebrity.tar.xz",
+        "sum": "1ee0147fc784ee630dcb91ef4bd37acc7fe6c2dadbc92b91fbba17b988ce3262",
+        "size": 1966196
+      }
+    },
+    {
+      "word": "HEY_SHAQ",
+      "locale": "en-CA",
+      "keyword": "HEY_SHAQ",
+      "dir": "en-US/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-us-celebrity.tar.xz",
+        "sum": "1ee0147fc784ee630dcb91ef4bd37acc7fe6c2dadbc92b91fbba17b988ce3262",
+        "size": 1966196
+      }
+    },
+    {
+      "word": "ZIGGY",
+      "locale": "en-CA",
+      "keyword": "ZIGGY",
+      "dir": "en-US/AMAZON-COMPUTER-ZIGGY",
+      "archive": {
+        "name": "pryon-en-us-amazon-computer-ziggy.tar.xz",
+        "sum": "f670db93ceae77b4dbb5cc9d7d08dfccb656aa49a223115e8a5ab93d040dddfb",
+        "size": 5187248
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "en-GB",
+      "keyword": "ALEXA",
+      "dir": "en-AU/ALEXA",
+      "archive": {
+        "name": "pryon-en-au-alexa.tar.xz",
+        "sum": "ea05fa8565f757a2ab0c84d572887849b58e1c3ffdfb04c775a93abd382bf23e",
+        "size": 4026404
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "en-GB",
+      "keyword": "AMAZON",
+      "dir": "en-AU/AMAZON",
+      "archive": {
+        "name": "pryon-en-au-amazon.tar.xz",
+        "sum": "15f7908a175289322d13bf70f2fcbc764636864b8711b3cdf63a4fd4fb2a78cd",
+        "size": 11613172
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "en-GB",
+      "keyword": "COMPUTER",
+      "dir": "en-AU/COMPUTER",
+      "archive": {
+        "name": "pryon-en-au-computer.tar.xz",
+        "sum": "517011b86287a94f0ec9d6d7acf73050bcd60c23190adc3bfcca066790e5e825",
+        "size": 11613468
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "en-GB",
+      "keyword": "ECHO",
+      "dir": "en-AU/ECHO",
+      "archive": {
+        "name": "pryon-en-au-echo.tar.xz",
+        "sum": "c1c8d7bf541b62d457d52ee4b9663f420769b97a43883d60a7a651878d7eeb30",
+        "size": 11610428
+      }
+    },
+    {
+      "word": "ZIGGY",
+      "locale": "en-GB",
+      "keyword": "ZIGGY",
+      "dir": "en-GB/ZIGGY",
+      "archive": {
+        "name": "pryon-en-gb-ziggy.tar.xz",
+        "sum": "e968daf8832cd58e747e074226b0630fe0b35cfdf85204066671a8050a952139",
+        "size": 11621764
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "en-IN",
+      "keyword": "ALEXA",
+      "dir": "en-IN/ALEXA",
+      "archive": {
+        "name": "pryon-en-in-alexa.tar.xz",
+        "sum": "12f75f1472a14c08f49d855520e3992a85c70abc9fb43e84783a9c11ab9e898a",
+        "size": 4026420
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "en-IN",
+      "keyword": "AMAZON",
+      "dir": "en-IN/AMAZON",
+      "archive": {
+        "name": "pryon-en-in-amazon.tar.xz",
+        "sum": "469b05cd278c47d2f788d794f58512c7ead4946d0c77e1e170e5c5a6907761a1",
+        "size": 4525832
+      }
+    },
+    {
+      "word": "AMIT_JI",
+      "locale": "en-IN",
+      "keyword": "AMIT_JI",
+      "dir": "en-IN/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-in-celebrity.tar.xz",
+        "sum": "699127e1cfc95d27cc31a9754a963ca3c324a9bb5332c3c9283819509156d7fe",
+        "size": 1774244
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "en-IN",
+      "keyword": "COMPUTER",
+      "dir": "en-IN/COMPUTER",
+      "archive": {
+        "name": "pryon-en-in-computer.tar.xz",
+        "sum": "f67b40de8df64e8ea46df429095f980b70a27a823964b994dc77a0112972f770",
+        "size": 4526232
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "en-IN",
+      "keyword": "ECHO",
+      "dir": "en-IN/ECHO",
+      "archive": {
+        "name": "pryon-en-in-echo.tar.xz",
+        "sum": "98b8f52f7c678edac2e3fb33eee0401bb1d12ee43beec053afa8a1c6b3dba9f9",
+        "size": 4523860
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "es-ES",
+      "keyword": "ALEXA",
+      "dir": "es-ES/ALEXA",
+      "archive": {
+        "name": "pryon-es-es-alexa.tar.xz",
+        "sum": "14f315d8ba5cd0e024d6bcd6517b792348b8a9895f59391066cbbb1c8ada4937",
+        "size": 4024452
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "es-ES",
+      "keyword": "AMAZON",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "es-ES",
+      "keyword": "ECHO",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "es-MX",
+      "keyword": "ALEXA",
+      "dir": "es-ES/ALEXA",
+      "archive": {
+        "name": "pryon-es-es-alexa.tar.xz",
+        "sum": "14f315d8ba5cd0e024d6bcd6517b792348b8a9895f59391066cbbb1c8ada4937",
+        "size": 4024452
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "es-MX",
+      "keyword": "AMAZON",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "es-MX",
+      "keyword": "ECHO",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "es-US",
+      "keyword": "ALEXA",
+      "dir": "es-ES/ALEXA",
+      "archive": {
+        "name": "pryon-es-es-alexa.tar.xz",
+        "sum": "14f315d8ba5cd0e024d6bcd6517b792348b8a9895f59391066cbbb1c8ada4937",
+        "size": 4024452
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "es-US",
+      "keyword": "AMAZON",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "es-US",
+      "keyword": "ECHO",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ZIGGY",
+      "locale": "es-US",
+      "keyword": "ZIGGY",
+      "dir": "es-ES/AMAZON-ECHO-ZIGGY",
+      "archive": {
+        "name": "pryon-es-es-amazon-echo-ziggy.tar.xz",
+        "sum": "1c52ebb5c7eb56861cb8bc21feee538c6f69796fc1106163232a8043450180e3",
+        "size": 4657392
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "fr-CA",
+      "keyword": "ALEXA",
+      "dir": "fr-CA/ALEXA",
+      "archive": {
+        "name": "pryon-fr-ca-alexa.tar.xz",
+        "sum": "d5a7be11d246357a0aa47c9a5762a11016723d86a13c9d7d06427810f418dbab",
+        "size": 4023372
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "fr-CA",
+      "keyword": "AMAZON",
+      "dir": "fr-CA/AMAZON",
+      "archive": {
+        "name": "pryon-fr-ca-amazon.tar.xz",
+        "sum": "bd28ce404e73723d1c1ec605cbd722553898745411ef18e5f649d8e2a35b29f9",
+        "size": 4123248
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "fr-CA",
+      "keyword": "ECHO",
+      "dir": "fr-CA/ECHO",
+      "archive": {
+        "name": "pryon-fr-ca-echo.tar.xz",
+        "sum": "cf473a7feb3f50de2ca09db715cd9ed959d94f402e16789a19ec5821d16827a2",
+        "size": 4104480
+      }
+    },
+    {
+      "word": "ZIGGY",
+      "locale": "fr-CA",
+      "keyword": "ZIGGY",
+      "dir": "de-DE/ZIGGY",
+      "archive": {
+        "name": "pryon-de-de-ziggy.tar.xz",
+        "sum": "371c1ff2b7f3025de36724a55c0785fa24d18283a9fa5c2001d5e1d7a8ff139e",
+        "size": 11646788
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "fr-FR",
+      "keyword": "ALEXA",
+      "dir": "fr-CA/ALEXA",
+      "archive": {
+        "name": "pryon-fr-ca-alexa.tar.xz",
+        "sum": "d5a7be11d246357a0aa47c9a5762a11016723d86a13c9d7d06427810f418dbab",
+        "size": 4023372
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "fr-FR",
+      "keyword": "AMAZON",
+      "dir": "fr-CA/AMAZON",
+      "archive": {
+        "name": "pryon-fr-ca-amazon.tar.xz",
+        "sum": "bd28ce404e73723d1c1ec605cbd722553898745411ef18e5f649d8e2a35b29f9",
+        "size": 4123248
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "fr-FR",
+      "keyword": "ECHO",
+      "dir": "fr-CA/ECHO",
+      "archive": {
+        "name": "pryon-fr-ca-echo.tar.xz",
+        "sum": "cf473a7feb3f50de2ca09db715cd9ed959d94f402e16789a19ec5821d16827a2",
+        "size": 4104480
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "hi-IN",
+      "keyword": "ALEXA",
+      "dir": "en-IN/ALEXA",
+      "archive": {
+        "name": "pryon-en-in-alexa.tar.xz",
+        "sum": "12f75f1472a14c08f49d855520e3992a85c70abc9fb43e84783a9c11ab9e898a",
+        "size": 4026420
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "hi-IN",
+      "keyword": "AMAZON",
+      "dir": "en-IN/AMAZON",
+      "archive": {
+        "name": "pryon-en-in-amazon.tar.xz",
+        "sum": "469b05cd278c47d2f788d794f58512c7ead4946d0c77e1e170e5c5a6907761a1",
+        "size": 4525832
+      }
+    },
+    {
+      "word": "AMIT_JI",
+      "locale": "hi-IN",
+      "keyword": "AMIT_JI",
+      "dir": "en-IN/CELEBRITY",
+      "archive": {
+        "name": "pryon-en-in-celebrity.tar.xz",
+        "sum": "699127e1cfc95d27cc31a9754a963ca3c324a9bb5332c3c9283819509156d7fe",
+        "size": 1774244
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "hi-IN",
+      "keyword": "COMPUTER",
+      "dir": "en-IN/COMPUTER",
+      "archive": {
+        "name": "pryon-en-in-computer.tar.xz",
+        "sum": "f67b40de8df64e8ea46df429095f980b70a27a823964b994dc77a0112972f770",
+        "size": 4526232
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "hi-IN",
+      "keyword": "ECHO",
+      "dir": "en-IN/ECHO",
+      "archive": {
+        "name": "pryon-en-in-echo.tar.xz",
+        "sum": "98b8f52f7c678edac2e3fb33eee0401bb1d12ee43beec053afa8a1c6b3dba9f9",
+        "size": 4523860
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "it-IT",
+      "keyword": "ALEXA",
+      "dir": "it-IT/ALEXA",
+      "archive": {
+        "name": "pryon-it-it-alexa.tar.xz",
+        "sum": "c6b78687ff83222343f7a736a2040615bad94dd856271bf18907adb61a985bd3",
+        "size": 4024184
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "it-IT",
+      "keyword": "AMAZON",
+      "dir": "it-IT/AMAZON",
+      "archive": {
+        "name": "pryon-it-it-amazon.tar.xz",
+        "sum": "d1abfcd81aa1937306207addcb3b903e9a4cdb1525bf8b73d1e7f404e356f817",
+        "size": 4462344
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "it-IT",
+      "keyword": "COMPUTER",
+      "dir": "it-IT/COMPUTER",
+      "archive": {
+        "name": "pryon-it-it-computer.tar.xz",
+        "sum": "3ad69b967da20b78854360a281d6f3f2e015856166fe958146856423bef91dfb",
+        "size": 4462628
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "it-IT",
+      "keyword": "ECHO",
+      "dir": "it-IT/ECHO",
+      "archive": {
+        "name": "pryon-it-it-echo.tar.xz",
+        "sum": "5f423154568f08916409f295a502d2749bdcc1d78b3e33e1dabcf046f5cbacc5",
+        "size": 11610060
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "ja-JP",
+      "keyword": "ALEXA",
+      "dir": "ja-JP/ALEXA",
+      "archive": {
+        "name": "pryon-ja-jp-alexa.tar.xz",
+        "sum": "27973f6f7678740bdf5be6b4680d1550d814688c8b841d17818592405c0e8d7a",
+        "size": 4027672
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "ja-JP",
+      "keyword": "AMAZON",
+      "dir": "ja-JP/AMAZON",
+      "archive": {
+        "name": "pryon-ja-jp-amazon.tar.xz",
+        "sum": "faef48170f4c6b1f3ca0b319d052cf5639cf1647282cfdc0fd206218312ea355",
+        "size": 1238656
+      }
+    },
+    {
+      "word": "COMPUTER",
+      "locale": "ja-JP",
+      "keyword": "COMPUTER",
+      "dir": "ja-JP/COMPUTER",
+      "archive": {
+        "name": "pryon-ja-jp-computer.tar.xz",
+        "sum": "dad60a36510a1f2fa9aca7516de6ad03e494dc298a2cd35b97a7326007408b9d",
+        "size": 1239424
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "ja-JP",
+      "keyword": "ECHO",
+      "dir": "ja-JP/ECHO",
+      "archive": {
+        "name": "pryon-ja-jp-echo.tar.xz",
+        "sum": "06b616904adb567d9d2d9d71736cea64cf8fcfd6da8230c3aba8f3b99322940e",
+        "size": 1238680
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "nl-NL",
+      "keyword": "ALEXA",
+      "dir": "de-DE/ALEXA",
+      "archive": {
+        "name": "pryon-de-de-alexa.tar.xz",
+        "sum": "558a80578f067f4617bff9e005c07d73e43fb0d780e17d0d5a12bb3912e84917",
+        "size": 4018300
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "nl-NL",
+      "keyword": "AMAZON",
+      "dir": "nl-NL/AMAZON",
+      "archive": {
+        "name": "pryon-nl-nl-amazon.tar.xz",
+        "sum": "7384850d7bbb02ca6fe87e9dbb10dbdc5d9c67037edd41d1b261d7dbbec23637",
+        "size": 11613324
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "nl-NL",
+      "keyword": "ECHO",
+      "dir": "nl-NL/ECHO",
+      "archive": {
+        "name": "pryon-nl-nl-echo.tar.xz",
+        "sum": "3cded79f6c9b5c887ddc040866210e18abf157f7f13b7ff4524a7401f0854eeb",
+        "size": 11611528
+      }
+    },
+    {
+      "word": "ALEXA",
+      "locale": "pt-BR",
+      "keyword": "ALEXA",
+      "dir": "pt-BR/ALEXA",
+      "archive": {
+        "name": "pryon-pt-br-alexa.tar.xz",
+        "sum": "c76dbdaf2d222bbf7343d91e56ae1804c5d9809518ec7d8f8ca6544e7abcd313",
+        "size": 4035372
+      }
+    },
+    {
+      "word": "AMAZON",
+      "locale": "pt-BR",
+      "keyword": "AMAZON",
+      "dir": "pt-BR/AMAZON",
+      "archive": {
+        "name": "pryon-pt-br-amazon.tar.xz",
+        "sum": "a72b1f262e1198a99b17b74802b50ff70cd024d9833f02b6dd3ef97c101ad074",
+        "size": 11614708
+      }
+    },
+    {
+      "word": "ECHO",
+      "locale": "pt-BR",
+      "keyword": "ECHO",
+      "dir": "pt-BR/ECHO",
+      "archive": {
+        "name": "pryon-pt-br-echo.tar.xz",
+        "sum": "75977cf73227483bc5e44330bce4ca066c5a07a0dfc7c56244b1a95735033452",
+        "size": 4379380
+      }
+    }
+  ],
+  "stop": {
+    "word": "STOP",
+    "locale": "en-US",
+    "keyword": "STOP",
+    "dir": "en-US/ALEXA",
+    "archive": {
+      "name": "pryon-en-us-alexa.tar.xz",
+      "sum": "dd8bb90e5a094acccd0e1e9db2f433b43df069bce3bf0506c970e2c2e7d9e7d9",
+      "size": 4633692
+    }
+  }
+}

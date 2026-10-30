@@ -393,6 +393,8 @@ var kernels = map[Op]kernel{
 	OpMaxPool2D:      maxPool2D,
 	OpFullyConnected: fullyConnected,
 	OpBatchMatMul:    batchMatMul,
+	OpSVDF:           svdf,
+	OpSoftmax:        softmax,
 
 	OpAdd:     elementwise(func(a, b float32) float32 { return a + b }),
 	OpSub:     elementwise(func(a, b float32) float32 { return a - b }),

@@ -26,6 +26,7 @@ const (
 	tensorType           = 1
 	tensorBuffer         = 2
 	tensorName           = 3
+	tensorQuantization   = 4
 	tensorIsVariable     = 5
 	tensorShapeSignature = 7
 
@@ -36,6 +37,9 @@ const (
 
 	bufferData   = 0
 	bufferOffset = 1
+
+	quantScale     = 2
+	quantZeroPoint = 3
 )
 
 type TensorType uint8
@@ -43,6 +47,7 @@ type TensorType uint8
 const (
 	Float32 TensorType = 0
 	Int32   TensorType = 2
+	Uint8   TensorType = 3
 	Int64   TensorType = 4
 	Bool    TensorType = 6
 	Int8    TensorType = 9
@@ -54,6 +59,8 @@ func (t TensorType) String() string {
 		return "float32"
 	case Int32:
 		return "int32"
+	case Uint8:
+		return "uint8"
 	case Int64:
 		return "int64"
 	case Bool:
@@ -78,6 +85,7 @@ const (
 	OpRelu6          Op = 21
 	OpReshape        Op = 22
 	OpSoftmax        Op = 25
+	OpSVDF           Op = 27
 	OpConcatenation  Op = 2
 	OpPad            Op = 34
 	OpTranspose      Op = 39
@@ -111,7 +119,7 @@ var opNames = map[Op]string{
 	OpAdd: "ADD", OpConcatenation: "CONCATENATION", OpConv2D: "CONV_2D",
 	OpDepthwiseConv: "DEPTHWISE_CONV_2D", OpFullyConnected: "FULLY_CONNECTED",
 	OpLogistic: "LOGISTIC", OpMaxPool2D: "MAX_POOL_2D", OpMul: "MUL", OpRelu: "RELU",
-	OpRelu6: "RELU6", OpReshape: "RESHAPE", OpSoftmax: "SOFTMAX", OpPad: "PAD",
+	OpRelu6: "RELU6", OpReshape: "RESHAPE", OpSoftmax: "SOFTMAX", OpSVDF: "SVDF", OpPad: "PAD",
 	OpTranspose: "TRANSPOSE", OpMean: "MEAN", OpSub: "SUB", OpDiv: "DIV",
 	OpSqueeze: "SQUEEZE", OpStridedSlice: "STRIDED_SLICE", OpExp: "EXP",
 	OpMaximum: "MAXIMUM", OpMinimum: "MINIMUM", OpExpandDims: "EXPAND_DIMS",
@@ -162,6 +170,9 @@ type TensorDesc struct {
 	Dynamic  []bool
 	Buffer   int
 	Variable bool
+
+	Scale     float32
+	ZeroPoint int64
 }
 
 type OpDesc struct {
@@ -175,6 +186,8 @@ type OpDesc struct {
 	act      Activation
 	keepDims bool
 	alpha    float32
+	beta     float32
+	rank     int
 	dims     []int
 	count    int
 	axis     int
@@ -234,6 +247,14 @@ func Parse(b []byte) (m *Model, err error) {
 				Shape:    tt.vec(tensorShape).ints(),
 				Buffer:   int(tt.u32f(tensorBuffer, 0)),
 				Variable: tt.boolf(tensorIsVariable, false),
+			}
+			if q, ok := tt.table(tensorQuantization); ok {
+				if s := q.vec(quantScale); s.len() > 0 {
+					d.Scale = s.f32(0)
+				}
+				if z := q.vec(quantZeroPoint); z.len() > 0 {
+					d.ZeroPoint = z.i64(0)
+				}
 			}
 			d.Dynamic = make([]bool, len(d.Shape))
 			if sig := tt.vec(tensorShapeSignature); sig.len() == len(d.Shape) {
@@ -299,6 +320,7 @@ type convParams struct {
 func (o *OpDesc) decodeOptions(t table, present bool) {
 	o.conv = convParams{strideW: 1, strideH: 1, dilationW: 1, dilationH: 1}
 	o.pool = poolParams{strideW: 1, strideH: 1, filterW: 1, filterH: 1}
+	o.beta = 1
 	if !present {
 		return
 	}
@@ -339,6 +361,13 @@ func (o *OpDesc) decodeOptions(t table, present bool) {
 
 	case OpLeakyRelu:
 		o.alpha = t.f32f(0, 0)
+
+	case OpSoftmax:
+		o.beta = t.f32f(0, 1)
+
+	case OpSVDF:
+		o.rank = int(t.i32f(0, 0))
+		o.act = Activation(t.u8f(1, 0))
 
 	case OpReshape, OpSqueeze:
 		o.dims = t.vec(0).ints()

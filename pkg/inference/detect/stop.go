@@ -1,12 +1,15 @@
 package detect
 
 import (
+	"context"
 	"log/slog"
+	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"github.com/ygelfand/libcountertop/pkg/inference/wakeassets"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 const StopSlot = 100
@@ -16,7 +19,12 @@ type StopOptions struct {
 	DeviceID  uint32
 	Read      func() float64
 	Save      func(float64) error
+
+	PryonOn    func() bool
+	PryonModel func(context.Context) (wake.Model, error)
 }
+
+const pryonStopWait = 2 * time.Minute
 
 type StopWord struct {
 	Entity  *esphome.Number
@@ -59,6 +67,10 @@ func (s *StopWord) Load() {
 		slog.Info("stop word off", "threshold", threshold)
 		return
 	}
+	if s.options.PryonOn != nil && s.options.PryonOn() {
+		safe.Go("loading the pryon stop word", s.loadPryon)
+		return
+	}
 	path, err := wakeassets.Stop(s.options.Directory)
 	if err == nil {
 		m := wake.Model{
@@ -78,4 +90,18 @@ func (s *StopWord) Load() {
 		return
 	}
 	slog.Info("stop word listening", "threshold", threshold)
+}
+
+func (s *StopWord) loadPryon() {
+	ctx, cancel := context.WithTimeout(context.Background(), pryonStopWait)
+	defer cancel()
+	m, err := s.options.PryonModel(ctx)
+	if err == nil && s.options.PryonOn() {
+		err = s.engine.Use(StopSlot, m)
+	}
+	if err != nil {
+		slog.Error("loading the pryon stop word failed", "err", err)
+		return
+	}
+	slog.Info("stop word listening", "engine", m.Kind, "threshold", s.options.Read())
 }

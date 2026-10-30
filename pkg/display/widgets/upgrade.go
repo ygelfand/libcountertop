@@ -17,6 +17,7 @@ type Upgrade struct {
 	Active  bool
 	At      float32
 	Version string
+	Label   string
 }
 
 func UpgradeCard(w *gogui.Window, up Upgrade, pal theme.Theme, logo string) gogui.View {
@@ -73,6 +74,9 @@ func UpgradeCard(w *gogui.Window, up Upgrade, pal theme.Theme, logo string) gogu
 		status = say.T("upgrade.installing")
 	}
 	line := say.F("upgrade.line", map[string]any{"Version": up.Version, "Status": status})
+	if up.Label != "" {
+		line = say.F("upgrade.preparing", map[string]any{"Name": up.Label, "Status": status})
+	}
 
 	return gogui.Column(gogui.ContainerCfg{
 		ID:      "upgrade",

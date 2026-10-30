@@ -83,7 +83,7 @@ func build(m *Model, at int, built map[int]*Interpreter) (*Interpreter, error) {
 		t := &Tensor{Name: d.Name, Type: d.Type, Shape: append([]int(nil), d.Shape...)}
 		raw := m.buffer(d.Buffer)
 		if raw != nil {
-			if err := decode(t, raw); err != nil {
+			if err := decode(t, raw, d); err != nil {
 				return nil, fmt.Errorf("tensor %d (%s): %w", i, d.Name, err)
 			}
 			t.Const = true
@@ -150,8 +150,23 @@ func (in *Interpreter) branch(o *OpDesc, ins, outs []*Tensor) error {
 	return nil
 }
 
-func decode(t *Tensor, raw []byte) error {
+func decode(t *Tensor, raw []byte, d *TensorDesc) error {
 	switch t.Type {
+	case Uint8, Int8:
+		if d.Scale == 0 {
+			return fmt.Errorf("%s constant without a quantization scale", t.Type)
+		}
+		unsigned := t.Type == Uint8 && d.ZeroPoint != 0
+		t.Type = Float32
+		t.F32 = make([]float32, len(raw))
+		for i, b := range raw {
+			// Hybrid models keep signed weights in UINT8 tensors with a zero point of 0.
+			v := int64(int8(b))
+			if unsigned {
+				v = int64(b)
+			}
+			t.F32[i] = float32(v-d.ZeroPoint) * d.Scale
+		}
 	case Float32:
 		n := len(raw) / 4
 		t.F32 = make([]float32, n)
@@ -191,6 +206,16 @@ func (in *Interpreter) Output(i int) *Tensor { return in.tensors[in.graph.Output
 
 func (in *Interpreter) ResizeInput(i int, shape []int) {
 	in.Input(i).resize(shape)
+}
+
+func (in *Interpreter) Reset() {
+	for _, t := range in.tensors {
+		if t.Const {
+			continue
+		}
+		clear(t.F32)
+		clear(t.I32)
+	}
 }
 
 func (in *Interpreter) Invoke() error {

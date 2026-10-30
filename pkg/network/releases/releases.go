@@ -126,7 +126,38 @@ func Asset(repo, tag, name string) string {
 	return strings.TrimSuffix(repo, "/") + "/releases/download/" + tag + "/" + name
 }
 
+var files string
+
+var ErrNoFiles = errors.New("releases: this build has no file host")
+
+func File(folder, name string) (string, error) {
+	if files == "" {
+		return "", ErrNoFiles
+	}
+	return strings.TrimSuffix(files, "/") + "/" + folder + "/" + name, nil
+}
+
 func Download(ctx context.Context, url, sum, dest string, limit int64) error {
+	return DownloadProgress(ctx, url, sum, dest, limit, nil)
+}
+
+type counter struct {
+	done   int64
+	report func(done int64)
+}
+
+func (c *counter) Write(p []byte) (int, error) {
+	c.done += int64(len(p))
+	c.report(c.done)
+	return len(p), nil
+}
+
+func DownloadProgress(
+	ctx context.Context,
+	url, sum, dest string,
+	limit int64,
+	report func(done int64),
+) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -145,7 +176,11 @@ func Download(ctx context.Context, url, sum, dest string, limit int64) error {
 	}
 	defer os.Remove(tmp.Name())
 	h := sha256.New()
-	n, err := io.Copy(io.MultiWriter(tmp, h), io.LimitReader(resp.Body, limit+1))
+	sink := io.MultiWriter(tmp, h)
+	if report != nil {
+		sink = io.MultiWriter(tmp, h, &counter{report: report})
+	}
+	n, err := io.Copy(sink, io.LimitReader(resp.Body, limit+1))
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}

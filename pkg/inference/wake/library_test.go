@@ -1,8 +1,10 @@
 package wake
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	esphome "github.com/ygelfand/go-esphome-device"
@@ -98,5 +100,46 @@ func TestAdvertiseIsStableAcrossCalls(t *testing.T) {
 	}
 	if first[0].ID != "a_first" {
 		t.Errorf("advertised %q, want the first by id", first[0].ID)
+	}
+}
+
+type provided struct {
+	models  []Model
+	ensured []string
+}
+
+func (p *provided) Models() []Model { return p.models }
+
+func (p *provided) Ensure(_ context.Context, id string, progress func(float32)) error {
+	p.ensured = append(p.ensured, id)
+	progress(0.501)
+	progress(0.505)
+	return nil
+}
+
+func TestProvidersAddWordsAndPrepareThemWhenChosen(t *testing.T) {
+	p := &provided{models: []Model{{ID: "pryon_alexa", Phrase: "Pryon: Alexa", Kind: KindPryon}}}
+	l := NewLibrary(t.TempDir(), p)
+
+	if _, ok := Find(l.Ours(), "pryon_alexa"); !ok {
+		t.Fatal("the provided word is not listed")
+	}
+	words, _ := l.Advertise()
+	if len(words) != 1 || words[0].Phrase != "Pryon: Alexa" {
+		t.Errorf("advertised %+v", words)
+	}
+	var seen []Preparation
+	stop := l.Preparing.Listen(func(p Preparation) { seen = append(seen, p) })
+	defer stop()
+	l.Ensure([]string{"pryon_alexa", "", "nobody"})
+	if len(p.ensured) != 1 || p.ensured[0] != "pryon_alexa" {
+		t.Errorf("ensured %v, want only the provided word", p.ensured)
+	}
+	want := []Preparation{{Phrase: "Pryon: Alexa"}, {Phrase: "Pryon: Alexa", At: 0.501}, {}}
+	if !slices.Equal(seen, want) {
+		t.Errorf("preparations %+v, want %+v", seen, want)
+	}
+	if l.Preparation().Active() {
+		t.Errorf("still preparing %+v", l.Preparation())
 	}
 }

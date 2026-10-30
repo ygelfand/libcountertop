@@ -412,6 +412,25 @@ func (w StopWriter) Threshold(v float64) error {
 	return w.s.Update(func(c *Wake) { c.Stop.Threshold = v })
 }
 
+type PryonWriter struct{ s storage.Section[Wake] }
+
+func NewPryonWriter(s storage.Section[Wake]) PryonWriter { return PryonWriter{s: s} }
+
+type GeminiWriter struct{ s storage.Section[Wake] }
+
+func NewGeminiWriter(s storage.Section[Wake]) GeminiWriter { return GeminiWriter{s: s} }
+
+func (w GeminiWriter) On(v bool) error {
+	return w.s.Update(func(c *Wake) { c.Gemini = v })
+}
+
+func (w PryonWriter) Set(v Wake) error {
+	return w.s.Update(func(c *Wake) {
+		c.Pryon = v.Pryon
+		c.Stop.Pryon = v.Stop.Pryon
+	})
+}
+
 type WakeWriter struct {
 	s    storage.Section[Wake]
 	slot int

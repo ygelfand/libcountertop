@@ -5,14 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/inference/pryon"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const Hold = 300 * time.Millisecond
+
+const (
+	loosest   = 0.5
+	strictest = 0.99
+)
 
 const Refractory = 800 * time.Millisecond
 
@@ -42,10 +51,13 @@ type Engine struct {
 	Load func() error
 
 	Paused func() bool
+
+	Pryon func() (pryon.Options, error)
 }
 
 type slot struct {
 	model  wake.Model
+	key    string
 	loaded bool
 
 	scored bool
@@ -108,7 +120,13 @@ func (e *Engine) engineFor(k wake.Kind) (backend, error) {
 	if b, ok := e.backends[k]; ok {
 		return b, nil
 	}
-	b, err := build(k)
+	var b backend
+	var err error
+	if k == wake.KindPryon {
+		b, err = newPryon(e.Pryon)
+	} else {
+		b, err = build(k)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +141,12 @@ func (e *Engine) Use(n int, m wake.Model) error {
 	if n < 0 || n >= len(e.slots) {
 		return fmt.Errorf("wake: slot %d out of range", n)
 	}
-	if s := e.slots[n]; s.loaded && s.model.ID == m.ID {
+	return e.use(n, m)
+}
+
+func (e *Engine) use(n int, m wake.Model) error {
+	key := e.loadKey(n, m)
+	if s := e.slots[n]; s.loaded && s.key == key {
 		return nil
 	}
 
@@ -131,17 +154,46 @@ func (e *Engine) Use(n int, m wake.Model) error {
 	if err != nil {
 		return err
 	}
-	if err := b.load(m); err != nil {
-		e.drop(slot{model: m, loaded: true})
+	if err := b.load(key, m, e.sensitivity(n)); err != nil {
+		e.drop(slot{model: m, key: key, loaded: true})
 		return err
 	}
 
 	old := e.slots[n]
-	e.slots[n] = slot{model: m, loaded: true}
+	e.slots[n] = slot{model: m, key: key, loaded: true, scored: old.scored && old.model.ID == m.ID}
 	e.drop(old)
 
-	slog.Info("wake word loaded", "slot", n+1, "phrase", m.Phrase, "id", m.ID, "engine", m.Kind)
+	slog.Info("wake word loaded", "slot", n+1, "phrase", m.Phrase, "id", m.ID, "engine", m.Kind,
+		"key", key)
 	return nil
+}
+
+func (e *Engine) loadKey(n int, m wake.Model) string {
+	if m.Kind == wake.KindPryon {
+		return strconv.Itoa(n) + "/" + m.ID + "/" + strconv.Itoa(e.sensitivity(n))
+	}
+	return m.ID
+}
+
+func (e *Engine) cutoff(n int) float64 {
+	if e.Threshold != nil {
+		return e.Threshold(n)
+	}
+	return wake.DefaultThreshold
+}
+
+// Pryon's sensitivityValue runs -10..10 between a word's min and max accept; 0 is its own accept.
+func (e *Engine) sensitivity(n int) int {
+	center := wake.DefaultThreshold
+	if n == StopSlot {
+		center = schema.DefaultStopThreshold
+	}
+	t := e.cutoff(n)
+	span := center - loosest
+	if t > center {
+		span = strictest - center
+	}
+	return min(max(int(math.Round(10*(t-center)/span)), -10), 10)
 }
 
 func (e *Engine) Clear(n int) {
@@ -160,6 +212,20 @@ func (e *Engine) Clear(n int) {
 	e.drop(old)
 }
 
+func (e *Engine) ClearKind(k wake.Kind) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for n, s := range e.slots {
+		if !s.loaded || s.model.Kind != k {
+			continue
+		}
+		slog.Info("wake word cleared", "slot", n+1, "id", s.model.ID)
+		e.slots[n] = slot{}
+		e.drop(s)
+	}
+}
+
 func (e *Engine) drop(was slot) {
 	if !was.loaded {
 		return
@@ -169,8 +235,8 @@ func (e *Engine) drop(was slot) {
 		return
 	}
 
-	if !e.uses(was.model.ID) {
-		b.unload(was.model.ID)
+	if !e.uses(was.key) {
+		b.unload(was.key)
 	}
 	if !e.runs(was.model.Kind) {
 		b.close()
@@ -178,9 +244,9 @@ func (e *Engine) drop(was slot) {
 	}
 }
 
-func (e *Engine) uses(id string) bool {
+func (e *Engine) uses(key string) bool {
 	for _, s := range e.slots {
-		if s.loaded && s.model.ID == id {
+		if s.loaded && s.key == key {
 			return true
 		}
 	}
@@ -306,7 +372,13 @@ func (e *Engine) score(frame []int16) {
 		if !s.loaded {
 			continue
 		}
-		score, ok := heard[s.model.Kind][s.model.ID]
+		if s.model.Kind == wake.KindPryon && e.loadKey(i, s.model) != s.key {
+			if err := e.use(i, s.model); err != nil {
+				slog.Error("retuning a wake word failed", "slot", i+1, "id", s.model.ID, "err", err)
+			}
+			continue
+		}
+		score, ok := heard[s.model.Kind][s.key]
 		if !ok {
 			continue
 		}
@@ -323,9 +395,9 @@ func (e *Engine) score(frame []int16) {
 }
 
 func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
-	cutoff := wake.DefaultThreshold
-	if e.Threshold != nil {
-		cutoff = e.Threshold(n)
+	cutoff := e.cutoff(n)
+	if s.model.Kind == wake.KindPryon {
+		cutoff = math.SmallestNonzeroFloat64
 	}
 
 	if now.Before(s.quiet) {

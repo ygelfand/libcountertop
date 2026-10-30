@@ -171,6 +171,64 @@ func TestFullyConnected(t *testing.T) {
 	f32(t, "fc", y.F32, []float32{1.5, 4})
 }
 
+func TestSVDFRemembersEarlierFrames(t *testing.T) {
+	feature := tf([]int{2, 2}, 1, 0, 0, 1)
+	time := tf([]int{2, 2}, 1, 10, 1, 10)
+	bias := tf([]int{2}, 0.5, -1)
+	state := tf([]int{1, 4})
+	op := &OpDesc{rank: 1}
+	for _, step := range []struct {
+		x    []float32
+		want []float32
+	}{
+		{[]float32{1, 2}, []float32{10.5, 19}},
+		{[]float32{3, 4}, []float32{31.5, 41}},
+	} {
+		y := out()
+		x := tf([]int{1, 2}, step.x...)
+		if err := kernels[OpSVDF](
+			op,
+			[]*Tensor{x, feature, time, bias, state},
+			[]*Tensor{y},
+		); err != nil {
+			t.Fatal(err)
+		}
+		shape(t, "svdf", y.Shape, []int{1, 2})
+		f32(t, "svdf", y.F32, step.want)
+	}
+}
+
+func TestSoftmaxSumsToOne(t *testing.T) {
+	x := tf([]int{1, 3}, 1, 2, 3)
+	y := out()
+	if err := kernels[OpSoftmax](&OpDesc{beta: 1}, []*Tensor{x}, []*Tensor{y}); err != nil {
+		t.Fatal(err)
+	}
+	f32(t, "softmax", y.F32, []float32{0.09003057, 0.24472847, 0.66524096})
+}
+
+func TestQuantizedConstantsBecomeFloats(t *testing.T) {
+	for _, c := range []struct {
+		typ  TensorType
+		zero int64
+		raw  []byte
+		want []float32
+	}{
+		{Int8, 0, []byte{0xff, 0x02}, []float32{-0.5, 1}},
+		{Uint8, 0, []byte{0xff, 0x02}, []float32{-0.5, 1}},
+		{Uint8, 128, []byte{0x80, 0x82}, []float32{0, 1}},
+	} {
+		tensor := &Tensor{Type: c.typ}
+		if err := decode(tensor, c.raw, &TensorDesc{Scale: 0.5, ZeroPoint: c.zero}); err != nil {
+			t.Fatal(err)
+		}
+		if tensor.Type != Float32 {
+			t.Errorf("%s decoded as %s", c.typ, tensor.Type)
+		}
+		f32(t, c.typ.String(), tensor.F32, c.want)
+	}
+}
+
 func TestBatchMatMul(t *testing.T) {
 	a := tf([]int{1, 2, 3}, 1, 2, 3, 4, 5, 6)
 	b := tf([]int{1, 3, 2}, 1, 2, 3, 4, 5, 6)

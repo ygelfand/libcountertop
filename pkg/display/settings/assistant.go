@@ -29,8 +29,21 @@ type PipelineChooser interface {
 	Choose(ctx context.Context, slot int, option string) error
 }
 
+type Switch interface {
+	On() bool
+	Set(on bool) error
+}
+
+type GatedSwitch interface {
+	Switch
+	Available() bool
+}
+
 type AssistantDependencies struct {
 	Slots       int
+	Pryon       Switch
+	PryonStop   GatedSwitch
+	Gemini      Switch
 	Preferences Preferences
 	Models      func() []wake.Model
 	Phrases     func() []string
@@ -90,6 +103,49 @@ func (p *AssistantPages) Page() *shell.Page {
 					Chosen: false,
 				})
 				acts = append(acts, nil)
+			}
+			if pryon := p.options.Pryon; pryon != nil {
+				on := pryon.On()
+				rows = append(rows, menu.Row{
+					Label: say.T("assistants.setting.pryon"),
+					Kind:  menu.Toggle,
+					On:    on,
+				})
+				acts = append(acts, func(int) {
+					if err := pryon.Set(!on); err != nil {
+						slog.Error("switching pryon failed", "err", err)
+					}
+				})
+			}
+			if stop := p.options.PryonStop; stop != nil {
+				on, available := stop.On(), stop.Available()
+				rows = append(rows, menu.Row{
+					Label: say.T("assistants.setting.pryon_stop"),
+					Kind:  menu.Toggle,
+					On:    on,
+					Dim:   !available,
+				})
+				acts = append(acts, func(int) {
+					if !available {
+						return
+					}
+					if err := stop.Set(!on); err != nil {
+						slog.Error("switching the pryon stop word failed", "err", err)
+					}
+				})
+			}
+			if gemini := p.options.Gemini; gemini != nil {
+				on := gemini.On()
+				rows = append(rows, menu.Row{
+					Label: say.T("assistants.setting.gemini"),
+					Kind:  menu.Toggle,
+					On:    on,
+				})
+				acts = append(acts, func(int) {
+					if err := gemini.Set(!on); err != nil {
+						slog.Error("switching gemini failed", "err", err)
+					}
+				})
 			}
 			return rows, acts
 		},

@@ -82,6 +82,11 @@ assistants.off: "Off"
 assistants.pipeline: Pipeline
 assistants.pipeline.preferred: Preferred
 assistants.reply: Response playback
+assistants.group.pryon: Pryon
+assistants.setting.pryon: Amazon wake words
+assistants.setting.pryon_stop: Amazon stop word
+assistants.group.gemini: Gemini
+assistants.setting.gemini: Gemini wake word
 assistants.group.stopword: Stop word
 assistants.setting.stop_sensitivity: Stop word sensitivity
 assistants.setting.buffer: Reply buffer
@@ -1468,6 +1473,7 @@ update.versions.none: No other versions
 upgrade.installing: Installing…
 upgrade.line: Updating to {{.Version}} · {{.Status}}
 upgrade.percent: "{{.N}}%"
+upgrade.preparing: Getting {{.Name}} ready · {{.Status}}
 visual.group.visual: Visuals
 visual.aurora: Aurora
 visual.classic-vu: Classic VU

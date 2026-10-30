@@ -27,6 +27,8 @@ type Kind string
 const (
 	KindOpenWakeWord  Kind = "openwakeword"
 	KindMicroWakeWord Kind = "microwakeword"
+	KindPryon         Kind = "pryon"
+	KindGemini        Kind = "gemini"
 )
 
 type Model struct {
@@ -41,6 +43,8 @@ type Model struct {
 
 	Path   string
 	Config microwakeword.Config
+
+	Keyword string
 }
 
 type manifest struct {
