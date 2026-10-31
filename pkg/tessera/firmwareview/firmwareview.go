@@ -304,6 +304,8 @@ func (v *View) rest(wake func()) {
 	}
 }
 
+func (v *View) SaverUp() bool { return v.wake.Load() != nil }
+
 func (v *View) woke() {
 	if wake := v.wake.Swap(nil); wake != nil {
 		go (*wake)()
