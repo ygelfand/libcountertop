@@ -48,14 +48,16 @@ func TestTopicsMapToKinds(t *testing.T) {
 		"tns1:RuleEngine/MyRuleDetector/VehicleDetect": Vehicle,
 		"tns1:RuleEngine/MyRuleDetector/DogCatDetect":  Animal,
 		"tns1:RuleEngine/MyRuleDetector/Package":       Package,
+		"tns1:VideoSource/MotionAlarm":                 Motion,
+		"tns1:RuleEngine/CellMotionDetector/Motion":    Motion,
 	}
 	for topic, want := range cases {
 		if got, ok := topicKind(topic); !ok || got != want {
 			t.Errorf("%s: got %q, want %q", topic, got, want)
 		}
 	}
-	if _, ok := topicKind("tns1:VideoSource/MotionAlarm"); ok {
-		t.Error("plain motion became a doorbell event")
+	if _, ok := topicKind("tns1:Device/Trigger/DigitalInput"); ok {
+		t.Error("a digital input became a doorbell event")
 	}
 }
 

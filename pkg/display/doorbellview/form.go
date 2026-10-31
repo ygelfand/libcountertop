@@ -12,6 +12,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	sharedsettings "github.com/ygelfand/libcountertop/pkg/display/settings"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -31,6 +32,7 @@ type form struct {
 
 func (v *View) doorPage(slot int) *shell.Page {
 	f := &form{v: v, slot: slot, cfg: v.o.Settings.Read()}
+	f.fit()
 	return f.page(v.doorName(slot), shell.Action{
 		Label: say.T("doorbell.forget"),
 		Role:  shell.Danger,
@@ -46,7 +48,7 @@ func (v *View) doorPage(slot int) *shell.Page {
 func (v *View) manualPage() *shell.Page {
 	cfg := v.o.Settings.Read()
 	slot, _ := freeSlot(cfg)
-	cfg.Doors[slot] = schema.DoorbellDoor{User: schema.DoorbellUser}
+	cfg.Doors[slot] = schema.DoorbellDoor{User: schema.DoorbellUser, Video: schema.VideoReolink}
 	f := &form{v: v, slot: slot, fresh: true, cfg: cfg}
 	return f.page(say.T("doorbell.manual"))
 }
@@ -92,43 +94,123 @@ func (f *form) build() ([]menu.Row, []func(int)) {
 		}, nil)
 	}
 	door := f.door()
-	text := func(label string, kind menu.Kind, value string, set func(*schema.DoorbellDoor, string)) {
-		add(menu.Row{Label: say.T(label), Kind: kind, Value: value, Save: func(s string) {
-			f.edit(func(d *schema.DoorbellDoor) { set(d, s) })
-		}}, nil)
+	text := func(label, hint string, kind menu.Kind, value string, set func(*schema.DoorbellDoor, string)) {
+		add(
+			menu.Row{
+				Label: say.T(label),
+				Hint:  hint,
+				Kind:  kind,
+				Value: value,
+				Save: func(s string) {
+					f.edit(func(d *schema.DoorbellDoor) { set(d, s) })
+				},
+			},
+			nil,
+		)
 	}
-	text("doorbell.field.name", menu.Field, door.Name,
-		func(d *schema.DoorbellDoor, s string) { d.Name = s })
-	text("doorbell.field.uid", menu.Field, door.UID,
-		func(d *schema.DoorbellDoor, s string) { d.UID = s })
-	text("doorbell.field.host", menu.Field, door.Host,
-		func(d *schema.DoorbellDoor, s string) { d.Host = s })
-	text("doorbell.field.user", menu.Field, door.User,
-		func(d *schema.DoorbellDoor, s string) { d.User = s })
-	text("doorbell.field.password", menu.Password, door.Password,
-		func(d *schema.DoorbellDoor, s string) { d.Password = s })
-	streams := schema.DoorbellStreams()
-	add(sharedsettings.SegmentRow(say.T("doorbell.field.stream"), streams, door.Stream),
-		sharedsettings.SegmentPick(streams, func(s schema.DoorbellStream) {
-			f.edit(func(d *schema.DoorbellDoor) { d.Stream = s })
-		}))
-	for _, field := range []string{"video", "events", "talk"} {
-		add(f.choiceRow(fmt.Sprintf("door%d.%s", f.slot+1, field)))
+	login := func() {
+		text("doorbell.field.user", "", menu.Field, door.User,
+			func(d *schema.DoorbellDoor, s string) { d.User = s })
+		text("doorbell.field.password", "", menu.Password, door.Password,
+			func(d *schema.DoorbellDoor, s string) { d.Password = s })
 	}
-	if door.Device != "" {
+	stream := func() {
+		streams := schema.DoorbellStreams()
+		add(sharedsettings.SegmentRow(say.T("doorbell.field.stream"), streams, door.Stream),
+			sharedsettings.SegmentPick(streams, func(s schema.DoorbellStream) {
+				f.edit(func(d *schema.DoorbellDoor) { d.Stream = s })
+			}))
+	}
+	camera := func() {
 		add(menu.Row{Label: say.T("doorbell.camera.title"), Kind: menu.Chevron, Value: door.Camera},
 			func(int) { f.v.o.Shell.Push(f.cameraPage()) })
-		for _, s := range sensorKinds {
-			title := say.T("doorbell.sensor." + s.field)
-			value := *s.at(&door.Sensors)
-			if value == "" {
-				value = say.T("doorbell.sensor.none")
-			}
-			add(menu.Row{Label: title, Kind: menu.Chevron, Value: value},
-				func(int) { f.v.o.Shell.Push(f.sensorPage(s, title)) })
+	}
+	text("doorbell.field.name", "", menu.Field, door.Name,
+		func(d *schema.DoorbellDoor, s string) { d.Name = s })
+	add(f.choiceRow("video", nil))
+	switch door.Video {
+	case schema.VideoReolink:
+		text("doorbell.field.uid", "", menu.Field, door.UID,
+			func(d *schema.DoorbellDoor, s string) { d.UID = s })
+		text("doorbell.field.host", "", menu.Field, door.Host,
+			func(d *schema.DoorbellDoor, s string) { d.Host = s })
+		login()
+		stream()
+	case schema.VideoONVIF:
+		text("doorbell.field.host", say.T("doorbell.field.host_port"), menu.Field, door.Host,
+			func(d *schema.DoorbellDoor, s string) { d.Host = s })
+		login()
+		stream()
+	case schema.VideoRTSP:
+		text("doorbell.field.rtsp", "", menu.Field, door.RTSP,
+			func(d *schema.DoorbellDoor, s string) { d.RTSP = s })
+		login()
+	case schema.VideoAssistant:
+		camera()
+	}
+	add(
+		f.choiceRow(
+			"events",
+			func(v string) bool { return feedFits(door, schema.DoorbellFeed(v)) },
+		),
+	)
+	if door.Video != schema.VideoAssistant {
+		add(
+			f.choiceRow(
+				"talk",
+				func(v string) bool { return talkFits(door, schema.DoorbellTalk(v)) },
+			),
+		)
+	}
+	if door.Events != schema.FeedAssistant && door.Events != schema.FeedAuto {
+		return rows, taps
+	}
+	if door.Video != schema.VideoAssistant {
+		camera()
+	}
+	for _, s := range sensorKinds {
+		title := say.T("doorbell.sensor." + s.field)
+		value := *s.at(&door.Sensors)
+		if value == "" {
+			value = say.T("doorbell.sensor.none")
 		}
+		add(menu.Row{Label: title, Kind: menu.Chevron, Value: value},
+			func(int) { f.v.o.Shell.Push(f.sensorPage(s, title)) })
 	}
 	return rows, taps
+}
+
+func feedFits(door schema.DoorbellDoor, feed schema.DoorbellFeed) bool {
+	switch feed {
+	case schema.FeedAuto, schema.FeedReolink:
+		return door.Video == schema.VideoReolink
+	case schema.FeedONVIF:
+		return door.Video == schema.VideoReolink || door.Video == schema.VideoONVIF
+	}
+	return true
+}
+
+func talkFits(door schema.DoorbellDoor, talk schema.DoorbellTalk) bool {
+	switch talk {
+	case schema.TalkAuto, schema.TalkReolink:
+		return door.Video == schema.VideoReolink
+	case schema.TalkONVIF:
+		return door.Video != schema.VideoAssistant
+	}
+	return false
+}
+
+func (f *form) fit() {
+	d := &f.cfg.Doors[f.slot]
+	if !feedFits(*d, d.Events) {
+		d.Events = schema.FeedAssistant
+		if feedFits(*d, schema.FeedONVIF) {
+			d.Events = schema.FeedONVIF
+		}
+	}
+	if d.Video != schema.VideoAssistant && !talkFits(*d, d.Talk) {
+		d.Talk = schema.TalkONVIF
+	}
 }
 
 func (f *form) busy() (shell.Busy, bool) {
@@ -162,25 +244,22 @@ func (f *form) save() {
 	busy := f.shown != nil
 	door := f.cfg.Doors[f.slot]
 	f.mu.Unlock()
-	switch {
-	case busy:
+	if busy {
 		return
-	case f.fresh && door.UID == "" && door.Host == "":
-		f.refuse(say.T("doorbell.needs"))
-		return
-	case !door.Signed() && door.Device == "":
-		f.refuse(say.T("doorbell.why.nopassword"))
+	}
+	if why := missing(door); why != "" {
+		f.refuse(say.T(why))
 		return
 	}
 	f.show(&shell.Busy{Text: say.T("doorbell.checking")})
 	safe.Go("doorbell check", func() {
-		if door.Signed() {
-			pic, err := doorbell.Check(context.Background(), door)
-			if err != nil {
-				slog.Warn("doorbell check failed", "door", door.Name, "err", err)
-				f.refuse(failure(err))
-				return
-			}
+		pic, err := doorbell.Check(context.Background(), door)
+		if err != nil {
+			slog.Warn("doorbell check failed", "door", door.Name, "err", err)
+			f.refuse(failure(err))
+			return
+		}
+		if pic != nil {
 			f.v.shots.keep(doorKey(f.slot), pic, f.v.screenMost()/thumbShare)
 		}
 		f.v.updateDoor(f.slot, func(d *schema.DoorbellDoor) { *d = door })
@@ -189,7 +268,35 @@ func (f *form) save() {
 	})
 }
 
-func (f *form) choiceRow(name string) (menu.Row, func(int)) {
+func missing(door schema.DoorbellDoor) string {
+	switch door.Video {
+	case schema.VideoReolink:
+		if door.UID == "" && door.Host == "" {
+			return "doorbell.needs"
+		}
+	case schema.VideoONVIF:
+		if door.Host == "" {
+			return "doorbell.needs.host"
+		}
+	case schema.VideoRTSP:
+		if door.RTSP == "" {
+			return "doorbell.needs.rtsp"
+		}
+		return ""
+	case schema.VideoAssistant:
+		if door.Camera == "" && door.Device == "" {
+			return "doorbell.why.nocamera"
+		}
+		return ""
+	}
+	if !door.Signed() {
+		return "doorbell.why.nopassword"
+	}
+	return ""
+}
+
+func (f *form) choiceRow(field string, fits func(string) bool) (menu.Row, func(int)) {
+	name := fmt.Sprintf("door%d.%s", f.slot+1, field)
 	c := f.v.o.Bell.Settings()
 	s, ok := find(c, name)
 	if !ok {
@@ -198,10 +305,16 @@ func (f *form) choiceRow(name string) (menu.Row, func(int)) {
 	f.mu.Lock()
 	current := s.Read(&f.cfg)
 	f.mu.Unlock()
-	values, labels := s.Values(), s.Labels()
+	var values, labels []string
+	for i, value := range s.Values() {
+		if fits == nil || fits(value) {
+			values, labels = append(values, value), append(labels, s.Labels()[i])
+		}
+	}
 	pick := func(value string) {
 		f.mu.Lock()
 		err := s.Write(&f.cfg, value)
+		f.fit()
 		f.mu.Unlock()
 		if err != nil {
 			slog.Error("doorbell setting", "setting", name, "err", err)
@@ -251,17 +364,27 @@ func (f *form) cameraPage() *shell.Page {
 				rows = append(rows, menu.Row{Label: say.T("doorbell.looking"), Dim: true})
 				taps = append(taps, nil)
 			}
+			listed := map[string]bool{}
+			offer := func(cam homeassistant.Named, chosen bool) {
+				if listed[cam.Entity] {
+					return
+				}
+				listed[cam.Entity] = true
+				rows = append(rows, menu.Row{Label: cam.Name, Hint: cam.Entity, Chosen: chosen})
+				taps = append(taps, func(int) {
+					f.edit(func(d *schema.DoorbellDoor) { d.Camera = cam.Entity })
+				})
+			}
 			for _, d := range list {
-				if d.Device != door.Device {
+				if door.Device == "" || d.Device != door.Device {
 					continue
 				}
 				for i, cam := range d.Cameras {
-					chosen := door.Camera == cam.Entity || (door.Camera == "" && i == 0)
-					rows = append(rows, menu.Row{Label: cam.Name, Hint: cam.Entity, Chosen: chosen})
-					taps = append(taps, func(int) {
-						f.edit(func(d *schema.DoorbellDoor) { d.Camera = cam.Entity })
-					})
+					offer(cam, door.Camera == cam.Entity || (door.Camera == "" && i == 0))
 				}
+			}
+			for _, cam := range found.allCameras() {
+				offer(cam, door.Camera == cam.Entity)
 			}
 			return rows, taps
 		},
@@ -284,17 +407,27 @@ func (f *form) sensorPage(kind sensorKind, title string) *shell.Page {
 			rows = append(rows, menu.Row{Label: say.T("doorbell.looking"), Dim: true})
 			taps = append(taps, nil)
 		}
+		listed := map[string]bool{}
+		offer := func(b homeassistant.Named) {
+			if listed[b.Entity] {
+				return
+			}
+			listed[b.Entity] = true
+			rows = append(
+				rows,
+				menu.Row{Label: b.Name, Hint: b.Entity, Chosen: current == b.Entity},
+			)
+			taps = append(taps, func(int) { pick(b.Entity) })
+		}
 		for _, d := range list {
-			if d.Device != door.Device {
-				continue
+			if door.Device != "" && d.Device == door.Device {
+				for _, b := range d.Binary {
+					offer(b)
+				}
 			}
-			for _, b := range d.Binary {
-				rows = append(
-					rows,
-					menu.Row{Label: b.Name, Hint: b.Entity, Chosen: current == b.Entity},
-				)
-				taps = append(taps, func(int) { pick(b.Entity) })
-			}
+		}
+		for _, b := range found.sensors() {
+			offer(b)
 		}
 		return rows, taps
 	}}

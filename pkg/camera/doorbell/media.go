@@ -42,16 +42,17 @@ func (d *Doorbell) PlannedVideo(slot int) string {
 	if !ok {
 		return ""
 	}
+	return plannedVideo(door)
+}
+
+func plannedVideo(door schema.DoorbellDoor) string {
 	switch door.Video {
 	case schema.VideoReolink:
 		return sourceReolink
+	case schema.VideoONVIF:
+		return sourceOnvif
 	case schema.VideoRTSP:
 		return sourceRTSP
-	case schema.VideoAssistant:
-		return sourceAssistant
-	}
-	if door.Signed() {
-		return sourceReolink
 	}
 	return sourceAssistant
 }
@@ -67,56 +68,26 @@ func (d *Doorbell) Watch(
 		return errUnsupported
 	}
 	door.Stream = quality
-	switch door.Video {
-	case schema.VideoReolink:
+	source := plannedVideo(door)
+	switch source {
+	case sourceReolink:
 		return d.tryVideo(
 			ctx,
 			slot,
-			sourceReolink,
+			source,
 			w,
 			func(w Watcher) error { return d.reolinkWatch(ctx, slot, door, w) },
 		)
-	case schema.VideoRTSP:
+	case sourceOnvif, sourceRTSP:
 		return d.tryVideo(
 			ctx,
 			slot,
-			sourceRTSP,
+			source,
 			w,
 			func(w Watcher) error { return rtspWatch(ctx, door, w) },
 		)
-	case schema.VideoAssistant:
-		d.seeVideo(slot, sourceAssistant, Unset, "")
-		return ErrAssistantVideo
 	}
-	var why string
-	if door.Signed() {
-		err := d.tryVideo(
-			ctx,
-			slot,
-			sourceReolink,
-			w,
-			func(w Watcher) error { return d.reolinkWatch(ctx, slot, door, w) },
-		)
-		if ctx.Err() != nil || !errors.Is(err, ErrUnreachable) {
-			return err
-		}
-		why = tried(sourceReolink, err)
-		if door.Host != "" {
-			err = d.tryVideo(
-				ctx,
-				slot,
-				sourceRTSP,
-				w,
-				func(w Watcher) error { return rtspWatch(ctx, door, w) },
-			)
-			if ctx.Err() != nil || !errors.Is(err, ErrUnreachable) {
-				return err
-			}
-			why += "\n" + tried(sourceRTSP, err)
-		}
-		slog.Warn("doorbell video falls back to Home Assistant", "door", door.Name, "why", why)
-	}
-	d.seeVideo(slot, sourceAssistant, Unset, why)
+	d.seeVideo(slot, sourceAssistant, Unset, "")
 	return ErrAssistantVideo
 }
 

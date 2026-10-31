@@ -23,6 +23,8 @@ var sliders = []string{"ring_for"}
 type found struct {
 	mu      sync.Mutex
 	list    []homeassistant.ReolinkDevice
+	binary  []homeassistant.Named
+	cameras []homeassistant.Named
 	fetched bool
 }
 
@@ -66,8 +68,16 @@ func (v *View) lookup(f *found) {
 		if err != nil {
 			slog.Debug("doorbell lookup", "err", err)
 		}
+		binary, err := v.o.Bell.BinarySensors(ctx)
+		if err != nil {
+			slog.Debug("doorbell sensor lookup", "err", err)
+		}
+		cameras, err := v.o.Bell.Cameras(ctx)
+		if err != nil {
+			slog.Debug("doorbell camera lookup", "err", err)
+		}
 		f.mu.Lock()
-		f.list, f.fetched = list, true
+		f.list, f.binary, f.cameras, f.fetched = list, binary, cameras, true
 		f.mu.Unlock()
 		v.o.Shell.Redraw()
 	})
@@ -77,6 +87,18 @@ func (f *found) get() ([]homeassistant.ReolinkDevice, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.list), f.fetched
+}
+
+func (f *found) sensors() []homeassistant.Named {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.binary)
+}
+
+func (f *found) allCameras() []homeassistant.Named {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.cameras)
 }
 
 func freeSlot(cfg schema.Doorbell) (int, bool) {

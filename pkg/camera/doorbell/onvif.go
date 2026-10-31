@@ -27,6 +27,12 @@ func onvifDevice(ctx context.Context, door schema.DoorbellDoor) (*onvif.Client, 
 }
 
 func streamURI(ctx context.Context, door schema.DoorbellDoor) (string, error) {
+	if door.Video == schema.VideoRTSP {
+		if door.RTSP == "" {
+			return "", errUnsupported
+		}
+		return door.RTSP, nil
+	}
 	c, err := onvifDevice(ctx, door)
 	if err != nil {
 		return "", err
@@ -181,6 +187,8 @@ func topicKind(topic string) (Kind, bool) {
 		return Vehicle, true
 	case strings.Contains(t, "dog"), strings.Contains(t, "animal"), strings.Contains(t, "pet"):
 		return Animal, true
+	case strings.Contains(t, "motion"):
+		return Motion, true
 	}
 	return "", false
 }

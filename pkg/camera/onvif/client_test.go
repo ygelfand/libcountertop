@@ -38,6 +38,13 @@ func TestFindReadsTheDeviceAddressFromTheProbeMatch(t *testing.T) {
 	}
 }
 
+func TestFindWithAPortSkipsDiscovery(t *testing.T) {
+	got, err := Find(context.Background(), "10.0.0.9:2020")
+	if want := "http://10.0.0.9:2020/onvif/device_service"; err != nil || got != want {
+		t.Errorf("got %q, %v; want %q", got, err, want)
+	}
+}
+
 func TestTheClientFollowsCapabilitiesToTheStreamAndEvents(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)

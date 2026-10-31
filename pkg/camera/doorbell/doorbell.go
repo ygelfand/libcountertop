@@ -43,9 +43,10 @@ const (
 	Package Kind = "package"
 	Vehicle Kind = "vehicle"
 	Animal  Kind = "dog_cat"
+	Motion  Kind = "motion"
 )
 
-var kinds = []Kind{Visitor, Person, Package, Vehicle, Animal}
+var kinds = []Kind{Visitor, Person, Package, Vehicle, Animal, Motion}
 
 type Event struct {
 	Kind     Kind
@@ -101,6 +102,7 @@ func (s Status) Says() string {
 
 type Finder interface {
 	ReolinkDevices(ctx context.Context) ([]homeassistant.ReolinkDevice, error)
+	Named(ctx context.Context, domain string) ([]homeassistant.Named, error)
 }
 
 type Follower interface {
@@ -225,6 +227,29 @@ func (d *Doorbell) ReolinkDevices(ctx context.Context) ([]homeassistant.ReolinkD
 	return d.o.Finder.ReolinkDevices(ctx)
 }
 
+func (d *Doorbell) BinarySensors(ctx context.Context) ([]homeassistant.Named, error) {
+	return d.named(ctx, "binary_sensor")
+}
+
+func (d *Doorbell) Cameras(ctx context.Context) ([]homeassistant.Named, error) {
+	return d.named(ctx, "camera")
+}
+
+func (d *Doorbell) named(ctx context.Context, domain string) ([]homeassistant.Named, error) {
+	if d.o.Finder == nil {
+		return nil, nil
+	}
+	out, err := d.o.Finder.Named(ctx, domain)
+	if err != nil {
+		return nil, err
+	}
+	slices.SortFunc(
+		out,
+		func(a, b homeassistant.Named) int { return strings.Compare(a.Name, b.Name) },
+	)
+	return out, nil
+}
+
 func (d *Doorbell) Device(
 	ctx context.Context,
 	door schema.DoorbellDoor,
@@ -273,6 +298,8 @@ func sensorFor(door schema.DoorbellDoor, k Kind) string {
 		return door.Sensors.Vehicle
 	case Animal:
 		return door.Sensors.Animal
+	case Motion:
+		return door.Sensors.Motion
 	}
 	return ""
 }

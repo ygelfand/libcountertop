@@ -287,6 +287,8 @@ func kindIcon(k doorbell.Kind) string {
 		return "mdi:car"
 	case doorbell.Animal:
 		return "mdi:paw"
+	case doorbell.Motion:
+		return "mdi:motion-sensor"
 	}
 	return "mdi:doorbell"
 }

@@ -68,6 +68,9 @@ type PullPoint struct {
 }
 
 func Find(ctx context.Context, host string) (string, error) {
+	if _, _, err := net.SplitHostPort(host); err == nil {
+		return "http://" + host + DevicePath, nil
+	}
 	return findAt(ctx, net.JoinHostPort(host, discoveryPort))
 }
 

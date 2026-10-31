@@ -73,6 +73,9 @@ func (d *Doorbell) reolinkEvents(ctx context.Context, slot int, door schema.Door
 	var active []string
 	stop, err := c.ListenForMotion(ctx, uint8(door.Channel), func(e baichuan.MotionEvent) {
 		now := slices.Concat(e.AITypes, e.States)
+		if slices.Contains(now, "MD") || slices.Contains(now, "other") {
+			now = append(now, string(Motion))
+		}
 		mu.Lock()
 		was := active
 		active = now
@@ -128,12 +131,7 @@ func (d *Doorbell) Snapshot(ctx context.Context, slot int) ([]byte, error) {
 	return pic, err
 }
 
-func Check(ctx context.Context, door schema.DoorbellDoor) ([]byte, error) {
-	if !door.Signed() {
-		return nil, ErrNoPassword
-	}
-	ctx, cancel := context.WithTimeout(ctx, snapWait)
-	defer cancel()
+func reolinkCheck(ctx context.Context, door schema.DoorbellDoor) ([]byte, error) {
 	c, err := dial(ctx, door)
 	if errors.Is(err, ErrUnreachable) && door.UID != "" && door.Host != "" {
 		if uid, ok := answering(ctx, door); ok && uid != door.UID {

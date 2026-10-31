@@ -26,6 +26,7 @@ var sensorKinds = []sensorKind{
 	{"package", func(s *schema.DoorbellSensors) *string { return &s.Package }},
 	{"vehicle", func(s *schema.DoorbellSensors) *string { return &s.Vehicle }},
 	{"animal", func(s *schema.DoorbellSensors) *string { return &s.Animal }},
+	{"motion", func(s *schema.DoorbellSensors) *string { return &s.Motion }},
 }
 
 func (v *View) addPage() *shell.Page {
@@ -104,6 +105,8 @@ func (v *View) setupReolink(d homeassistant.ReolinkDevice) {
 			Device: d.Device,
 			UID:    d.UID,
 			User:   schema.DoorbellUser,
+			Video:  schema.VideoAssistant,
+			Events: schema.FeedAssistant,
 		}
 		if len(d.Cameras) > 0 {
 			door.Camera = d.Cameras[0].Entity
@@ -248,7 +251,7 @@ func (v *View) setupChannel(host, user, password string, ch doorbell.Channel) {
 			User:     user,
 			Password: password,
 			Channel:  ch.Number,
-			Video:    schema.VideoRTSP,
+			Video:    schema.VideoONVIF,
 			Events:   schema.FeedONVIF,
 			Talk:     schema.TalkONVIF,
 		}

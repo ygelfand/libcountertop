@@ -34,6 +34,9 @@ var blocked = map[string]bool{
 	"psram_largest_block": true,
 	"last_boot":           true,
 	"node_status":         true,
+	"wi-fi_co-processor":  true,
+	"panel_watch":         true,
+	"panel_misses":        true,
 }
 
 const clockPattern = `^([01][0-9]|2[0-3]):[0-5][0-9]$`

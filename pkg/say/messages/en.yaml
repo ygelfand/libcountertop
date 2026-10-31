@@ -884,8 +884,10 @@ doorbell.app: Doorbell
 doorbell.camera.title: Home Assistant camera
 doorbell.cancel: Cancel
 doorbell.field.host: IP address or hostname
+doorbell.field.host_port: Add :port to skip discovery
 doorbell.field.name: Name
 doorbell.field.password: Password
+doorbell.field.rtsp: RTSP URL
 doorbell.field.uid: UID
 doorbell.field.user: User
 doorbell.forget: Remove
@@ -907,6 +909,7 @@ doorbell.connecting: Connecting…
 doorbell.events.via: "{{.State}} via {{.Source}}"
 doorbell.offline: Offline
 doorbell.sensor.animal: Animal sensor
+doorbell.sensor.motion: Motion sensor
 doorbell.sensor.none: None
 doorbell.sensor.package: Package sensor
 doorbell.sensor.person: Person sensor
@@ -923,6 +926,8 @@ doorbell.video.working: "Working via {{.Source}}"
 doorbell.looking: Looking in Home Assistant…
 doorbell.manual: Manual
 doorbell.needs: Enter a UID or an IP address or hostname
+doorbell.needs.host: Enter an IP address or hostname
+doorbell.needs.rtsp: Enter an RTSP URL
 doorbell.none: No doorbells set up
 doorbell.save: Save
 doorbell.checking: Checking…
@@ -939,6 +944,7 @@ doorbell.why.fallback: Showing Home Assistant video, no talkback
 doorbell.why.toobig: The main stream is too large for this screen, showing the sub stream
 doorbell.why.decoder: This screen can't play this doorbell's video
 doorbell.why.nopassword: Enter the doorbell's password
+doorbell.why.nocamera: Pick a Home Assistant camera
 doorbell.why.refused: "Login refused (code {{.Code}})"
 doorbell.why.other: A different doorbell answers at that address
 doorbell.why.unreachable: Can't reach the doorbell
@@ -962,6 +968,7 @@ doorbell.event.people: "Person at the {{.Door}}"
 doorbell.event.package: "Package at the {{.Door}}"
 doorbell.event.vehicle: "Vehicle by the {{.Door}}"
 doorbell.event.dog_cat: "Animal at the {{.Door}}"
+doorbell.event.motion: "Motion at the {{.Door}}"
 photos.entity.immich.albums: Immich albums
 photos.entity.immich.enabled: Immich photos
 photos.entity.immich.favorites: Immich favorites only

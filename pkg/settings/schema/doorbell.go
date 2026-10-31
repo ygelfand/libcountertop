@@ -50,6 +50,7 @@ type DoorbellDoor struct {
 	Host     string          `json:"host"`
 	User     string          `json:"user"`
 	Password string          `json:"password"`
+	RTSP     string          `json:"rtsp"`
 	Stream   DoorbellStream  `json:"stream"`
 	Camera   string          `json:"camera"`
 	Device   string          `json:"device"`
@@ -76,7 +77,9 @@ func (s DoorbellStream) Label() string {
 	return say.T("doorbell.stream." + string(s))
 }
 
-func (d DoorbellDoor) Set() bool { return d.UID != "" || d.Host != "" || d.Device != "" }
+func (d DoorbellDoor) Set() bool {
+	return d.UID != "" || d.Host != "" || d.Device != "" || d.RTSP != "" || d.Camera != ""
+}
 
 func (d DoorbellDoor) Signed() bool { return d.Password != "" }
 
@@ -86,6 +89,7 @@ type DoorbellSensors struct {
 	Package string `json:"package"`
 	Vehicle string `json:"vehicle"`
 	Animal  string `json:"animal"`
+	Motion  string `json:"motion"`
 }
 
 type DoorbellVideo string
@@ -93,19 +97,36 @@ type DoorbellVideo string
 const (
 	VideoAuto      DoorbellVideo = ""
 	VideoReolink   DoorbellVideo = "reolink"
+	VideoONVIF     DoorbellVideo = "onvif"
 	VideoRTSP      DoorbellVideo = "rtsp"
 	VideoAssistant DoorbellVideo = "ha"
 )
 
 func DoorbellVideos() []DoorbellVideo {
-	return []DoorbellVideo{VideoAuto, VideoReolink, VideoRTSP, VideoAssistant}
+	return []DoorbellVideo{VideoReolink, VideoONVIF, VideoRTSP, VideoAssistant}
 }
 
 func (v DoorbellVideo) Label() string {
-	if v == VideoAuto {
-		return say.T("doorbell.source.auto")
-	}
 	return say.T("doorbell.source." + string(v))
+}
+
+func MigrateDoorbell(_ []byte, bell *Doorbell) error {
+	for i := range bell.Doors {
+		d := &bell.Doors[i]
+		switch {
+		case !d.Set():
+		case d.Video == VideoRTSP && d.RTSP == "":
+			d.Video = VideoONVIF
+		case d.Video != VideoAuto:
+		case d.RTSP != "":
+			d.Video = VideoRTSP
+		case d.Signed():
+			d.Video = VideoReolink
+		default:
+			d.Video = VideoAssistant
+		}
+	}
+	return nil
 }
 
 type DoorbellFeed string
