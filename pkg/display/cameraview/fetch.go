@@ -2,6 +2,7 @@ package cameraview
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -25,7 +26,10 @@ const (
 	frameMost    = 8 << 20
 )
 
-var ErrNoSite = errors.New("cameras: Home Assistant's address is not known")
+var (
+	ErrNoSite = errors.New("cameras: Home Assistant's address is not known")
+	errIdle   = errors.New("cameras: the live stream stopped sending pictures")
+)
 
 func get(ctx context.Context, c *http.Client, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -78,9 +82,15 @@ func stream(
 	if base == "" {
 		return ErrNoSite
 	}
-	resp, err := get(ctx, c, base+strings.Replace(picture, snapshotPath, streamPath, 1))
+	streaming := *c
+	streaming.Timeout = 0
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	idle := time.AfterFunc(fetchWait, func() { cancel(errIdle) })
+	defer idle.Stop()
+	resp, err := get(ctx, &streaming, base+strings.Replace(picture, snapshotPath, streamPath, 1))
 	if err != nil {
-		return err
+		return cmp.Or(context.Cause(ctx), err)
 	}
 	defer resp.Body.Close()
 	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -96,8 +106,9 @@ func stream(
 		waited := time.Now()
 		part, err := parts.NextPart()
 		if err != nil {
-			return err
+			return cmp.Or(context.Cause(ctx), err)
 		}
+		idle.Reset(fetchWait)
 		decoding := time.Now()
 		img, _, err := image.Decode(io.LimitReader(part, frameMost))
 		if cerr := part.Close(); cerr != nil {

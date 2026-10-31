@@ -11,6 +11,7 @@ type Doorbell struct {
 	Chime   Chime                       `json:"chime"`
 	Notify  Chime                       `json:"notify"`
 	RingFor Delay                       `json:"ring_for"`
+	LiveFor Delay                       `json:"live_for"`
 	Style   AlertStyle                  `json:"style"`
 	Visitor AlertStyle                  `json:"visitor"`
 	Tab     bool                        `json:"tab"`
@@ -24,7 +25,17 @@ func DoorbellStyles() []AlertStyle {
 func VisitorStyles() []AlertStyle { return append([]AlertStyle{AlertAnswer}, DoorbellStyles()...) }
 
 func DefaultDoorbell() Doorbell {
-	return Doorbell{Chime: ChimeRing, Notify: ChimeDing, RingFor: Delay30s, Visitor: AlertAnswer}
+	return Doorbell{
+		Chime:   ChimeRing,
+		Notify:  ChimeDing,
+		RingFor: Delay30s,
+		LiveFor: Delay2m,
+		Visitor: AlertAnswer,
+	}
+}
+
+func DoorbellLiveSpans() []Delay {
+	return []Delay{Delay1m, Delay2m, Delay3m, Delay5m, Delay10m}
 }
 
 func DoorbellRingSpans() []Delay {

@@ -208,3 +208,38 @@ func TestTheLiveStreamYieldsEachFrame(t *testing.T) {
 		}
 	}
 }
+
+func TestTheLiveStreamOutlastsTheClientTimeout(t *testing.T) {
+	shot := jpegOf(t, 16, 9)
+	const sent = 8
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "multipart/x-mixed-replace;boundary=frame")
+		for range sent {
+			fmt.Fprintf(
+				w,
+				"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n",
+				len(shot),
+			)
+			_, _ = w.Write(shot)
+			_, _ = w.Write([]byte("\r\n"))
+			w.(http.Flusher).Flush()
+			time.Sleep(50 * time.Millisecond)
+		}
+		_, _ = w.Write([]byte("--frame--\r\n"))
+	}))
+	defer srv.Close()
+	client := srv.Client()
+	client.Timeout = 100 * time.Millisecond
+	frames := 0
+	err := stream(context.Background(), client, srv.URL, "/api/camera_proxy/camera.door", 16, 9,
+		func(*image.RGBA) { frames++ })
+	if frames != sent {
+		t.Errorf(
+			"got %d frames over %v, want %d; err %v",
+			frames,
+			sent*50*time.Millisecond,
+			sent,
+			err,
+		)
+	}
+}

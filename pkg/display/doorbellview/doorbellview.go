@@ -25,7 +25,6 @@ import (
 )
 
 const (
-	ringFor          = 2 * time.Minute
 	lingerFor        = 3 * time.Minute
 	cardFor          = 20 * time.Second
 	snapWait         = 15 * time.Second
@@ -64,16 +63,14 @@ func (*App) Covers() bool { return true }
 
 func (*App) Timeout() time.Duration { return lingerFor }
 
-type Live struct{ rang bool }
+type Live struct {
+	rang    bool
+	openFor time.Duration
+}
 
 func (*Live) Covers() bool { return true }
 
-func (l *Live) Timeout() time.Duration {
-	if l.rang {
-		return ringFor
-	}
-	return lingerFor
-}
+func (l *Live) Timeout() time.Duration { return l.openFor }
 
 type View struct {
 	o        Options
@@ -189,7 +186,8 @@ func (v *View) seen(e doorbell.Event) {
 func (v *View) Watch(slot int, rang bool) {
 	v.mu.Lock()
 	old := v.live
-	l := &session{v: v, slot: slot, view: &Live{rang: rang}, began: time.Now()}
+	view := &Live{rang: rang, openFor: v.o.Settings.Read().LiveFor.After()}
+	l := &session{v: v, slot: slot, view: view, began: time.Now()}
 	v.live = l
 	v.mu.Unlock()
 	if old != nil {

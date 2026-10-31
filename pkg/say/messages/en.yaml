@@ -873,6 +873,8 @@ doorbell.entity.notify: Doorbell notification sound
 doorbell.setting.notify: Notification sound
 doorbell.entity.ring_for: Doorbell ring for
 doorbell.setting.ring_for: Ring for
+doorbell.entity.live_for: Doorbell live view open for
+doorbell.setting.live_for: Keep live view open
 doorbell.entity.style: Doorbell notification style
 doorbell.setting.style: Notification style
 doorbell.entity.visitor: Doorbell ring style

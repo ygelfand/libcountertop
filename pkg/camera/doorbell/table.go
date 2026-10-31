@@ -35,6 +35,11 @@ func NewTable(chimes func() []setting.Option) *Table {
 			func(c *schema.Doorbell) *schema.Delay { return &c.RingFor },
 		),
 		setting.Pick(
+			Setting{Name: "live_for", Group: Group, Icon: "mdi:cctv"},
+			schema.DoorbellLiveSpans(),
+			func(c *schema.Doorbell) *schema.Delay { return &c.LiveFor },
+		),
+		setting.Pick(
 			Setting{Name: "notify", Group: Group, Icon: "mdi:bell-outline", More: chimes},
 			schema.AlertChimes(),
 			func(c *schema.Doorbell) *schema.Chime { return &c.Notify },

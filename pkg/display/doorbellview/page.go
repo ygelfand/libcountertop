@@ -18,7 +18,7 @@ import (
 
 const segmentsMost = 4
 
-var sliders = []string{"ring_for"}
+var sliders = []string{"ring_for", "live_for"}
 
 type found struct {
 	mu      sync.Mutex
@@ -52,7 +52,7 @@ func (v *View) Page() *shell.Page {
 			rows = append(rows, menu.Row{Label: say.T("doorbell.add"), Kind: menu.Chevron})
 			taps = append(taps, func(int) { v.o.Shell.Push(v.addPage()) })
 		}
-		for _, name := range []string{"visitor", "chime", "ring_for", "style", "notify", "tab"} {
+		for _, name := range []string{"visitor", "chime", "ring_for", "live_for", "style", "notify", "tab"} {
 			r, t := v.settingRow(name)
 			rows, taps = append(rows, r), append(taps, t)
 		}
