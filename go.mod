@@ -14,6 +14,7 @@ require (
 	github.com/bluenviron/gohlslib/v2 v2.4.5
 	github.com/bluenviron/mediacommon/v2 v2.9.5
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/gen2brain/jpegn v0.6.2
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-gui-org/go-glyph v1.26.4
 	github.com/go-gui-org/go-gui v0.91.0

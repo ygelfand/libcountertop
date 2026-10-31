@@ -1,11 +1,8 @@
 package photoframe
 
 import (
-	"bytes"
 	"fmt"
 	"image"
-	_ "image/jpeg"
-	_ "image/png"
 	"log/slog"
 	"sync"
 	"time"
@@ -13,6 +10,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 	_ "golang.org/x/image/webp"
 
+	"github.com/ygelfand/libcountertop/pkg/display/picture"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -41,6 +39,7 @@ type Frame struct {
 	img     image.Image
 	shownAt time.Time
 	version int
+	most    int
 }
 
 type Shot struct {
@@ -71,7 +70,7 @@ func (f *Frame) Next(now time.Time) bool {
 	if !ok {
 		return false
 	}
-	img, err := Decode(pic.Data)
+	img, err := f.decode(pic.Data)
 	if err != nil {
 		slog.Warn("decoding a photo failed", "frame", f.name, "photo", pic.ID, "err", err)
 		return false
@@ -137,7 +136,7 @@ func (f *Frame) Current() (Shot, bool) {
 }
 
 func (f *Frame) show(pic photos.Picture, at int, now time.Time) bool {
-	img, err := Decode(pic.Data)
+	img, err := f.decode(pic.Data)
 	if err != nil {
 		slog.Warn("decoding a photo failed", "frame", f.name, "photo", pic.ID, "err", err)
 		return false
@@ -155,13 +154,22 @@ func (f *Frame) put(img image.Image, at int, now time.Time) {
 	f.version++
 }
 
-func Decode(data []byte) (image.Image, error) {
-	img, kind, err := image.Decode(bytes.NewReader(data))
+func (f *Frame) aim(most int) {
+	f.mu.Lock()
+	f.most = most
+	f.mu.Unlock()
+}
+
+func (f *Frame) decode(data []byte) (image.Image, error) {
+	f.mu.Lock()
+	most := f.most
+	f.mu.Unlock()
+	img, err := picture.Decode(data, image.Point{X: most, Y: most}, picture.Smooth)
 	if err != nil {
 		return nil, fmt.Errorf("photoframe: decoding %d bytes: %w", len(data), err)
 	}
 	if b := img.Bounds(); b.Dx() < 2 || b.Dy() < 2 {
-		return nil, fmt.Errorf("photoframe: a %dx%d %s", b.Dx(), b.Dy(), kind)
+		return nil, fmt.Errorf("photoframe: a %dx%d picture", b.Dx(), b.Dy())
 	}
 	return img, nil
 }

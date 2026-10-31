@@ -2,13 +2,12 @@ package cameraview
 
 import (
 	"bufio"
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"image"
-	_ "image/jpeg"
-	_ "image/png"
 	"io"
 	"log/slog"
 	"mime"
@@ -18,6 +17,8 @@ import (
 	"time"
 
 	xdraw "golang.org/x/image/draw"
+
+	"github.com/ygelfand/libcountertop/pkg/display/picture"
 )
 
 const (
@@ -65,7 +66,11 @@ func snapshot(
 		return nil, err
 	}
 	defer resp.Body.Close()
-	img, _, err := image.Decode(io.LimitReader(resp.Body, frameMost))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, frameMost))
+	if err != nil {
+		return nil, err
+	}
+	img, err := decode(data, w, h)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +81,7 @@ func stream(
 	ctx context.Context,
 	c *http.Client,
 	base, picture string,
+	w, h int,
 	frame func(*image.RGBA),
 ) error {
 	if base == "" {
@@ -101,6 +107,7 @@ func stream(
 		bufio.NewReader(resp.Body),
 		strings.TrimPrefix(params["boundary"], "--"),
 	)
+	var buf bytes.Buffer
 	for ctx.Err() == nil {
 		waited := time.Now()
 		part, err := parts.NextPart()
@@ -108,25 +115,41 @@ func stream(
 			return cmp.Or(context.Cause(ctx), err)
 		}
 		idle.Reset(fetchWait)
-		decoding := time.Now()
-		img, _, err := image.Decode(io.LimitReader(part, frameMost))
+		buf.Reset()
+		_, err = buf.ReadFrom(io.LimitReader(part, frameMost))
 		if cerr := part.Close(); cerr != nil {
 			return cerr
 		}
 		if err != nil {
+			return cmp.Or(context.Cause(ctx), err)
+		}
+		decoding := time.Now()
+		img, err := decode(buf.Bytes(), w, h)
+		if err != nil {
 			continue
 		}
 		fitting := time.Now()
-		fitted := fit(img, 0, 0)
+		pic := rgba(img)
 		slog.Debug("camera live frame",
-			"size", img.Bounds().Size(),
+			"size", pic.Bounds().Size(),
 			"wait", decoding.Sub(waited),
 			"decode", fitting.Sub(decoding),
 			"fit", time.Since(fitting),
 		)
-		frame(fitted)
+		frame(pic)
 	}
 	return ctx.Err()
+}
+
+func decode(data []byte, w, h int) (image.Image, error) {
+	return picture.Decode(data, image.Point{X: w, Y: h}, picture.Fast)
+}
+
+func rgba(img image.Image) *image.RGBA {
+	if pic, ok := img.(*image.RGBA); ok {
+		return pic
+	}
+	return fit(img, 0, 0)
 }
 
 func fit(img image.Image, w, h int) *image.RGBA {

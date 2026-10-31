@@ -694,15 +694,24 @@ func (c *Cameras) pictures(ctx context.Context, id string) {
 		if !ok {
 			return
 		}
-		err := stream(ctx, c.o.Client, c.o.Site.URL(), cam.Picture, func(img *image.RGBA) {
-			c.showLive(id, img)
-		})
+		c.mu.Lock()
+		size := c.screen
+		c.mu.Unlock()
+		err := stream(ctx, c.o.Client, c.o.Site.URL(), cam.Picture, size.X, size.Y,
+			func(img *image.RGBA) { c.showLive(id, img) })
 		if ctx.Err() != nil {
 			return
 		}
 		slog.Debug("camera live stream ended", "camera", id, "err", err)
 		snap, sctx := context.WithTimeout(ctx, fetchWait)
-		if img, err := snapshot(snap, c.o.Client, c.o.Site.URL(), cam.Picture, 0, 0); err == nil {
+		if img, err := snapshot(
+			snap,
+			c.o.Client,
+			c.o.Site.URL(),
+			cam.Picture,
+			size.X,
+			size.Y,
+		); err == nil {
 			c.showLive(id, img)
 		}
 		sctx()

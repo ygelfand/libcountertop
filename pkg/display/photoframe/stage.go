@@ -75,6 +75,7 @@ func (s *Stage) Keep(area ui.Rect, look Look) bool {
 	if s.broken || s.o.GPU == nil || area.W <= 0 || area.H <= 0 {
 		return false
 	}
+	s.frame.aim(max(area.W, area.H))
 	if s.layer != nil && (s.area.W != area.W || s.area.H != area.H || !s.layer.Alive()) {
 		s.close()
 	}
