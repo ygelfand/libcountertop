@@ -76,7 +76,6 @@ func stream(
 	ctx context.Context,
 	c *http.Client,
 	base, picture string,
-	w, h int,
 	frame func(*image.RGBA),
 ) error {
 	if base == "" {
@@ -118,7 +117,7 @@ func stream(
 			continue
 		}
 		fitting := time.Now()
-		fitted := fit(img, w, h)
+		fitted := fit(img, 0, 0)
 		slog.Debug("camera live frame",
 			"size", img.Bounds().Size(),
 			"wait", decoding.Sub(waited),

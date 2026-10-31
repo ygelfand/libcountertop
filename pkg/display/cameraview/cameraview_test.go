@@ -194,11 +194,11 @@ func TestTheLiveStreamYieldsEachFrame(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		frames := 0
-		_ = stream(ctx, srv.Client(), srv.URL, "/api/camera_proxy/camera.door?token=abc", 80, 80,
+		_ = stream(ctx, srv.Client(), srv.URL, "/api/camera_proxy/camera.door?token=abc",
 			func(img *image.RGBA) {
 				frames++
-				if b := img.Bounds(); b.Dx() != 80 || b.Dy() != 45 {
-					t.Errorf("boundary %q: frame fitted to %v, want 80x45", declared, b.Size())
+				if b := img.Bounds(); b.Dx() != 160 || b.Dy() != 90 {
+					t.Errorf("boundary %q: frame is %v, want the full 160x90", declared, b.Size())
 				}
 			})
 		cancel()
@@ -231,7 +231,7 @@ func TestTheLiveStreamOutlastsTheClientTimeout(t *testing.T) {
 	client := srv.Client()
 	client.Timeout = 100 * time.Millisecond
 	frames := 0
-	err := stream(context.Background(), client, srv.URL, "/api/camera_proxy/camera.door", 16, 9,
+	err := stream(context.Background(), client, srv.URL, "/api/camera_proxy/camera.door",
 		func(*image.RGBA) { frames++ })
 	if frames != sent {
 		t.Errorf(
