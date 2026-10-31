@@ -775,7 +775,7 @@ thermostat.chosen: "{{.N}} di {{.Of}}"
 thermostat.full: "Massimo {{.N}}; disattivane prima uno"
 thermostat.look.dial: Ghiera
 thermostat.look.column: Colonna
-thermostat.look.wheel: Rotella
+thermostat.look.wheel: Manopola
 thermostat.look.bars: Barre
 thermostat.look.split: Diviso
 thermostat.look.terminal: Terminale
@@ -1268,7 +1268,7 @@ tessera.alarm.cancel: Annulla
 tessera.alarm.clear: Cancella
 tessera.alarm.disarm: Disinserisci
 tessera.alarm.ok: OK
-tessera.alarm.text: Inserisci il codice di questa centrale in Home Assistant.
+tessera.alarm.text: Inserisci il codice di questo pannello in Home Assistant.
 tessera.alert.notification: Notifica
 tessera.again: Tocca di nuovo per sbloccare
 tessera.binary.battery.off: Normale
@@ -1291,8 +1291,8 @@ tessera.binary.heat.off: Normale
 tessera.binary.heat.on: Caldo
 tessera.binary.light.off: Nessuna luce
 tessera.binary.light.on: Luce rilevata
-tessera.binary.lock.off: Bloccata
-tessera.binary.lock.on: Sbloccata
+tessera.binary.lock.off: Bloccato
+tessera.binary.lock.on: Sbloccato
 tessera.binary.moisture.off: Asciutto
 tessera.binary.moisture.on: Bagnato
 tessera.binary.motion.off: Nessun rilevamento
@@ -1549,7 +1549,7 @@ wake.white: Bianco
 weather.group.weather: Meteo
 weather.alert.until: "Fino alle {{.T}}"
 weather.alert.dismiss: Ignora
-weather.alerts.hint: Allerte meteo gravi per la tua casa negli USA, dal National Weather Service
+weather.alerts.hint: Allerte meteo gravi per la tua casa, dal National Weather Service
 weather.animate: Animazione
 weather.cond.clear-night: Sereno
 weather.cond.cloudy: Nuvoloso
