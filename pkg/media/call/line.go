@@ -51,23 +51,37 @@ func (c *Calls) Actions() []*esphome.Action {
 	}
 	return []*esphome.Action{
 		{
-			Name: "call_offer",
+			Name:        "call_offer",
+			Description: "Ring the device with a WebRTC call from Home Assistant; answers ringing, busy or refused.",
 			Args: []esphome.Arg{
-				{Name: "session", Type: esphome.ArgString},
-				{Name: "sdp", Type: esphome.ArgString},
+				{
+					Name:        "session",
+					Type:        esphome.ArgString,
+					Description: "The caller's id for this call.",
+				},
+				{Name: "sdp", Type: esphome.ArgString, Description: "The caller's WebRTC offer."},
 				{Name: "video", Type: esphome.ArgBool},
-				{Name: "from", Type: esphome.ArgString},
-				{Name: "width", Type: esphome.ArgInt},
-				{Name: "height", Type: esphome.ArgInt},
-				{Name: "user", Type: esphome.ArgString},
+				{
+					Name:        "from",
+					Type:        esphome.ArgString,
+					Description: "Shown as the caller; empty shows Home Assistant.",
+				},
+				{Name: "width", Type: esphome.ArgInt, Description: "The caller's video width."},
+				{Name: "height", Type: esphome.ArgInt, Description: "The caller's video height."},
+				{
+					Name:        "user",
+					Type:        esphome.ArgString,
+					Description: "The calling Home Assistant user's id.",
+				},
 			},
 			Answers: true,
 			Run:     c.homeOffer,
 		},
 		{
-			Name: "call_end",
-			Args: []esphome.Arg{{Name: "session", Type: esphome.ArgString}},
-			Run:  c.homeEnd,
+			Name:        "call_end",
+			Description: "Hang up the call with this session.",
+			Args:        []esphome.Arg{{Name: "session", Type: esphome.ArgString}},
+			Run:         c.homeEnd,
 		},
 	}
 }

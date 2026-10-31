@@ -51,9 +51,10 @@ func (r *Registry) Actions() []*esphome.Action {
 	out := make([]*esphome.Action, 0, len(list))
 	for _, a := range list {
 		out = append(out, &esphome.Action{
-			Name:    a.Name,
-			Args:    a.Args,
-			Answers: true,
+			Name:        a.Name,
+			Description: a.Title,
+			Args:        a.Args,
+			Answers:     true,
 			Run: func(c esphome.Call) (any, error) {
 				reply, err := a.Run(c)
 				if err != nil {

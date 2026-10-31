@@ -100,9 +100,15 @@ func New(o Dependencies) *Broadcaster { return &Broadcaster{o: o} }
 
 func (b *Broadcaster) Action() actions.Action {
 	return actions.Action{
-		Name:   "broadcast",
-		Title:  say.T("actions.broadcast"),
-		Args:   []esphome.Arg{{Name: "message", Type: esphome.ArgString}},
+		Name:  "broadcast",
+		Title: say.T("actions.broadcast"),
+		Args: []esphome.Arg{
+			{
+				Name:        "message",
+				Type:        esphome.ArgString,
+				Description: "What to announce, or an http(s) URL of a clip; empty records the next thing said.",
+			},
+		},
 		Speech: "message",
 		Triggers: []actions.Trigger{
 			{Sentence: "(broadcast|announce)"},

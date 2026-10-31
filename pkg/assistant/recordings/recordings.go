@@ -106,17 +106,24 @@ func (s *Store) Restore() {
 func (s *Store) Actions() []*esphome.Action {
 	return []*esphome.Action{
 		{
-			Name:    "recordings",
-			Answers: true,
+			Name:        "recordings",
+			Description: "List the ids of the assistant turns whose audio is kept.",
+			Answers:     true,
 			Run: func(esphome.Call) (any, error) {
 				return s.available()
 			},
 		},
 		{
-			Name: "turn_audio",
+			Name:        "turn_audio",
+			Description: "One page of a kept turn's WAV recording, base64-encoded.",
 			Args: []esphome.Arg{
-				{Name: "id", Type: esphome.ArgString},
-				{Name: "page", Type: esphome.ArgInt},
+				{Name: "id", Type: esphome.ArgString, Description: "A turn id from recordings."},
+				{
+					Name:        "page",
+					Type:        esphome.ArgInt,
+					Description: "Zero-based; the answer says how many pages there are.",
+					Example:     "0",
+				},
 			},
 			Answers: true,
 			Run: func(c esphome.Call) (any, error) {

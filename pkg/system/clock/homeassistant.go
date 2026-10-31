@@ -16,7 +16,8 @@ const homeResolution = time.Second
 func (c *Clock) Handle(_ context.Context, conn *esphome.Conn, msg proto.Message) error {
 	if reply, ok := msg.(*api.GetTimeResponse); ok {
 		c.fromHome(reply.GetEpochSeconds())
-		c.zone.FromHome(reply.GetTimezone())
+		zone := reply.GetTimezone() //nolint:staticcheck // Home Assistant still sends the name
+		c.zone.FromHome(zone)
 		return nil
 	}
 

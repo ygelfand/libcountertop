@@ -184,9 +184,10 @@ func (s *Screen) Actions() []*esphome.Action {
 		return nil
 	}
 	return append([]*esphome.Action{{
-		Name:    s.options.Facing.word() + "_screen_message",
-		Args:    []esphome.Arg{{Name: "message", Type: esphome.ArgString}},
-		Answers: true,
+		Name:        s.options.Facing.word() + "_screen_message",
+		Description: "Tessera's screen protocol: one message from the Tessera integration.",
+		Args:        []esphome.Arg{{Name: "message", Type: esphome.ArgString}},
+		Answers:     true,
 		Run: func(c esphome.Call) (any, error) {
 			answer := s.Receive(c.String("message"))
 			s.inbox.Set(answer["status"].(string))

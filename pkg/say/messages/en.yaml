@@ -74,7 +74,7 @@ access.group.api: Home Assistant
 access.setting.adopted: Adopted by Home Assistant
 apps.group.apps: Apps
 apps.empty: No apps
-apps.hint: Tap the star to keep an app in the dock. Drag a tile to move it.
+apps.hint: Tap the star to keep an app in the dock. Hold a tile, then drag it to move it.
 apps.setting.dock: Apps in the dock
 apps.setting.order: App order
 apps.title: Apps

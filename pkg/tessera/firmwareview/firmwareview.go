@@ -61,6 +61,8 @@ type View struct {
 	preferred string
 	turning   bool
 	down      bool
+
+	wake atomic.Pointer[func()]
 }
 
 type run struct {
@@ -264,6 +266,7 @@ func (v *View) launch(l look) (*run, error) {
 		motion: v.motion,
 		turn:   v.opts.Turn,
 		redraw: v.opts.Redraw,
+		wake:   v.woke,
 	}
 	go func() {
 		defer close(done)
@@ -279,31 +282,39 @@ func (v *View) launch(l look) (*run, error) {
 }
 
 func (v *View) Draw(at ui.Rect) gogui.View {
-	v.Rest(false)
-	return v.draw(at, nil)
+	v.rest(nil)
+	return v.draw(at)
 }
 
-func (v *View) Saver(at ui.Rect, wake func(gogui.EventCtx)) gogui.View {
-	v.Rest(true)
-	return v.draw(at, wake)
+func (v *View) Saver(at ui.Rect, wake func()) gogui.View {
+	v.rest(wake)
+	return v.draw(at)
 }
 
-func (v *View) Rest(on bool) {
+func (v *View) rest(wake func()) {
+	if wake == nil {
+		v.wake.Store(nil)
+	} else {
+		v.wake.Store(&wake)
+	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.front != nil {
-		v.front.helper.Frame().Rest(on)
+		v.front.helper.Frame().Rest(wake != nil)
 	}
 }
 
-func (v *View) draw(at ui.Rect, wake func(gogui.EventCtx)) gogui.View {
+func (v *View) woke() {
+	if wake := v.wake.Swap(nil); wake != nil {
+		go (*wake)()
+	}
+}
+
+func (v *View) draw(at ui.Rect) gogui.View {
 	v.follow(v.look(at.H > at.W), v.prefs())
 	touch := func(down bool) func(gogui.EventCtx) {
 		return func(e gogui.EventCtx) {
 			v.touch(e, at, down)
-			if down && wake != nil {
-				wake(e)
-			}
 			e.Consume()
 		}
 	}
@@ -382,10 +393,11 @@ type feed struct {
 	motion *motion
 	turn   func() schema.TesseraTurn
 	redraw func()
+	wake   func()
 
 	cur, prev, rgba, old []byte
 	w, h                 int
-	seq, turns           uint32
+	seq, turns, woke     uint32
 	shown, moved         bool
 
 	on, fresh atomic.Bool
@@ -425,6 +437,10 @@ func (f *feed) pull() bool {
 	if t := f.frame.Turn(); t.Count != f.turns {
 		f.turns = t.Count
 		f.turned(t)
+	}
+	if n := f.frame.Woke(); n != f.woke {
+		f.woke = n
+		f.wake()
 	}
 	if f.shown && f.frame.Seq() == f.seq {
 		return false

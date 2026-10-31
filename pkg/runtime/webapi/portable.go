@@ -40,16 +40,22 @@ type imported struct {
 func (a *API) Actions() []*esphome.Action {
 	return []*esphome.Action{
 		{
-			Name:    "settings_export",
-			Answers: true,
+			Name:        "settings_export",
+			Description: "The device's settings that can move to another device.",
+			Answers:     true,
 			Run: func(esphome.Call) (any, error) {
 				return map[string]any{"settings": a.portable()}, nil
 			},
 		},
 		{
-			Name:    "settings_import",
-			Answers: true,
-			Args:    []esphome.Arg{{Name: "settings", Type: esphome.ArgString}},
+			Name:        "settings_import",
+			Description: "Apply settings exported from a device, reporting any it skipped.",
+			Answers:     true,
+			Args: []esphome.Arg{{
+				Name:        "settings",
+				Type:        esphome.ArgString,
+				Description: "The JSON settings_export answered.",
+			}},
 			Run: func(c esphome.Call) (any, error) {
 				var want setting.Snapshot
 				if err := json.Unmarshal([]byte(c.String("settings")), &want); err != nil {

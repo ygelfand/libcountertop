@@ -44,7 +44,10 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			Sizing:  gogui.FillFill,
 			Padding: gogui.NoPadding,
 			Content: []gogui.View{
-				widgets.Placed(ui.Rect{W: vw, H: vh}, f.Saver(ui.Rect{W: vw, H: vh}, wake)),
+				widgets.Placed(
+					ui.Rect{W: vw, H: vh},
+					f.Saver(ui.Rect{W: vw, H: vh}, func() { a.o.Shell.Remove(v) }),
+				),
 			},
 		})
 	}

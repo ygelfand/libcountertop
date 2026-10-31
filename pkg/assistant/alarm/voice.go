@@ -18,11 +18,20 @@ func (a *Alarms) VoiceAction() actions.Action {
 	return actions.Action{
 		Name: "alarm", Title: say.T("actions.alarm"),
 		Args: []esphome.Arg{
-			{Name: "operation", Type: esphome.ArgString},
-			{Name: "time", Type: esphome.ArgString},
-			{Name: "days", Type: esphome.ArgString},
-			{Name: "name", Type: esphome.ArgString},
-			{Name: "target", Type: esphome.ArgString},
+			{
+				Name:        "operation",
+				Type:        esphome.ArgString,
+				Description: "set, list, next, enable, disable, delete, stop or snooze.",
+				Example:     "set",
+			},
+			{Name: "time", Type: esphome.ArgString, Description: "For set.", Example: "7 am"},
+			{Name: "days", Type: esphome.ArgString, Description: "For set; empty rings once."},
+			{Name: "name", Type: esphome.ArgString, Description: "For set."},
+			{
+				Name:        "target",
+				Type:        esphome.ArgString,
+				Description: "The alarm to enable, disable or delete.",
+			},
 		},
 		Triggers: []actions.Trigger{
 			trigger("(set|create|add) [a|an] alarm (called|named) {name} (for|at) {time}", "set"),

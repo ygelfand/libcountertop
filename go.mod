@@ -17,7 +17,7 @@ require (
 	github.com/gen2brain/jpegn v0.6.2
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-gui-org/go-glyph v1.26.4
-	github.com/go-gui-org/go-gui v0.91.0
+	github.com/go-gui-org/go-gui v0.94.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
@@ -41,7 +41,7 @@ require (
 	github.com/tfriedel6/canvas v0.12.1
 	github.com/tphakala/go-aac v0.7.0
 	github.com/ulikunitz/xz v0.5.17
-	github.com/ygelfand/go-esphome-device v0.0.17
+	github.com/ygelfand/go-esphome-device v0.0.18
 	github.com/ygelfand/reolinkproxy v0.0.0-20261026000641-3a2fddcfed4f
 	github.com/zserge/microwakeword v0.0.0-20260330234603-bfaf3840114e
 	golang.org/x/crypto v0.57.0

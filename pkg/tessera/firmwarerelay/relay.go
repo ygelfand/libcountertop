@@ -402,14 +402,20 @@ func (r *Relay) base(id, name, icon string, category esphome.EntityCategory) esp
 func (r *Relay) action(m *api.ListEntitiesServicesResponse) *esphome.Action {
 	args := make([]esphome.Arg, 0, len(m.Args))
 	for _, a := range m.Args {
-		args = append(args, esphome.Arg{Name: a.Name, Type: argType(a.Type)})
+		args = append(args, esphome.Arg{
+			Name:        a.Name,
+			Type:        argType(a.Type),
+			Description: a.Description,
+			Example:     a.Example,
+		})
 	}
 	key := m.Key
 	answers := m.SupportsResponse != api.SupportsResponseType_SUPPORTS_RESPONSE_NONE
 	return &esphome.Action{
-		Name:    r.opts.Word + "_" + m.Name,
-		Args:    args,
-		Answers: answers,
+		Name:        r.opts.Word + "_" + m.Name,
+		Description: m.Description,
+		Args:        args,
+		Answers:     answers,
 		Run: func(call esphome.Call) (any, error) {
 			return r.execute(key, args, call, answers)
 		},
@@ -531,7 +537,8 @@ func (r *Relay) follow(c *firmware.Client, m *api.SubscribeHomeAssistantStateRes
 
 func (r *Relay) now() *api.GetTimeResponse {
 	zone := r.opts.Zone()
-	reply := &api.GetTimeResponse{EpochSeconds: uint32(time.Now().Unix()), Timezone: zone}
+	reply := &api.GetTimeResponse{EpochSeconds: uint32(time.Now().Unix())}
+	reply.Timezone = zone //nolint:staticcheck // ESPHome firmware before 2026.9.0 reads only the zone name.
 	if tz, ok := parseZone(zone); ok {
 		reply.ParsedTimezone = tz
 	} else if zone != "" {

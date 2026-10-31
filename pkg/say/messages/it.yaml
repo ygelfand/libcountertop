@@ -75,7 +75,7 @@ access.group.api: Home Assistant
 access.setting.adopted: Adottato da Home Assistant
 apps.group.apps: App
 apps.empty: Nessuna app
-apps.hint: Tocca la stella per tenere un'app nel dock. Trascina un riquadro per spostarlo.
+apps.hint: Tocca la stella per tenere un'app nel dock. Tieni premuto un riquadro e trascinalo per spostarlo.
 apps.setting.dock: App nel dock
 apps.setting.order: Ordine app
 apps.title: App

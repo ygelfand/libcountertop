@@ -94,12 +94,23 @@ func (m *Messages) Name() string { return "messages" }
 func (m *Messages) Actions() []*esphome.Action {
 	return []*esphome.Action{
 		{
-			Name: "show_message",
+			Name:        "show_message",
+			Description: "Show a message on the screen.",
 			Args: []esphome.Arg{
-				{Name: "body", Type: esphome.ArgString},
-				{Name: "title", Type: esphome.ArgString},
-				{Name: "tone", Type: esphome.ArgString},
-				{Name: "seconds", Type: esphome.ArgInt},
+				{Name: "body", Type: esphome.ArgString, Example: "The laundry is done"},
+				{Name: "title", Type: esphome.ArgString, Example: "Laundry"},
+				{
+					Name:        "tone",
+					Type:        esphome.ArgString,
+					Description: "info, success, warning or alert.",
+					Example:     "info",
+				},
+				{
+					Name:        "seconds",
+					Type:        esphome.ArgInt,
+					Description: "How long it stays up; 0 for 15 s, at most an hour.",
+					Example:     "30",
+				},
 			},
 			Run: func(c esphome.Call) (any, error) {
 				body := c.String("body")
@@ -116,8 +127,9 @@ func (m *Messages) Actions() []*esphome.Action {
 			},
 		},
 		{
-			Name: "clear_message",
-			Run:  func(esphome.Call) (any, error) { m.Hide(); return nil, nil },
+			Name:        "clear_message",
+			Description: "Take the message off the screen.",
+			Run:         func(esphome.Call) (any, error) { m.Hide(); return nil, nil },
 		},
 	}
 }

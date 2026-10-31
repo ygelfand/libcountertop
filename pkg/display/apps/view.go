@@ -1,7 +1,6 @@
 package apps
 
 import (
-	"log/slog"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
@@ -72,6 +71,28 @@ func (g grid) height(count int) float32 {
 	return max(0, float32(rows)*(g.side+g.gap)-g.gap)
 }
 
+func (g grid) blank() gogui.View {
+	return gogui.Column(gogui.ContainerCfg{
+		Width:   g.side,
+		Height:  g.side,
+		Sizing:  gogui.FixedFixed,
+		Padding: gogui.NoPadding,
+	})
+}
+
+func (g grid) rows(cells []gogui.View) []gogui.View {
+	var out []gogui.View
+	for start := 0; start < len(cells); start += g.cols {
+		out = append(out, gogui.Row(gogui.ContainerCfg{
+			Sizing:  gogui.FitFit,
+			Padding: gogui.NoPadding,
+			Spacing: gogui.SpacingPx(g.gap),
+			Content: cells[start:min(start+g.cols, len(cells))],
+		}))
+	}
+	return out
+}
+
 func (g grid) drop(from int, dx, dy float32, count int) int {
 	at := g.cell(from)
 	step := g.side + g.gap
@@ -91,22 +112,24 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 	d := a.drag
 	a.mu.Unlock()
 
-	var tiles []gogui.View
-	slot := 0
 	target := -1
 	if d.from >= 0 {
 		target = g.drop(d.from, d.dx, d.dy, len(list))
 	}
+	cells := make([]gogui.View, 0, len(list))
 	for n, app := range list {
 		if n == d.from {
 			continue
 		}
-		if slot == target {
-			slot++
+		if len(cells) == target {
+			cells = append(cells, g.blank())
 		}
-		tiles = append(tiles, widgets.Placed(g.cell(slot), a.tile(look, app, g.side)))
-		slot++
+		cells = append(cells, a.tile(look, app, g.side))
 	}
+	if len(cells) == target {
+		cells = append(cells, g.blank())
+	}
+	tiles := g.rows(cells)
 	if d.from >= 0 {
 		grown := g.side * lift
 		at := g.cell(d.from)
@@ -122,6 +145,7 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 		Height:  g.height(len(list)),
 		Sizing:  gogui.FixedFixed,
 		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingPx(g.gap),
 		Content: tiles,
 	})}
 	note := say.T("apps.hint")
@@ -137,28 +161,8 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 		Spacing: gogui.SpacingPx(g.gap),
 		Content: content,
 		OnGesture: func(e gogui.EventCtx) {
-			slog.Debug(
-				"apps gesture",
-				"type",
-				e.Event.GestureType,
-				"phase",
-				e.Event.GesturePhase,
-				"x",
-				e.Event.CentroidX,
-				"y",
-				e.Event.CentroidY,
-			)
-			switch e.Event.GestureType {
-			case gogui.GesturePan:
-				if !a.pan(e, g, len(list)) {
-					return
-				}
-			case gogui.GestureSwipe:
-				if !a.dragging() {
-					return
-				}
-				a.held.End(e.Window, 0)
-			default:
+			if e.Event.GestureType != gogui.GestureLongPress ||
+				e.Event.GesturePhase != gogui.GesturePhaseBegan || !a.lift(e, g, len(list)) {
 				return
 			}
 			e.Consume()
@@ -207,24 +211,29 @@ func face(app App, star gogui.View, width, height float32) gogui.View {
 	icon := t.TextStyleIconLarge
 	icon.Family = icons.Family
 	icon.Color = t.Cfg.TextStyleDef.Color
-	icon.Size = min(width, height) * 0.45
+	icon.Size = min(width, height) * 0.38
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   width,
 		Height:  height,
 		Sizing:  gogui.FixedFixed,
 		Padding: gogui.NoPadding,
-		Spacing: gogui.SpacingPx(height * 0.04),
-		HAlign:  gogui.HAlignCenter,
-		VAlign:  gogui.VAlignMiddle,
 		Content: []gogui.View{
-			gogui.Label(icons.Glyph(icons.Named(app.Icon)), icon),
-			gogui.Label(app.Label(), t.Cfg.TextStyleDef),
+			gogui.Row(gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				HAlign:  gogui.HAlignRight,
+				Content: []gogui.View{star},
+			}),
 			gogui.Column(gogui.ContainerCfg{
-				Float:       true,
-				FloatAnchor: gogui.FloatTopRight,
-				FloatTieOff: gogui.FloatTopRight,
-				Padding:     gogui.NoPadding,
-				Content:     []gogui.View{star},
+				Sizing:  gogui.FillFill,
+				Padding: gogui.NoPadding,
+				Spacing: gogui.SpacingPx(height * 0.04),
+				HAlign:  gogui.HAlignCenter,
+				VAlign:  gogui.VAlignMiddle,
+				Content: []gogui.View{
+					gogui.Label(icons.Glyph(icons.Named(app.Icon)), icon),
+					gogui.Label(app.Label(), t.Cfg.TextStyleDef),
+				},
 			}),
 		},
 	})
@@ -236,38 +245,24 @@ func (a *Apps) settling() bool {
 	return a.drag.from >= 0 || time.Since(a.drag.dropped) < settle
 }
 
-func (a *Apps) dragging() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.drag.from >= 0
-}
-
-func (a *Apps) pan(e gogui.EventCtx, g grid, count int) bool {
-	switch e.Event.GesturePhase {
-	case gogui.GesturePhaseBegan:
-		s := e.Layout.Shape
-		from := g.at(e.Event.CentroidX-s.X, e.Event.CentroidY-s.Y, count)
-		if from < 0 {
-			return false
-		}
-		a.mu.Lock()
-		a.drag = drag{from: from, dx: e.Event.GestureDX, dy: e.Event.GestureDY}
-		a.mu.Unlock()
-		a.held.Begin(e.Window, func(*gogui.Window, float32) { a.end(g, count) })
-	case gogui.GesturePhaseChanged:
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		if a.drag.from < 0 {
-			return false
-		}
-		a.drag.dx += e.Event.GestureDX
-		a.drag.dy += e.Event.GestureDY
-	default:
-		if !a.dragging() {
-			return false
-		}
-		a.held.End(e.Window, 0)
+func (a *Apps) lift(e gogui.EventCtx, g grid, count int) bool {
+	s := e.Layout.Shape
+	x, y := e.Event.CentroidX, e.Event.CentroidY
+	from := g.at(x-s.X, y-s.Y, count)
+	if from < 0 {
+		return false
 	}
+	a.mu.Lock()
+	a.drag = drag{from: from}
+	a.mu.Unlock()
+	a.held.Track(e.Window, func(m gogui.EventCtx) {
+		a.mu.Lock()
+		if a.drag.from >= 0 {
+			a.drag.dx, a.drag.dy = m.Event.MouseX-x, m.Event.MouseY-y
+		}
+		a.mu.Unlock()
+		m.Window.InvalidateLayout()
+	}, func(*gogui.Window, float32) { a.end(g, count) })
 	return true
 }
 

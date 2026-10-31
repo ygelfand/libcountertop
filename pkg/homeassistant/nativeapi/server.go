@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,6 +21,8 @@ import (
 
 // Home Assistant drops the connection after 4.5 keepalive intervals.
 const writeTimeout = 20 * time.Second
+
+const dialDelay = 10 * time.Second
 
 type Registry interface {
 	Entities() []esphome.Entity
@@ -41,6 +44,7 @@ type Identity struct {
 
 type Dependencies struct {
 	KeyPath      string
+	DialPath     string
 	Identity     func() (Identity, error)
 	Bluetooth    func() esphome.BluetoothFeature
 	Registry     Registry
@@ -140,6 +144,13 @@ func (a *Server) Start(context.Context) error {
 		Logger:             slog.Default(),
 		OnSetEncryptionKey: func(k esphome.PSK) error { return writePSK(a.deps.KeyPath, k) },
 		OnSubscribed:       a.subscribed,
+	}
+	if path := a.deps.DialPath; path != "" {
+		a.srv.Dial = &esphome.Dial{
+			Delay: dialDelay,
+			Load:  func() (netip.Addr, bool) { return loadTarget(path) },
+			Save:  func(addr netip.Addr) error { return writeTarget(path, addr) },
+		}
 	}
 	return a.register()
 }

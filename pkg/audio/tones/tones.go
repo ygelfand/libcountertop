@@ -107,13 +107,23 @@ func (s *Store) Sound(c, fallback schema.Chime) tone.Sound {
 func (s *Store) Actions() []*esphome.Action {
 	return []*esphome.Action{
 		{
-			Name: "tone_write",
+			Name:        "tone_write",
+			Description: "Upload a custom tone, one page per call; the last page saves it.",
 			Args: []esphome.Arg{
-				{Name: "key", Type: esphome.ArgString},
-				{Name: "name", Type: esphome.ArgString},
-				{Name: "page", Type: esphome.ArgInt},
-				{Name: "pages", Type: esphome.ArgInt},
-				{Name: "data", Type: esphome.ArgString},
+				{
+					Name:        "key",
+					Type:        esphome.ArgString,
+					Description: "Lowercase letters, digits, - and _.",
+					Example:     "front-door",
+				},
+				{Name: "name", Type: esphome.ArgString, Example: "Front door"},
+				{Name: "page", Type: esphome.ArgInt, Description: "Zero-based.", Example: "0"},
+				{Name: "pages", Type: esphome.ArgInt, Example: "4"},
+				{
+					Name:        "data",
+					Type:        esphome.ArgString,
+					Description: "Base64 of up to 32 KiB of 48 kHz mono 16-bit little-endian PCM; 30 s at most in all.",
+				},
 			},
 			Answers: true,
 			Run: func(c esphome.Call) (any, error) {
@@ -133,7 +143,8 @@ func (s *Store) Actions() []*esphome.Action {
 			},
 		},
 		{
-			Name: "tone_rename",
+			Name:        "tone_rename",
+			Description: "Rename a custom tone.",
 			Args: []esphome.Arg{
 				{Name: "key", Type: esphome.ArgString},
 				{Name: "name", Type: esphome.ArgString},
@@ -145,9 +156,10 @@ func (s *Store) Actions() []*esphome.Action {
 			},
 		},
 		{
-			Name:    "tone_remove",
-			Args:    []esphome.Arg{{Name: "key", Type: esphome.ArgString}},
-			Answers: true,
+			Name:        "tone_remove",
+			Description: "Delete a custom tone.",
+			Args:        []esphome.Arg{{Name: "key", Type: esphome.ArgString}},
+			Answers:     true,
 			Run: func(c esphome.Call) (any, error) {
 				key := c.String("key")
 				return done(key, s.Remove(key))

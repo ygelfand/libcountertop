@@ -12,10 +12,19 @@ type Drag struct {
 }
 
 func (d *Drag) Begin(w *gogui.Window, end func(w *gogui.Window, velocity float32)) {
+	d.Track(w, nil, end)
+}
+
+func (d *Drag) Track(
+	w *gogui.Window,
+	move func(gogui.EventCtx),
+	end func(w *gogui.Window, velocity float32),
+) {
 	d.mu.Lock()
 	d.end = end
 	d.mu.Unlock()
 	w.MouseLock(gogui.MouseLockCfg{
+		MouseMove: move,
 		MouseUp: func(e gogui.EventCtx) {
 			e.Window.MouseUnlock()
 			d.End(e.Window, 0)

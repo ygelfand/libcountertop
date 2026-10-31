@@ -123,37 +123,56 @@ func (s *Screen) Asked() PageAsk {
 func (s *Screen) screenActions() []*esphome.Action {
 	w := s.options.Facing.word()
 	alert := []esphome.Arg{
-		{Name: "title", Type: esphome.ArgString},
-		{Name: "subtitle", Type: esphome.ArgString},
-		{Name: "icon", Type: esphome.ArgString},
-		{Name: "color", Type: esphome.ArgString},
-		{Name: "button_text", Type: esphome.ArgString},
-		{Name: "timeout", Type: esphome.ArgInt},
+		{Name: "title", Type: esphome.ArgString, Example: "Front door"},
+		{Name: "subtitle", Type: esphome.ArgString, Example: "Someone is at the door"},
+		{Name: "icon", Type: esphome.ArgString, Example: "mdi:doorbell"},
+		{Name: "color", Type: esphome.ArgString, Example: "red"},
+		{
+			Name:        "button_text",
+			Type:        esphome.ArgString,
+			Description: "Empty shows OK.",
+		},
+		{
+			Name:        "timeout",
+			Type:        esphome.ArgInt,
+			Description: "Seconds before it closes itself; 0 keeps it until dismissed.",
+			Example:     "30",
+		},
 		{Name: "flash", Type: esphome.ArgBool},
 	}
 	choice := append(append([]esphome.Arg(nil), alert...),
 		esphome.Arg{Name: "button_color", Type: esphome.ArgString},
-		esphome.Arg{Name: "button2_text", Type: esphome.ArgString},
+		esphome.Arg{
+			Name:        "button2_text",
+			Type:        esphome.ArgString,
+			Description: "The second button; empty shows only one.",
+		},
 		esphome.Arg{Name: "button2_color", Type: esphome.ArgString},
 	)
 	return []*esphome.Action{
 		{
-			Name: w + "_show_page",
-			Args: []esphome.Arg{{Name: "page", Type: esphome.ArgInt}},
-			Run:  func(c esphome.Call) (any, error) { s.showPage(c.Int("page")); return nil, nil },
+			Name:        w + "_show_page",
+			Description: "Switch the dashboard to a page.",
+			Args: []esphome.Arg{
+				{Name: "page", Type: esphome.ArgInt, Description: "Counting from 1.", Example: "1"},
+			},
+			Run: func(c esphome.Call) (any, error) { s.showPage(c.Int("page")); return nil, nil },
 		},
 		{
-			Name: w + "_show_alert",
-			Args: alert,
-			Run:  func(c esphome.Call) (any, error) { s.alert(c, false); return nil, nil },
+			Name:        w + "_show_alert",
+			Description: "Show an alert; esphome.screen_alert fires with how it ended.",
+			Args:        alert,
+			Run:         func(c esphome.Call) (any, error) { s.alert(c, false); return nil, nil },
 		},
 		{
-			Name: w + "_show_alert_choice",
-			Args: choice,
-			Run:  func(c esphome.Call) (any, error) { s.alert(c, true); return nil, nil },
+			Name:        w + "_show_alert_choice",
+			Description: "Show an alert with up to two buttons; esphome.screen_alert says which was tapped.",
+			Args:        choice,
+			Run:         func(c esphome.Call) (any, error) { s.alert(c, true); return nil, nil },
 		},
 		{
-			Name: w + "_dismiss_alert",
+			Name:        w + "_dismiss_alert",
+			Description: "Close the alert on the screen.",
 			Run: func(esphome.Call) (any, error) {
 				if s.options.Unalert != nil {
 					s.options.Unalert()

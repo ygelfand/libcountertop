@@ -78,6 +78,8 @@ func (f *Frame) Rest(on bool) {
 	atomic.StoreUint32(f.word(40), v)
 }
 
+func (f *Frame) Woke() uint32 { return atomic.LoadUint32(f.word(52)) }
+
 func (f *Frame) Ready() bool { return atomic.LoadUint32(f.word(0)) == magic }
 
 func (f *Frame) Seq() uint32 { return atomic.LoadUint32(f.word(8)) }

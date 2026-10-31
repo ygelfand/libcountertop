@@ -24,8 +24,12 @@ func (c *Calls) Action(peers func() []discovery.Peer, video bool) actions.Action
 		Name:  "call",
 		Title: say.T("actions.call"),
 		Args: []esphome.Arg{
-			{Name: "peer", Type: esphome.ArgString},
-			{Name: "video", Type: esphome.ArgBool},
+			{Name: "peer", Type: esphome.ArgString, Description: "The name of the device to call."},
+			{
+				Name:        "video",
+				Type:        esphome.ArgBool,
+				Description: "A video call when both devices have cameras.",
+			},
 		},
 		Triggers: triggers,
 		Run: func(call esphome.Call) (string, error) {
@@ -52,7 +56,11 @@ func (c *Calls) ControlActions() []actions.Action {
 	return []actions.Action{
 		{
 			Name: "call_answer", Title: say.T("actions.call_answer"),
-			Args: []esphome.Arg{{Name: "video", Type: esphome.ArgBool}},
+			Args: []esphome.Arg{{
+				Name:        "video",
+				Type:        esphome.ArgBool,
+				Description: "Answer with video; off answers with audio only.",
+			}},
 			Triggers: []actions.Trigger{
 				{Sentence: "answer [the] (call|phone)"},
 				{Sentence: "answer"},

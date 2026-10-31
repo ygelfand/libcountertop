@@ -25,8 +25,14 @@ func (d *Diag) Actions() []*esphome.Action {
 	}
 	return []*esphome.Action{
 		{
-			Name:    "logs",
-			Args:    []esphome.Arg{{Name: "page", Type: esphome.ArgInt}},
+			Name:        "logs",
+			Description: "One page of the device's recent log.",
+			Args: []esphome.Arg{{
+				Name:        "page",
+				Type:        esphome.ArgInt,
+				Description: "Zero-based; the answer says how many pages there are.",
+				Example:     "0",
+			}},
 			Answers: true,
 			Run: func(c esphome.Call) (any, error) {
 				return logs(d.o.LogTag, c.Int("page"))
