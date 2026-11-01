@@ -138,8 +138,17 @@ func (a *App) dashboard(w *gogui.Window) gogui.View {
 	pal := a.ui.Palette()
 	margin := int(reach() * 0.5)
 
+	lovelace := a.o.Lovelace != nil && a.o.Home != nil &&
+		a.o.Home.Speaks() == schema.HomeLovelace
+	if a.o.Lovelace != nil {
+		a.o.Lovelace.Home.Set(lovelace)
+		a.o.Lovelace.Wake()
+	}
 	var layers []gogui.View
 	switch {
+	case lovelace:
+		whole := ui.Rect{W: vw, H: vh}
+		layers = []gogui.View{widgets.Placed(whole, a.o.Lovelace.Home.Draw(whole))}
 	case a.o.Firmware != nil && a.o.Firmware.On():
 		whole := ui.Rect{W: vw, H: vh}
 		layers = []gogui.View{widgets.Placed(whole, a.o.Firmware.Draw(whole))}

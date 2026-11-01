@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,7 @@ type entry struct {
 	link string
 }
 
-func archive(t *testing.T, entries []entry) string {
+func archive(t *testing.T, entries []entry) io.Reader {
 	t.Helper()
 	var buf bytes.Buffer
 	zw, err := xz.NewWriter(&buf)
@@ -53,11 +54,7 @@ func archive(t *testing.T, entries []entry) string {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "engine.tar.xz")
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return &buf
 }
 
 func TestUnpackDropsTheTopDirectoryAndKeepsModes(t *testing.T) {
@@ -107,7 +104,7 @@ func TestInstallKeepsAnExistingVersion(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, Tag), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	root, err := Install(context.Background(), dir)
+	root, err := Install(context.Background(), dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,15 +113,27 @@ func TestInstallKeepsAnExistingVersion(t *testing.T) {
 	}
 }
 
-func TestPruneRemovesOnlyOtherEngineVersions(t *testing.T) {
+func TestWipeLeavesOnlyTheCurrentVersion(t *testing.T) {
 	dir := t.TempDir()
-	for _, name := range []string{Tag, "engine-full-0", Tag + ".partial", "profile"} {
+	for _, name := range []string{Tag, "engine-full-0", Tag + ".partial", "cast-engine-1"} {
 		if err := os.MkdirAll(filepath.Join(dir, name), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	prune(dir, Tag)
-	for name, want := range map[string]bool{Tag: true, "engine-full-0": false, Tag + ".partial": false, "profile": true} {
+	if err := os.WriteFile(
+		filepath.Join(dir, "engine-full-armhf.tar.xz"),
+		[]byte("x"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := wipe(dir, Tag); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{
+		Tag: true, "engine-full-0": false, Tag + ".partial": false, "cast-engine-1": false,
+		"engine-full-armhf.tar.xz": false,
+	} {
 		_, err := os.Stat(filepath.Join(dir, name))
 		if (err == nil) != want {
 			t.Fatalf("%s present=%v, want %v", name, err == nil, want)

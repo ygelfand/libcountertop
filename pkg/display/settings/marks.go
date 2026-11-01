@@ -1,6 +1,7 @@
 package settings
 
 import (
+	_ "embed"
 	"image"
 	"slices"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
+
+//go:embed homeassistant.svg
+var homeAssistantMark string
 
 type ModeMarks struct {
 	Tessera string
@@ -25,6 +29,8 @@ func (m ModeMarks) mark(mode string) menu.Mark {
 	switch mode {
 	case string(config.HomeTessera), string(config.HomeFirmware):
 		return menu.Mark{SVG: m.Tessera}
+	case string(config.HomeLovelace):
+		return menu.Mark{SVG: homeAssistantMark}
 	case string(config.HomeNative):
 		if m.Native != nil {
 			return menu.Mark{Image: m.Native()}

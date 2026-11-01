@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -80,5 +81,50 @@ func TestAssetURL(t *testing.T) {
 	want := "https://github.com/ygelfand/libcountertop/releases/download/cast-engine-1/cast-engine-armhf.tar.xz"
 	if got != want {
 		t.Fatalf("Asset = %q, want %q", got, want)
+	}
+}
+
+func TestStreamReadsCountsAndChecksTheWholeBody(t *testing.T) {
+	var seen int64
+	var got []byte
+	err := Stream(
+		context.Background(),
+		serve(t, "engine-bytes"),
+		sha("engine-bytes"),
+		1<<20,
+		func(done int64) { seen = done },
+		func(r io.Reader) error {
+			b := make([]byte, 6)
+			_, err := io.ReadFull(r, b)
+			got = b
+			return err
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "engine" || seen != int64(len("engine-bytes")) {
+		t.Fatalf("read %q and counted %d bytes", got, seen)
+	}
+	read := func(r io.Reader) error { _, err := io.Copy(io.Discard, r); return err }
+	if err := Stream(
+		context.Background(),
+		serve(t, "tampered"),
+		sha("engine"),
+		1<<20,
+		nil,
+		read,
+	); err == nil {
+		t.Fatal("accepted a stream whose checksum does not match")
+	}
+	if err := Stream(
+		context.Background(),
+		serve(t, "too long"),
+		sha("too long"),
+		3,
+		nil,
+		read,
+	); err == nil {
+		t.Fatal("accepted a stream over the limit")
 	}
 }

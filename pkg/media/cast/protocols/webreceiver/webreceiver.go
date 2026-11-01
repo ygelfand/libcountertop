@@ -10,7 +10,6 @@ import (
 	"maps"
 	"net"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -33,21 +32,24 @@ const (
 	systemNS = "urn:x-cast:com.google.cast.system"
 	injected = "__inject__"
 	idle     = "about:blank"
-	display  = "wayland-0"
 
-	DefaultBusPort   = 8012
-	DefaultToolsPort = 9222
+	DefaultBusPort = 8012
 )
 
 type Options struct {
-	Dir         string
-	State       string
-	BusPort     int
-	ToolsPort   int
-	Nameservers func() []string
-	Helper      func() *surface.Client
-	Built       func(*Receiver)
-	Tuning      *engine.Tuning
+	Engine  *engine.Host
+	BusPort int
+	Helper  func() *surface.Client
+	Built   func(*Receiver)
+}
+
+func EngineArgs() []string {
+	return []string{
+		"--autoplay-policy=no-user-gesture-required",
+		"--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights",
+		"--user-agent=Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) " +
+			"Chrome/150.0.0.0 Safari/537.36 CrKey/1.56.500000",
+	}
 }
 
 type frame struct {
@@ -63,7 +65,7 @@ type Receiver struct {
 	hooks  string
 
 	mu           sync.Mutex
-	tools        *devtools
+	tools        *engine.Page
 	page         *websocket.Conn
 	asked        cast.App
 	app          cast.Application
@@ -92,9 +94,6 @@ func Maker(o Options) cast.Maker {
 func New(env cast.Env, o Options) *Receiver {
 	if o.BusPort == 0 {
 		o.BusPort = DefaultBusPort
-	}
-	if o.ToolsPort == 0 {
-		o.ToolsPort = DefaultToolsPort
 	}
 	r := &Receiver{env: env, o: o}
 	r.media = &bridge{r: r}
@@ -128,68 +127,34 @@ func (r *Receiver) Run(ctx context.Context) {
 }
 
 func (r *Receiver) run(ctx context.Context) error {
-	root, err := engine.Install(ctx, r.o.Dir)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	if r.o.Tuning != nil {
-		r.o.Tuning.Restarts(cancel)
-	}
-
 	srv, err := r.serve()
 	if err != nil {
 		return err
 	}
 	defer srv.Close()
 
-	width, height := r.screen()
-	socket := filepath.Join(r.o.State, display)
-	comp := compositor.New(compositor.Options{Path: socket, Width: width, Height: height})
-	comp.Opened.Listen(r.opened)
-	if err := comp.Listen(); err != nil {
-		return err
-	}
-	safe.Go("cast compositor", func() {
-		if err := comp.Run(ctx); err != nil && ctx.Err() == nil {
-			slog.Warn("the cast compositor stopped", "err", err)
-		}
-	})
-
-	safe.Go("cast engine", func() {
-		_ = engine.Run(ctx, engine.Options{
-			Root:        root,
-			State:       r.o.State,
-			Port:        r.o.ToolsPort,
-			Display:     socket,
-			Args:        r.args(),
-			Nameservers: r.o.Nameservers,
-		})
-	})
-	if err := engine.Ready(ctx, r.o.ToolsPort); err != nil {
-		return err
-	}
-	tools, err := dialPage(ctx, r.o.ToolsPort)
+	page, err := r.o.Engine.Open(ctx, "receiver")
 	if err != nil {
 		return err
 	}
-	defer tools.close()
+	defer func() { _ = page.Close() }()
+	r.opened(page.Window)
+	defer page.Events.Listen(logged)()
 	for _, call := range []struct {
 		method string
 		params any
 	}{
-		{"Runtime.enable", map[string]any{}},
-		{"Page.enable", map[string]any{}},
+		{"Runtime.enable", nil},
+		{"Page.enable", nil},
 		{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": r.hooks}},
 	} {
-		if err := tools.call(call.method, call.params); err != nil {
-			return fmt.Errorf("webreceiver: devtools: %w", err)
+		if err := page.Call(call.method, call.params); err != nil {
+			return err
 		}
 	}
 
 	r.mu.Lock()
-	r.tools = tools
+	r.tools = page
 	asked := r.asked
 	r.mu.Unlock()
 	slog.Info("the cast web receiver is ready")
@@ -202,25 +167,12 @@ func (r *Receiver) run(ctx context.Context) error {
 		r.mu.Unlock()
 	}()
 
-	stop := context.AfterFunc(ctx, tools.close)
-	defer stop()
-	if err := tools.read(); ctx.Err() == nil {
-		return err
+	select {
+	case <-page.Done():
+		return errors.New("webreceiver: the cast page closed")
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return ctx.Err()
-}
-
-func (r *Receiver) args() []string {
-	out := []string{
-		"--autoplay-policy=no-user-gesture-required",
-		"--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights",
-		"--user-agent=Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) " +
-			"Chrome/150.0.0.0 Safari/537.36 CrKey/1.56.500000",
-	}
-	if r.o.Tuning != nil {
-		out = append(out, r.o.Tuning.Args()...)
-	}
-	return out
 }
 
 func (r *Receiver) serve() (*http.Server, error) {
@@ -280,7 +232,7 @@ func (r *Receiver) Ended(cast.App) {
 		r.env.Output.Attend(nil)
 	}
 	if tools != nil {
-		_ = tools.navigate(idle)
+		_ = tools.Navigate(idle)
 	}
 }
 
@@ -314,21 +266,13 @@ func (r *Receiver) launch(a cast.App) {
 	slog.Info("a cast app runs in the web receiver", "app", title, "url", target)
 	if r.env.Video != nil {
 		if t := r.env.Video(); t.Width > 0 && t.Height > 0 {
-			_ = tools.size(t.Width, t.Height)
+			_ = tools.Emulate(t.Width, t.Height)
 		}
 	}
-	_ = tools.navigate(idle)
-	if err := tools.navigate(target); err != nil {
+	_ = tools.Navigate(idle)
+	if err := tools.Navigate(target); err != nil {
 		slog.Warn("the cast web receiver could not open a page", "err", err)
 	}
-}
-
-func (r *Receiver) screen() (width, height int) {
-	if r.env.Video == nil {
-		return 0, 0
-	}
-	t := r.env.Video()
-	return t.Width, t.Height
 }
 
 func (r *Receiver) opened(w *compositor.Window) {

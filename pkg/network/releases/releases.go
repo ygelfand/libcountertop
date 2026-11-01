@@ -148,7 +148,9 @@ type counter struct {
 
 func (c *counter) Write(p []byte) (int, error) {
 	c.done += int64(len(p))
-	c.report(c.done)
+	if c.report != nil {
+		c.report(c.done)
+	}
 	return len(p), nil
 }
 
@@ -157,6 +159,31 @@ func DownloadProgress(
 	url, sum, dest string,
 	limit int64,
 	report func(done int64),
+) error {
+	tmp, err := os.CreateTemp(filepath.Dir(dest), filepath.Base(dest)+".*")
+	if err != nil {
+		return fmt.Errorf("releases: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+	err = Stream(ctx, url, sum, limit, report, func(r io.Reader) error {
+		_, err := io.Copy(tmp, r)
+		return err
+	})
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), dest)
+}
+
+func Stream(
+	ctx context.Context,
+	url, sum string,
+	limit int64,
+	report func(done int64),
+	read func(io.Reader) error,
 ) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -170,30 +197,22 @@ func DownloadProgress(
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("releases: fetching %s: %s", url, resp.Status)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(dest), filepath.Base(dest)+".*")
-	if err != nil {
-		return fmt.Errorf("releases: %w", err)
-	}
-	defer os.Remove(tmp.Name())
 	h := sha256.New()
-	sink := io.MultiWriter(tmp, h)
-	if report != nil {
-		sink = io.MultiWriter(tmp, h, &counter{report: report})
-	}
-	n, err := io.Copy(sink, io.LimitReader(resp.Body, limit+1))
-	if cerr := tmp.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
+	seen := &counter{report: report}
+	body := io.TeeReader(io.LimitReader(resp.Body, limit+1), io.MultiWriter(h, seen))
+	if err := read(body); err != nil {
 		return fmt.Errorf("releases: fetching %s: %w", url, err)
 	}
-	if n > limit {
+	if _, err := io.Copy(io.Discard, body); err != nil {
+		return fmt.Errorf("releases: fetching %s: %w", url, err)
+	}
+	if seen.done > limit {
 		return fmt.Errorf("releases: %s is larger than %d bytes", url, limit)
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != sum {
 		return fmt.Errorf("releases: %s has sha256 %s, want %s", url, got, sum)
 	}
-	return os.Rename(tmp.Name(), dest)
+	return nil
 }
 
 func fetch(ctx context.Context, url string, limit int64, read func(io.Reader) error) error {

@@ -57,7 +57,7 @@ func (r *Receiver) Eval(ctx context.Context, expr string) (string, error) {
 	if tools == nil {
 		return "", errNoPage
 	}
-	raw, err := tools.request(ctx, "Runtime.evaluate", map[string]any{
+	raw, err := tools.Request(ctx, "Runtime.evaluate", map[string]any{
 		"expression":    expr,
 		"returnByValue": true,
 		"awaitPromise":  true,

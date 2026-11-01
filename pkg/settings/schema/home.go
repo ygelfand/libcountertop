@@ -64,6 +64,7 @@ const (
 	HomeNative   HomeMode = "native"
 	HomeTessera  HomeMode = "tessera"
 	HomeFirmware HomeMode = "firmware"
+	HomeLovelace HomeMode = "lovelace"
 )
 
 func (m HomeMode) Label() string {
@@ -74,19 +75,29 @@ func (m HomeMode) Label() string {
 		return say.T("mode.tessera_native")
 	case HomeFirmware:
 		return say.T("mode.firmware")
+	case HomeLovelace:
+		return say.T("mode.lovelace")
 	}
 	return string(m)
 }
 
 func (m HomeMode) Tessera() bool { return m == HomeTessera || m == HomeFirmware }
 
-func HomeModes() []HomeMode { return []HomeMode{HomeNative, HomeTessera, HomeFirmware} }
+func HomeModes() []HomeMode { return []HomeMode{HomeNative, HomeFirmware, HomeLovelace} }
+
+func MigrateHome(_ []byte, home *Home) error {
+	if home.Mode == HomeTessera {
+		home.Mode = HomeFirmware
+	}
+	return nil
+}
 
 type SaverMode string
 
 const (
-	SaverNative  SaverMode = "native"
-	SaverTessera SaverMode = "tessera"
+	SaverNative   SaverMode = "native"
+	SaverTessera  SaverMode = "tessera"
+	SaverLovelace SaverMode = "lovelace"
 )
 
 func (m SaverMode) Label() string {
@@ -95,11 +106,13 @@ func (m SaverMode) Label() string {
 		return say.T("mode.native")
 	case SaverTessera:
 		return say.T("mode.tessera")
+	case SaverLovelace:
+		return say.T("mode.lovelace")
 	}
 	return string(m)
 }
 
-func SaverModes() []SaverMode { return []SaverMode{SaverNative, SaverTessera} }
+func SaverModes() []SaverMode { return []SaverMode{SaverNative, SaverTessera, SaverLovelace} }
 
 type TesseraGrid struct {
 	Columns int `json:"columns"`
@@ -152,7 +165,7 @@ func (h Home) Grouped(key string) int {
 }
 
 func (h Home) Speaks() HomeMode {
-	if h.Mode.Tessera() {
+	if h.Mode.Tessera() || h.Mode == HomeLovelace {
 		return h.Mode
 	}
 	return HomeNative

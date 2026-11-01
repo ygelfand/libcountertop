@@ -519,6 +519,8 @@ type Dependencies struct {
 	Saver           SaverMode
 	Standby         func() bool
 	Visuals         Visuals
+	Lovelace        func(saver bool) ([]menu.Row, []func(int))
+	Reload          func()
 	UI              *widgets.UI
 }
 
@@ -642,6 +644,10 @@ func (view *Renderer) dashboardRows() ([]menu.Row, []func(int)) {
 	switch {
 	case title != "":
 		add(view.options.Visuals.LocalRows())
+	case view.options.Engine.Speaks() == schema.HomeLovelace && view.options.Lovelace != nil:
+		add(view.saverRows())
+		saver := view.options.Saver
+		add(view.options.Lovelace(saver != nil && saver.Saver() == schema.SaverLovelace))
 	case view.options.Engine.Tessera():
 		add(view.saverRows())
 		add(view.tesseraRows())
@@ -663,7 +669,12 @@ func (view *Renderer) modeLine(
 		ID:      "dashboard-refresh",
 		Padding: gogui.PaddingMedium,
 		Content: []gogui.View{icon(gogui.IconSync, gogui.CurrentTheme().Cfg.ColorTextSecondary)},
-	}, func(gogui.EventCtx) { engine.Refresh() })
+	}, func(gogui.EventCtx) {
+		engine.Refresh()
+		if engine.Speaks() == schema.HomeLovelace && view.options.Reload != nil {
+			view.options.Reload()
+		}
+	})
 	return gogui.Row(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
 		VAlign:  gogui.VAlignMiddle,

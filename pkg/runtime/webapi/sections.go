@@ -21,7 +21,7 @@ var sections = []section{
 		"screen", "clock", "idle", "visual", "poster", "photos", "weather", "apps", "cameras",
 		"doorbell", "homealarm", "thermostat", "presence",
 	}},
-	{"home.title", []string{"home"}},
+	{"home.title", []string{"home", "lovelace"}},
 	{"settings.volume", []string{"feedback", "microphone", "speaker"}},
 	{"alerts.page", []string{"alerts"}},
 	{"settings.camera", []string{"camera"}},

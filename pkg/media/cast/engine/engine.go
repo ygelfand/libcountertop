@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,7 +16,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/network/releases"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
-	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 )
 
 const (
@@ -23,10 +23,10 @@ const (
 	Tag        = "engine-full-1"
 	asset      = "engine-full-armhf.tar.xz"
 	sum        = "ee70db08ab23ffa6b0b05e33dfdac769f3f729e8d213c2c3ee3e3461257d455a"
+	size       = 102977724
 	maxArchive = 256 << 20
 	firstToGo  = 1000
 	diskCache  = 16 << 20
-	prefix     = "engine-full-"
 )
 
 type Options struct {
@@ -38,45 +38,35 @@ type Options struct {
 	Nameservers func() []string
 }
 
-func Install(ctx context.Context, dir string) (string, error) {
+func Install(ctx context.Context, dir string, progress func(at float32)) (string, error) {
 	root := filepath.Join(dir, Tag)
 	if _, err := os.Stat(root); err == nil {
 		return root, nil
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("engine: %w", err)
-	}
-	archive := filepath.Join(dir, asset)
-	defer os.Remove(archive)
-	if err := releases.Download(
-		ctx,
-		releases.Asset(repo, Tag, asset),
-		sum,
-		archive,
-		maxArchive,
-	); err != nil {
+	if err := wipe(dir, Tag); err != nil {
 		return "", err
 	}
 	partial := root + ".partial"
-	if err := os.RemoveAll(partial); err != nil {
-		return "", fmt.Errorf("engine: %w", err)
+	report := func(done int64) {
+		if progress != nil {
+			progress(min(float32(done)/size, 1))
+		}
 	}
-	if err := unpack(archive, partial); err != nil {
+	err := releases.Stream(
+		ctx,
+		releases.Asset(repo, Tag, asset),
+		sum,
+		maxArchive,
+		report,
+		func(r io.Reader) error { return unpack(r, partial) },
+	)
+	if err != nil {
 		return "", errors.Join(err, os.RemoveAll(partial))
 	}
 	if err := os.Rename(partial, root); err != nil {
 		return "", fmt.Errorf("engine: %w", err)
 	}
-	prune(dir, Tag)
 	return root, nil
-}
-
-func Run(ctx context.Context, o Options) error {
-	return service.Keep(
-		ctx,
-		"cast engine",
-		func(ctx context.Context) error { return session(ctx, o) },
-	)
 }
 
 func Ready(ctx context.Context, port int) error {
@@ -202,14 +192,21 @@ func tidy(profile string) {
 	}
 }
 
-func prune(dir, keep string) {
+func wipe(dir, keep string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("engine: %w", err)
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return
+		return fmt.Errorf("engine: %w", err)
 	}
 	for _, e := range entries {
-		if e.Name() != keep && strings.HasPrefix(e.Name(), prefix) {
-			_ = os.RemoveAll(filepath.Join(dir, e.Name()))
+		if e.Name() == keep {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+			return fmt.Errorf("engine: %w", err)
 		}
 	}
+	return nil
 }

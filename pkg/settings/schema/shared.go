@@ -24,6 +24,7 @@ type Shared struct {
 	HomeAlarm  HomeAlarm  `json:"home_alarm"`
 	Idle       Idle       `json:"idle"`
 	Lock       Lock       `json:"lock"`
+	Lovelace   Lovelace   `json:"lovelace"`
 	Media      Media      `json:"media"`
 	Network    Network    `json:"network"`
 	Photos     Photos     `json:"photos"`
@@ -114,6 +115,7 @@ type Sections[C any] struct {
 	HomeAlarm  storage.Binding[C, HomeAlarm]
 	Idle       storage.Binding[C, Idle]
 	Lock       storage.Binding[C, Lock]
+	Lovelace   storage.Binding[C, Lovelace]
 	Media      storage.Binding[C, Media]
 	Network    storage.Binding[C, Network]
 	Photos     storage.Binding[C, Photos]
@@ -155,6 +157,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		HomeAlarm: bind(store, shared, func(s *Shared) *HomeAlarm { return &s.HomeAlarm }),
 		Idle:      bind(store, shared, func(s *Shared) *Idle { return &s.Idle }),
 		Lock:      bind(store, shared, func(s *Shared) *Lock { return &s.Lock }),
+		Lovelace:  bind(store, shared, func(s *Shared) *Lovelace { return &s.Lovelace }),
 		Media:     bind(store, shared, func(s *Shared) *Media { return &s.Media }),
 		Network:   bind(store, shared, func(s *Shared) *Network { return &s.Network }),
 		Photos:    bind(store, shared, func(s *Shared) *Photos { return &s.Photos }),

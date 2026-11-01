@@ -13,13 +13,8 @@ import (
 	"github.com/ulikunitz/xz"
 )
 
-func unpack(archive, dest string) error {
-	f, err := os.Open(archive)
-	if err != nil {
-		return fmt.Errorf("engine: %w", err)
-	}
-	defer f.Close()
-	zr, err := xz.NewReader(bufio.NewReader(f))
+func unpack(r io.Reader, dest string) error {
+	zr, err := xz.NewReader(bufio.NewReader(r))
 	if err != nil {
 		return fmt.Errorf("engine: %w", err)
 	}

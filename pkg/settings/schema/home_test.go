@@ -91,3 +91,26 @@ func TestATesseraGridKeepsAPageWithinItsCells(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrateHomeMovesTesseraNativeToEmbedded(t *testing.T) {
+	for in, want := range map[HomeMode]HomeMode{
+		HomeTessera:  HomeFirmware,
+		HomeFirmware: HomeFirmware,
+		HomeNative:   HomeNative,
+		HomeLovelace: HomeLovelace,
+	} {
+		h := Home{Mode: in}
+		if err := MigrateHome(nil, &h); err != nil {
+			t.Fatal(err)
+		}
+		if h.Mode != want {
+			t.Errorf("MigrateHome(%q) = %q, want %q", in, h.Mode, want)
+		}
+	}
+	if slices.Contains(HomeModes(), HomeTessera) {
+		t.Error("HomeModes still offers Tessera native")
+	}
+	if got := (Home{Mode: HomeLovelace}).Speaks(); got != HomeLovelace {
+		t.Errorf("Speaks() = %q for the Home Assistant mode", got)
+	}
+}

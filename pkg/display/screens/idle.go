@@ -15,6 +15,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/display/visualview"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 func (a *App) idleScreen(v *idleview.View) *Screen {
@@ -36,6 +37,22 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		e.Window.InvalidateLayout()
 	}
 	night := v.Night()
+	if l := a.o.Lovelace; l != nil {
+		if a.o.Settings().Idle.Saver != schema.SaverLovelace || night.Quiet() {
+			l.Wake()
+		} else {
+			v.Close()
+			whole := ui.Rect{W: vw, H: vh}
+			return gogui.Column(gogui.ContainerCfg{
+				ID:      "idle",
+				Sizing:  gogui.FillFill,
+				Padding: gogui.NoPadding,
+				Content: []gogui.View{
+					widgets.Placed(whole, l.Rest().Saver(whole, func() { a.o.Shell.Remove(v) })),
+				},
+			})
+		}
+	}
 	if f := a.o.Firmware; f != nil && f.On() && f.Rests() && a.o.Settings().Idle.Tessera() &&
 		!night.Quiet() {
 		v.Close()

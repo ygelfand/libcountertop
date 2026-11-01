@@ -61,6 +61,7 @@ type Controller struct {
 	closed   bool
 
 	Changed hook.Hook[Access]
+	Linked  hook.Hook[struct{}]
 
 	mu      sync.Mutex
 	links   map[sender]*link
@@ -342,6 +343,7 @@ func (h *Controller) settle(conn sender, access Access, integration Integration,
 	if moved {
 		h.Changed.Emit(overall)
 	}
+	h.Linked.Emit(struct{}{})
 }
 
 func (h *Controller) lost(conn sender) {
@@ -363,6 +365,7 @@ func (h *Controller) lost(conn sender) {
 	if moved {
 		h.Changed.Emit(access)
 	}
+	h.Linked.Emit(struct{}{})
 	time.AfterFunc(dropHold, func() { h.expire(at) })
 }
 

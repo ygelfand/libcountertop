@@ -45,6 +45,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/calendar"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/homecontrol"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/lovelaceview"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/nws"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/todo"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/weather"
@@ -180,6 +181,7 @@ type Options struct {
 	Visuals   homeview.Visuals
 	Tessera   *tesseraview.View
 	Firmware  *firmwareview.View
+	Lovelace  *lovelaceview.Feature
 	Forecast  Weather
 	Warnings  weatherview.Alerts
 	Alarms    alarmview.Alarms
@@ -291,6 +293,8 @@ func New(o Options) *App {
 		Saver:           o.Saver,
 		Standby:         standby(o.Firmware),
 		Visuals:         o.Visuals,
+		Lovelace:        lovelaceRows(o.Lovelace),
+		Reload:          lovelaceReload(o.Lovelace),
 		UI:              o.UI,
 	})
 	if o.Tessera != nil {

@@ -494,7 +494,8 @@ home.saver.off: Attiva lo standby automatico nelle impostazioni schermo di Tesse
 mode.native: Nativa
 mode.tessera: Tessera
 mode.tessera_native: Tessera nativa
-mode.firmware: Tessera integrata
+mode.firmware: Tessera
+mode.lovelace: Home Assistant
 home.noarea: Nessuna area
 home.none: Nessuno
 home.off: Home Assistant disattivato
@@ -521,10 +522,10 @@ home.setting.tessera.home_after_idle: "Tessera: torna alla home dopo il salvasch
 home.setting.tessera.landscape: "Tessera: schermo orizzontale"
 home.setting.tessera.portrait: "Tessera: schermo verticale"
 home.setting.tessera.rows: Riquadri Tessera sul lato corto
-home.setting.tessera.themed: "Tessera integrata: usa il tema di questo dispositivo"
-home.setting.tessera.turn: "Tessera integrata: transizione pagina"
-home.setting.tessera.bottom: "Tessera integrata: scorri dal basso verso l'alto"
-home.setting.tessera.follow: "Tessera integrata: la pagina segue il dito"
+home.setting.tessera.themed: "Tessera: usa il tema di questo dispositivo"
+home.setting.tessera.turn: "Tessera: transizione pagina"
+home.setting.tessera.bottom: "Tessera: scorri dal basso verso l'alto"
+home.setting.tessera.follow: "Tessera: la pagina segue il dito"
 home.tab.labels: Etichette
 home.tab.manual: Manuale
 home.tessera.grid: Griglia
@@ -1166,6 +1167,22 @@ screen.setting.lock_pin: Blocco impostazioni
 lock.title: Impostazioni
 lock.wait: "Riprova tra {{.Seconds}} s"
 lock.wrong: PIN errato
+lovelace.default: Dashboard predefinita
+lovelace.first: Prima vista
+lovelace.hint.integration: Installa l'integrazione EchoLocal in Home Assistant
+lovelace.hint.allow: Consenti un utente nelle opzioni dell'integrazione EchoLocal in Home Assistant
+lovelace.hint.user: Scegli un utente in Impostazioni › Dashboard
+lovelace.group.lovelace: Dashboard di Home Assistant
+lovelace.entity.user: Utente della dashboard
+lovelace.setting.user: Mostra come
+lovelace.entity.dashboard: Dashboard
+lovelace.setting.dashboard: Dashboard
+lovelace.entity.view: Vista della dashboard
+lovelace.setting.view: Vista
+lovelace.entity.saver_dashboard: Dashboard del salvaschermo
+lovelace.setting.saver_dashboard: Dashboard del salvaschermo
+lovelace.entity.saver_view: Vista del salvaschermo
+lovelace.setting.saver_view: Vista del salvaschermo
 rtsp.entity.password: Password RTSP
 rtsp.entity.username: Nome utente RTSP
 rtsp.group.rtsp: RTSP
@@ -1479,6 +1496,7 @@ update.versions.confirm: "Installa {{.Version}}"
 update.versions.installed: Installata
 update.versions.what: "{{.Running}} verrà sostituita da {{.Version}} e l'app si riavvierà."
 update.versions.none: Nessun'altra versione
+upgrade.engine: il motore cast
 upgrade.installing: Installazione…
 upgrade.line: Aggiornamento a {{.Version}} · {{.Status}}
 upgrade.percent: "{{.N}}%"
