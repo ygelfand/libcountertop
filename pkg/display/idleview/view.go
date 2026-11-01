@@ -85,7 +85,11 @@ func Dark(idle config.Idle, clock config.Face, n config.Night) config.Idle {
 
 func (v *View) read() Settings {
 	cfg := v.options.Read()
-	cfg.Idle = Dark(cfg.Idle, cfg.Clock.Face, v.Night())
+	night := v.Night()
+	if cfg.Idle.ScreenOff() {
+		night = config.NightOff
+	}
+	cfg.Idle = Dark(cfg.Idle, cfg.Clock.Face, night)
 	return cfg
 }
 

@@ -104,8 +104,11 @@ func TestNoneThenPhotosAreOfferedFirst(t *testing.T) {
 	row := NewTable().MustRow("visual1")
 	labels := row.Labels()
 	if labels[0] != KindLabel("") || labels[1] != KindLabel(schema.IdlePhotos) ||
-		len(labels) != len(visual.Built())+2 {
+		len(labels) != len(visual.Built())+3 || labels[len(labels)-1] != KindLabel(schema.IdleOff) {
 		t.Errorf("labels %v", labels)
+	}
+	if second := NewTable().MustRow("visual2").Labels(); len(second) != len(visual.Built())+2 {
+		t.Errorf("visual2 labels %v", second)
 	}
 	if k := row.ValueOf(KindLabel("orb")); k != "orb" {
 		t.Errorf("orb by label: %q", k)
@@ -220,6 +223,19 @@ func TestEverySettingReachesBothSides(t *testing.T) {
 	if r.sel("visual2").Get() != KindLabel("orb") ||
 		r.sel("visual2.source").Get() != schema.SourceMic.Label() {
 		t.Error("the second visual's entities did not follow")
+	}
+}
+
+func TestScreenOffIsOnlyTheFirstVisual(t *testing.T) {
+	r := newRig(t)
+	r.SetKind(1, schema.IdleOff)
+	r.SetKind(0, schema.IdleOff)
+	got := r.store.Get()
+	if got.First.Kind != schema.IdleOff || !got.ScreenOff() {
+		t.Errorf("the first visual saved as %+v", got.First)
+	}
+	if got.Second.Kind == schema.IdleOff {
+		t.Error("the second visual took Screen off")
 	}
 }
 

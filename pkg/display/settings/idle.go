@@ -317,7 +317,16 @@ func (p *IdlePages) Visual(slot int) *shell.Page {
 			Preview: p.options.Previews.Painted("photos", PhotosTile),
 		}
 		pick := func(int) { p.options.Idle.SetKind(slot, config.IdlePhotos) }
-		return slices.Insert(cells, 1, photo), slices.Insert(acts, 1, pick)
+		cells, acts = slices.Insert(cells, 1, photo), slices.Insert(acts, 1, pick)
+		if slot == 0 {
+			cells = append(cells, menu.Cell{
+				Label:   say.T("idle.off"),
+				Chosen:  p.SlotVisual(slot).Kind == config.IdleOff,
+				Preview: p.options.Previews.Painted("screen-off", OffTile),
+			})
+			acts = append(acts, func(int) { p.options.Idle.SetKind(slot, config.IdleOff) })
+		}
+		return cells, acts
 	}
 	return page
 }

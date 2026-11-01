@@ -27,11 +27,16 @@ type IdleVisual struct {
 	Source Source `json:"source"`
 }
 
-const IdlePhotos = "photos"
+const (
+	IdlePhotos = "photos"
+	IdleOff    = "off"
+)
 
-func (v IdleVisual) On() bool { return v.Kind != "" }
+func (v IdleVisual) On() bool { return v.Kind != "" && v.Kind != IdleOff }
 
 func (v IdleVisual) Photos() bool { return v.Kind == IdlePhotos }
+
+func (c Idle) ScreenOff() bool { return c.First.Kind == IdleOff }
 
 func IdlePhotoSpans() []Delay {
 	return []Delay{Delay10s, Delay15s, Delay30s, Delay1m, Delay2m, Delay5m}

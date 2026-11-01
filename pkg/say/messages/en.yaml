@@ -563,6 +563,7 @@ idle.night.lux: Darker than
 idle.night.lux.value: "{{.N}} lx"
 idle.night.mode: Mode
 idle.none: None
+idle.off: Screen off
 idle.setting.after: Idle screen after
 idle.setting.align: Idle clock horizontal position
 idle.setting.face: Idle clock face

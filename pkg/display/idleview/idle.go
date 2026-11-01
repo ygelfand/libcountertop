@@ -126,6 +126,16 @@ func (i *Idle) dusk(c schema.Idle) {
 	showing := i.showing()
 	after := c.NightAfter.After()
 
+	if c.ScreenOff() {
+		switch {
+		case showing:
+			i.setNight(schema.NightOff)
+		case on:
+			i.setNight(schema.NightNone)
+		}
+		return
+	}
+
 	switch {
 	case on && !showing:
 		i.setNight(schema.NightNone)
@@ -236,6 +246,8 @@ func KindLabel(kind string) string {
 		return say.T("idle.none")
 	case schema.IdlePhotos:
 		return say.T("photos.page")
+	case schema.IdleOff:
+		return say.T("idle.off")
 	}
 	return visual.Kind(kind).Label()
 }
@@ -311,7 +323,8 @@ func slot(c *schema.Idle, n int) *schema.IdleVisual {
 }
 
 func (i *Idle) SetKind(n int, kind string) {
-	if kind != "" && kind != schema.IdlePhotos &&
+	off := kind == schema.IdleOff && n == 0
+	if kind != "" && kind != schema.IdlePhotos && !off &&
 		!slices.Contains(visual.Built(), visual.Kind(kind)) {
 		return
 	}

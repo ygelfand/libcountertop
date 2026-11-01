@@ -13,6 +13,8 @@ import (
 
 func NoneTile(s ui.Surface, at ui.Rect, p theme.Theme) { ui.FillRect(s, at, p.Surface) }
 
+func OffTile(s ui.Surface, at ui.Rect, _ theme.Theme) { ui.FillRect(s, at, theme.Color{}) }
+
 func PhotosTile(s ui.Surface, at ui.Rect, _ theme.Theme) {
 	ui.FillRect(s, at, theme.Color{R: 0x5d, G: 0x9c, B: 0xd8})
 	sun := min(at.W, at.H) / 5

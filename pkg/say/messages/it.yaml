@@ -564,6 +564,7 @@ idle.night.lux: Più buio di
 idle.night.lux.value: "{{.N}} lx"
 idle.night.mode: Modalità
 idle.none: Nessuno
+idle.off: Schermo spento
 idle.setting.after: Schermo inattivo dopo
 idle.setting.align: Posizione orizzontale orologio inattivo
 idle.setting.face: Quadrante orologio inattivo

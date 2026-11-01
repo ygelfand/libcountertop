@@ -92,6 +92,12 @@ func kindRow(s Setting, n int) Setting {
 	for _, k := range visual.Built() {
 		s.Options = append(s.Options, setting.Option{Value: string(k), Label: k.Label()})
 	}
+	if n == 0 {
+		s.Options = append(
+			s.Options,
+			setting.Option{Value: schema.IdleOff, Label: KindLabel(schema.IdleOff)},
+		)
+	}
 	s.Read = func(c *schema.Idle) string {
 		if k := slot(c, n).Kind; k != "" {
 			return k
