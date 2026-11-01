@@ -886,6 +886,8 @@ doorbell.entity.tab: Scheda dashboard campanello
 doorbell.setting.tab: Scheda dashboard
 doorbell.add: Aggiungi campanello
 doorbell.app: Campanello
+doorbell.camera.pictures: Foto degli eventi da
+doorbell.camera.pictures.hint: Una videocamera di Home Assistant che inquadra questa porta
 doorbell.camera.title: Videocamera Home Assistant
 doorbell.cancel: Annulla
 doorbell.field.host: Indirizzo IP o nome host
@@ -1174,6 +1176,9 @@ lovelace.first: Prima vista
 lovelace.hint.integration: Installa l'integrazione EchoLocal in Home Assistant
 lovelace.hint.allow: Consenti un utente nelle opzioni dell'integrazione EchoLocal in Home Assistant
 lovelace.hint.user: Scegli un utente in Impostazioni › Dashboard
+lovelace.loading: Caricamento di Home Assistant
+lovelace.unreachable: Home Assistant non è raggiungibile
+lovelace.unreachable.retry: Nuovo tentativo automatico · tocca per riprovare ora
 lovelace.group.lovelace: Dashboard di Home Assistant
 lovelace.entity.user: Utente della dashboard
 lovelace.setting.user: Mostra come

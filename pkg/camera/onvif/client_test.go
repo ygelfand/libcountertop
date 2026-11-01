@@ -2,46 +2,27 @@ package onvif
 
 import (
 	"context"
+	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/network/digest"
 )
 
-func TestFindReadsTheDeviceAddressFromTheProbeMatch(t *testing.T) {
-	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	want := "http://127.0.0.1:8123/onvif/device_service"
-	go func() {
-		buf := make([]byte, maxDatagram)
-		n, from, err := conn.ReadFromUDP(buf)
-		if err != nil {
-			return
+func TestDeviceURLUsesTheTypedAddress(t *testing.T) {
+	for _, tt := range []struct{ host, want string }{
+		{"10.10.70.1", "http://10.10.70.1/onvif/device_service"},
+		{"10.0.0.9:2020", "http://10.0.0.9:2020/onvif/device_service"},
+		{"door.lan", "http://door.lan/onvif/device_service"},
+		{"fd00::5", "http://[fd00::5]/onvif/device_service"},
+		{"[fd00::5]:8000", "http://[fd00::5]:8000/onvif/device_service"},
+	} {
+		if got := DeviceURL(tt.host); got != tt.want {
+			t.Errorf("DeviceURL(%q) = %q, want %q", tt.host, got, tt.want)
 		}
-		p, ok := ParseProbe(buf[:n])
-		if !ok {
-			return
-		}
-		_, _ = conn.WriteToUDP(Matches(p, NewUUID(), want, "door"), from)
-	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	got, err := findAt(ctx, conn.LocalAddr().String())
-	if err != nil || got != want {
-		t.Fatalf("got %q, %v; want %q", got, err, want)
-	}
-}
-
-func TestFindWithAPortSkipsDiscovery(t *testing.T) {
-	got, err := Find(context.Background(), "10.0.0.9:2020")
-	if want := "http://10.0.0.9:2020/onvif/device_service"; err != nil || got != want {
-		t.Errorf("got %q, %v; want %q", got, err, want)
 	}
 }
 
@@ -114,6 +95,34 @@ func TestTheClientFollowsCapabilitiesToTheStreamAndEvents(t *testing.T) {
 	}
 	if _, err := Dial(ctx, srv.URL+"/onvif/device_service", "", ""); err != ErrRefused {
 		t.Fatalf("no credentials gave %v, want ErrRefused", err)
+	}
+}
+
+func TestStillAnswersADigestChallenge(t *testing.T) {
+	gate := digest.New("door")
+	creds := digest.Credentials(func() (string, string) { return "admin", "secret" })
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !gate.Allows(r.Header.Get("Authorization"), r.Method, creds) {
+			w.Header().Set("WWW-Authenticate", gate.Header())
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = io.WriteString(w, "jpeg")
+	}))
+	defer srv.Close()
+	for _, tt := range []struct {
+		pass string
+		want string
+		err  error
+	}{
+		{pass: "secret", want: "jpeg"},
+		{pass: "wrong", err: ErrRefused},
+	} {
+		c := &Client{http: srv.Client(), user: "admin", pass: tt.pass}
+		got, err := c.Still(context.Background(), srv.URL+"/snap.jpg?channel=1")
+		if string(got) != tt.want || !errors.Is(err, tt.err) {
+			t.Errorf("password %q: got %q, %v; want %q, %v", tt.pass, got, err, tt.want, tt.err)
+		}
 	}
 }
 

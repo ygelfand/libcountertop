@@ -886,6 +886,8 @@ doorbell.entity.tab: Doorbell dashboard tab
 doorbell.setting.tab: Dashboard tab
 doorbell.add: Add doorbell
 doorbell.app: Doorbell
+doorbell.camera.pictures: Event pictures from
+doorbell.camera.pictures.hint: A Home Assistant camera that shows this door
 doorbell.camera.title: Home Assistant camera
 doorbell.cancel: Cancel
 doorbell.field.host: IP address or hostname
@@ -1174,6 +1176,9 @@ lovelace.first: First view
 lovelace.hint.integration: Install the EchoLocal integration in Home Assistant
 lovelace.hint.allow: Allow a user under the EchoLocal integration's options in Home Assistant
 lovelace.hint.user: Choose a user under Settings › Dashboard
+lovelace.loading: Loading Home Assistant
+lovelace.unreachable: Home Assistant isn't reachable
+lovelace.unreachable.retry: Trying again automatically · tap to try now
 lovelace.group.lovelace: Home Assistant dashboard
 lovelace.entity.user: Dashboard user
 lovelace.setting.user: Show as

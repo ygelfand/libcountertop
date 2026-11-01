@@ -110,6 +110,20 @@ func (d *Doorbell) Snapshot(ctx context.Context, slot int) ([]byte, error) {
 	if !ok {
 		return nil, errUnsupported
 	}
+	switch door.Video {
+	case schema.VideoReolink:
+		return d.reolinkSnapshot(ctx, slot, door)
+	case schema.VideoONVIF:
+		return onvifSnapshot(ctx, door)
+	}
+	return nil, errUnsupported
+}
+
+func (d *Doorbell) reolinkSnapshot(
+	ctx context.Context,
+	slot int,
+	door schema.DoorbellDoor,
+) ([]byte, error) {
 	if !door.Signed() {
 		return nil, ErrNoPassword
 	}

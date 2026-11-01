@@ -17,13 +17,13 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/fetch"
+	"github.com/ygelfand/libcountertop/pkg/network/digest"
 )
 
 const (
-	discoveryPort = "3702"
-	findWait      = 3 * time.Second
 	callWait      = 20 * time.Second
 	maxReply      = 1 << 20
+	maxStill      = 8 << 20
 	pullFor       = 10 * time.Second
 	pullLimit     = 20
 	subscribeLife = 10 * time.Minute
@@ -33,7 +33,6 @@ var subscribeFor = fmt.Sprintf("PT%dS", int(subscribeLife.Seconds()))
 
 var (
 	ErrRefused    = errors.New("onvif: wrong user or password")
-	ErrNotFound   = errors.New("onvif: no device answered discovery")
 	ErrNoService  = errors.New("onvif: the device does not offer that service")
 	ErrNoProfiles = errors.New("onvif: the device has no media profiles")
 )
@@ -67,67 +66,11 @@ type PullPoint struct {
 	at string
 }
 
-func Find(ctx context.Context, host string) (string, error) {
-	if _, _, err := net.SplitHostPort(host); err == nil {
-		return "http://" + host + DevicePath, nil
+func DeviceURL(host string) string {
+	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
+		host = "[" + host + "]"
 	}
-	return findAt(ctx, net.JoinHostPort(host, discoveryPort))
-}
-
-func findAt(ctx context.Context, addr string) (string, error) {
-	to, err := net.ResolveUDPAddr("udp4", addr)
-	if err != nil {
-		return "", err
-	}
-	conn, err := net.ListenUDP("udp4", nil)
-	if err != nil {
-		return "", err
-	}
-	defer conn.Close()
-	deadline := time.Now().Add(findWait)
-	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
-		deadline = d
-	}
-	_ = conn.SetDeadline(deadline)
-	probe := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>`+
-		`<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery" xmlns:dn="http://www.onvif.org/ver10/network/wsdl">`+
-		`<s:Header><a:MessageID>urn:uuid:%s</a:MessageID><a:To s:mustUnderstand="1">urn:schemas-xmlsoap-org:ws:2005:04:discovery</a:To>`+
-		`<a:Action s:mustUnderstand="1">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</a:Action></s:Header>`+
-		`<s:Body><d:Probe><d:Types>dn:NetworkVideoTransmitter</d:Types></d:Probe></s:Body></s:Envelope>`, NewUUID())
-	if _, err := conn.WriteToUDP([]byte(probe), to); err != nil {
-		return "", err
-	}
-	buf := make([]byte, maxDatagram)
-	for {
-		n, from, err := conn.ReadFromUDP(buf)
-		if err != nil {
-			return "", errors.Join(ErrNotFound, err)
-		}
-		if !from.IP.Equal(to.IP) {
-			continue
-		}
-		var m struct {
-			XAddrs string `xml:"Body>ProbeMatches>ProbeMatch>XAddrs"`
-		}
-		if xml.Unmarshal(buf[:n], &m) != nil {
-			continue
-		}
-		if x := pickAddr(strings.Fields(m.XAddrs), to.IP.String()); x != "" {
-			return x, nil
-		}
-	}
-}
-
-func pickAddr(addrs []string, host string) string {
-	for _, a := range addrs {
-		if u, err := url.Parse(a); err == nil && u.Hostname() == host {
-			return a
-		}
-	}
-	if len(addrs) > 0 {
-		return addrs[0]
-	}
-	return ""
+	return "http://" + host + DevicePath
 }
 
 func Dial(ctx context.Context, device, user, pass string) (*Client, error) {
@@ -221,6 +164,72 @@ func (c *Client) StreamURI(ctx context.Context, token string) (string, error) {
 		return "", ErrNoService
 	}
 	return strings.TrimSpace(r.URI), nil
+}
+
+func (c *Client) SnapshotURI(ctx context.Context, token string) (string, error) {
+	if c.media == "" {
+		return "", ErrNoService
+	}
+	var r struct {
+		URI string `xml:"Body>GetSnapshotUriResponse>MediaUri>Uri"`
+	}
+	body := `<GetSnapshotUri xmlns="http://www.onvif.org/ver10/media/wsdl">` +
+		`<ProfileToken>` + escape(token) + `</ProfileToken></GetSnapshotUri>`
+	if err := c.call(ctx, c.media, "", body, &r); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(r.URI) == "" {
+		return "", ErrNoService
+	}
+	return strings.TrimSpace(r.URI), nil
+}
+
+func (c *Client) Still(ctx context.Context, uri string) ([]byte, error) {
+	at, err := url.Parse(uri)
+	if err != nil {
+		return nil, fmt.Errorf("onvif: snapshot address %q: %w", uri, err)
+	}
+	resp, err := c.get(ctx, uri, "")
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		challenge := resp.Header.Get("WWW-Authenticate")
+		_ = resp.Body.Close()
+		if challenge == "" || c.user == "" {
+			return nil, ErrRefused
+		}
+		answer := digest.Answer(challenge, http.MethodGet, at.RequestURI(), c.user, c.pass)
+		if resp, err = c.get(ctx, uri, answer); err != nil {
+			return nil, err
+		}
+	}
+	defer resp.Body.Close()
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized:
+		return nil, ErrRefused
+	case resp.StatusCode != http.StatusOK:
+		return nil, fmt.Errorf("onvif: snapshot: %s", resp.Status)
+	}
+	pic, err := io.ReadAll(io.LimitReader(resp.Body, maxStill+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(pic) > maxStill {
+		return nil, fmt.Errorf("onvif: snapshot is larger than %d bytes", maxStill)
+	}
+	return pic, nil
+}
+
+func (c *Client) get(ctx context.Context, uri, authorization string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
+	return c.http.Do(req)
 }
 
 func (c *Client) Subscribe(ctx context.Context) (*PullPoint, error) {

@@ -165,8 +165,13 @@ func (f *form) build() ([]menu.Row, []func(int)) {
 	if door.Events != schema.FeedAssistant && door.Events != schema.FeedAuto {
 		return rows, taps
 	}
-	if door.Video != schema.VideoAssistant {
-		camera()
+	if door.Video == schema.VideoRTSP {
+		add(menu.Row{
+			Label: say.T("doorbell.camera.pictures"),
+			Hint:  say.T("doorbell.camera.pictures.hint"),
+			Kind:  menu.Chevron,
+			Value: door.Camera,
+		}, func(int) { f.v.o.Shell.Push(f.cameraPage()) })
 	}
 	for _, s := range sensorKinds {
 		title := say.T("doorbell.sensor." + s.field)

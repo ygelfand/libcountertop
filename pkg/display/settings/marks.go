@@ -1,19 +1,16 @@
 package settings
 
 import (
-	_ "embed"
 	"image"
 	"slices"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
-
-//go:embed homeassistant.svg
-var homeAssistantMark string
 
 type ModeMarks struct {
 	Tessera string
@@ -30,7 +27,7 @@ func (m ModeMarks) mark(mode string) menu.Mark {
 	case string(config.HomeTessera), string(config.HomeFirmware):
 		return menu.Mark{SVG: m.Tessera}
 	case string(config.HomeLovelace):
-		return menu.Mark{SVG: homeAssistantMark}
+		return menu.Mark{SVG: icons.HomeAssistant}
 	case string(config.HomeNative):
 		if m.Native != nil {
 			return menu.Mark{Image: m.Native()}

@@ -15,11 +15,7 @@ func onvifDevice(ctx context.Context, door schema.DoorbellDoor) (*onvif.Client, 
 	if door.Host == "" {
 		return nil, errUnsupported
 	}
-	device, err := onvif.Find(ctx, door.Host)
-	if err != nil {
-		return nil, errors.Join(ErrUnreachable, err)
-	}
-	c, err := onvif.Dial(ctx, device, door.User, door.Password)
+	c, err := onvif.Dial(ctx, onvif.DeviceURL(door.Host), door.User, door.Password)
 	if err != nil && !errors.Is(err, onvif.ErrRefused) {
 		return nil, errors.Join(ErrUnreachable, err)
 	}
@@ -46,6 +42,24 @@ func streamURI(ctx context.Context, door schema.DoorbellDoor) (string, error) {
 		return "", errors.Join(ErrUnreachable, err)
 	}
 	return uri, nil
+}
+
+func onvifSnapshot(ctx context.Context, door schema.DoorbellDoor) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, snapWait)
+	defer cancel()
+	c, err := onvifDevice(ctx, door)
+	if err != nil {
+		return nil, err
+	}
+	profiles, err := channelProfiles(ctx, c, door.Channel)
+	if err != nil {
+		return nil, err
+	}
+	uri, err := c.SnapshotURI(ctx, pickProfile(profiles, door.Stream).Token)
+	if err != nil {
+		return nil, errors.Join(ErrUnreachable, err)
+	}
+	return c.Still(ctx, uri)
 }
 
 func channelProfiles(

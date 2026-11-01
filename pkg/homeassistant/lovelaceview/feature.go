@@ -47,8 +47,10 @@ type Feature struct {
 
 	Listed hook.Hook[struct{}]
 
-	mu   sync.Mutex
-	list homeassistant.Dashboards
+	mu     sync.Mutex
+	list   homeassistant.Dashboards
+	denied bool
+	ready  bool
 }
 
 func New(o FeatureOptions) *Feature {
@@ -87,7 +89,13 @@ func New(o FeatureOptions) *Feature {
 		},
 		OnPress: f.Refresh,
 	}
-	o.Controller.Linked.Listen(func(struct{}) { safe.Go("dashboard lists", f.refresh) })
+	o.Controller.Linked.Listen(func(struct{}) {
+		if f.cameBack() {
+			f.Home.Retry()
+			f.Saver.Retry()
+		}
+		safe.Go("dashboard lists", f.refresh)
+	})
 	safe.Go("dashboard lists", f.refresh)
 	return f
 }
@@ -157,6 +165,15 @@ func (f *Feature) Wake() { f.Saver.Set(false) }
 
 func (f *Feature) Ready() bool { return f.o.Controller.Speaks(homeassistant.DashboardProtocol) }
 
+func (f *Feature) cameBack() bool {
+	now := f.Ready()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	back := now && !f.ready
+	f.ready = now
+	return back
+}
+
 func (f *Feature) refresh() {
 	if !f.Ready() {
 		return
@@ -200,15 +217,30 @@ func (f *Feature) hint() string {
 		return say.T("lovelace.hint.allow")
 	}
 	for _, u := range f.list.Users {
-		if u.ID == user {
-			return ""
+		if u.ID != user {
+			continue
 		}
+		if f.denied {
+			return say.T("lovelace.hint.allow")
+		}
+		return ""
 	}
 	return say.T("lovelace.hint.user")
 }
 
 func (f *Feature) token(ctx context.Context) (Token, error) {
 	t, err := f.o.Controller.DashboardToken(ctx, f.o.Node(), f.o.Settings.Read().User)
+	var refused *homeassistant.Failed
+	f.mu.Lock()
+	was := f.denied
+	f.denied = errors.As(err, &refused)
+	f.mu.Unlock()
+	if f.denied && !was {
+		safe.Go("dashboard lists", f.refresh)
+	}
+	if was != f.denied && f.o.Redraw != nil {
+		f.o.Redraw()
+	}
 	if err != nil {
 		return Token{}, err
 	}
@@ -217,6 +249,13 @@ func (f *Feature) token(ctx context.Context) (Token, error) {
 
 func (f *Feature) store(s Setting, v string) error {
 	err := setting.Store(f.o.Settings, s, v)
+	if err == nil && s.Name == "user" {
+		f.mu.Lock()
+		f.denied = false
+		f.mu.Unlock()
+		f.Home.Restart()
+		f.Saver.Restart()
+	}
 	if f.o.Redraw != nil {
 		f.o.Redraw()
 	}

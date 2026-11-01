@@ -12,6 +12,9 @@ import (
 //go:embed mdi.ttf
 var MDI []byte
 
+//go:embed homeassistant.svg
+var HomeAssistant string
+
 const Family = "Material Design Icons"
 
 const (
