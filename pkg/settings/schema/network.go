@@ -4,6 +4,7 @@ import "encoding/json"
 
 type Network struct {
 	Verify  bool   `json:"verify"`
+	ViaHome bool   `json:"via_home,omitempty"`
 	Address string `json:"address,omitempty"`
 	HomeKey string `json:"home_key,omitempty"`
 }

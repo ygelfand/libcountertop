@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -129,6 +130,14 @@ func Asset(repo, tag, name string) string {
 var files string
 
 var ErrNoFiles = errors.New("releases: this build has no file host")
+
+func Hosts() []string {
+	out := []string{"github.com", "api.github.com"}
+	if u, err := url.Parse(files); err == nil && u.Hostname() != "" {
+		out = append(out, u.Hostname())
+	}
+	return out
+}
 
 func File(folder, name string) (string, error) {
 	if files == "" {

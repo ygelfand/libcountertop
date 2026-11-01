@@ -641,8 +641,10 @@ network.mac: MAC address
 network.router: Router
 network.setting.home_key: Home key
 network.setting.verify: Verify certificates
+network.setting.via_home: Download through Home Assistant
 network.ssid: Wi-Fi network
 network.title: Network & internet
+network.via_home.hint: Updates fetched by Home Assistant
 night.clock: Dim to a clock
 night.dim: Dim
 night.none: Nothing

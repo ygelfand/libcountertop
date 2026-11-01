@@ -14,12 +14,12 @@ import (
 type NetworkState struct {
 	SSID, Address, MAC, Router string
 	Renew                      time.Time
-	Verify                     bool
+	Verify, ViaHome            bool
 }
 
 func NetworkPage(
 	read func() NetworkState,
-	setVerify func(bool),
+	setVerify, setViaHome func(bool),
 	web *WebAccess,
 	stack *shell.Shell,
 ) *shell.Page {
@@ -54,6 +54,14 @@ func NetworkPage(
 			},
 		)
 		acts = append(acts, func(int) { setVerify(!c.Verify) })
+		rows = append(rows, menu.Row{
+			Glyph: gogui.IconDownload,
+			Label: say.T("network.setting.via_home"),
+			Hint:  say.T("network.via_home.hint"),
+			Kind:  menu.Toggle,
+			On:    c.ViaHome,
+		})
+		acts = append(acts, func(int) { setViaHome(!c.ViaHome) })
 		if web != nil {
 			rows = append(rows, menu.Row{
 				Glyph: gogui.IconGlobe,

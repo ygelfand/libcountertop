@@ -7,7 +7,20 @@ import (
 	"time"
 )
 
-var skip atomic.Bool
+var (
+	skip  atomic.Bool
+	route atomic.Pointer[Route]
+)
+
+type Route func(r *http.Request) http.RoundTripper
+
+func Through(r Route) {
+	if r == nil {
+		route.Store(nil)
+		return
+	}
+	route.Store(&r)
+}
 
 func Verify(on bool) { skip.Store(!on) }
 
@@ -27,6 +40,11 @@ type policy struct {
 }
 
 func (p *policy) RoundTrip(r *http.Request) (*http.Response, error) {
+	if to := route.Load(); to != nil {
+		if t := (*to)(r); t != nil {
+			return t.RoundTrip(r)
+		}
+	}
 	if skip.Load() {
 		return p.lax.RoundTrip(r)
 	}

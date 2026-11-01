@@ -641,8 +641,10 @@ network.mac: Indirizzo MAC
 network.router: Router
 network.setting.home_key: Chiave casa
 network.setting.verify: Verifica certificati
+network.setting.via_home: Scarica tramite Home Assistant
 network.ssid: Rete Wi-Fi
 network.title: Rete e Internet
+network.via_home.hint: Aggiornamenti scaricati da Home Assistant
 night.clock: Attenua a orologio
 night.dim: Attenua
 night.none: Niente
