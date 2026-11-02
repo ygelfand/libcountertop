@@ -8,6 +8,16 @@ type Lovelace struct {
 	View           LovelaceView      `json:"view"`
 	SaverDashboard LovelaceDashboard `json:"saver_dashboard"`
 	SaverView      LovelaceView      `json:"saver_view"`
+	Theme          LovelaceTheme     `json:"theme,omitempty"`
+}
+
+type LovelaceTheme string
+
+func (t LovelaceTheme) Label() string {
+	if t == "" {
+		return say.T("lovelace.theme.default")
+	}
+	return string(t)
 }
 
 type LovelaceDashboard string

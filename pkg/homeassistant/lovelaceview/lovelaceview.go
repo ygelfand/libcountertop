@@ -18,6 +18,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/compositor"
 	backend "github.com/ygelfand/libcountertop/pkg/display/gogui"
 	"github.com/ygelfand/libcountertop/pkg/display/icons"
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/cast/engine"
@@ -50,6 +51,7 @@ type Options struct {
 	Name   string
 	Engine *engine.Host
 	Path   func() string
+	Theme  func() string
 	Token  func(context.Context) (Token, error)
 	Hint   func() string
 	Redraw func()
@@ -67,6 +69,7 @@ type View struct {
 	w, h     int
 	down     bool
 	pictured bool
+	scheme   string
 	failed   bool
 	healing  bool
 	wait     time.Duration
@@ -230,6 +233,11 @@ func (v *View) fit(at ui.Rect) {
 	if moved {
 		v.shown = want
 	}
+	scheme := currentScheme()
+	recolor := page != nil && scheme != v.scheme
+	if recolor {
+		v.scheme = scheme
+	}
 	v.mu.Unlock()
 	if page == nil {
 		return
@@ -237,9 +245,35 @@ func (v *View) fit(at ui.Rect) {
 	if changed && at.W > 0 && at.H > 0 {
 		page.Window.Resize(at.W, at.H)
 	}
+	if recolor {
+		_ = page.Call("Emulation.setEmulatedMedia", map[string]any{
+			"features": []map[string]string{{"name": "prefers-color-scheme", "value": scheme}},
+		})
+	}
 	if moved {
 		_ = page.Navigate(want)
 	}
+}
+
+func (v *View) themeScript() string {
+	name := ""
+	if v.o.Theme != nil {
+		name = v.o.Theme()
+	}
+	if name == "" {
+		return `try { localStorage.removeItem("selectedTheme"); } catch (e) {}`
+	}
+	chosen, _ := json.Marshal(map[string]string{"theme": name})
+	quoted, _ := json.Marshal(string(chosen))
+	return `try { localStorage.setItem("selectedTheme", ` + string(quoted) + `); } catch (e) {}`
+}
+
+func currentScheme() string {
+	bg := gogui.CurrentTheme().Cfg.ColorBackground
+	if theme.Dark(theme.Color{R: bg.R, G: bg.G, B: bg.B}) {
+		return "dark"
+	}
+	return "light"
 }
 
 func (v *View) address() string {
@@ -280,6 +314,7 @@ func (v *View) session(ctx context.Context) error {
 		{"Page.enable", nil},
 		{"Runtime.addBinding", map[string]any{"name": binding}},
 		{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": bridge}},
+		{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": v.themeScript()}},
 	} {
 		if err := page.Call(call.method, call.params); err != nil {
 			return err
@@ -294,6 +329,7 @@ func (v *View) session(ctx context.Context) error {
 		v.mu.Lock()
 		if v.page == page {
 			v.page, v.shown, v.pictured, v.failed, v.healing, v.wait = nil, "", false, false, false, 0
+			v.scheme = ""
 			v.stopRetry()
 		}
 		v.mu.Unlock()
@@ -390,6 +426,9 @@ func (v *View) navigated(page *engine.Page, raw json.RawMessage) {
 	if nav.Frame.Unreachable == "" {
 		v.healing, v.wait = v.failed, 0
 		v.mu.Unlock()
+		if page != nil {
+			_ = page.Call("Page.resetNavigationHistory", nil)
+		}
 		return
 	}
 	v.failed, v.healing = true, false

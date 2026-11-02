@@ -64,6 +64,7 @@ func New(o FeatureOptions) *Feature {
 		Name:   "home",
 		Engine: o.Engine,
 		Path:   func() string { c := o.Settings.Read(); return path(c.Dashboard, c.View) },
+		Theme:  func() string { return string(o.Settings.Read().Theme) },
 		Token:  f.token,
 		Hint:   f.hint,
 		Redraw: o.Redraw,
@@ -75,6 +76,7 @@ func New(o FeatureOptions) *Feature {
 			c := o.Settings.Read()
 			return path(c.SaverDashboard, c.SaverView)
 		},
+		Theme:  func() string { return string(o.Settings.Read().Theme) },
 		Token:  f.token,
 		Hint:   f.hint,
 		Redraw: o.Redraw,
@@ -253,6 +255,8 @@ func (f *Feature) store(s Setting, v string) error {
 		f.mu.Lock()
 		f.denied = false
 		f.mu.Unlock()
+	}
+	if err == nil && (s.Name == "user" || s.Name == "theme") {
 		f.Home.Restart()
 		f.Saver.Restart()
 	}
@@ -278,6 +282,16 @@ func (f *Feature) dashboards() []setting.Option {
 	out := make([]setting.Option, 0, len(f.list.Dashboards))
 	for _, d := range f.list.Dashboards {
 		out = append(out, setting.Option{Value: d.Path, Label: d.Title})
+	}
+	return out
+}
+
+func (f *Feature) themes() []setting.Option {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]setting.Option, 0, len(f.list.Themes))
+	for _, t := range f.list.Themes {
+		out = append(out, setting.Option{Value: t.Name, Label: t.Name})
 	}
 	return out
 }
@@ -355,6 +369,11 @@ func (f *Feature) table() *setting.Table[schema.Lovelace] {
 			},
 			first,
 			func(c *schema.Lovelace) *schema.LovelaceView { return &c.SaverView },
+		),
+		setting.Pick(
+			Setting{Name: "theme", Group: Group, Icon: "mdi:palette", More: f.themes},
+			[]schema.LovelaceTheme{""},
+			func(c *schema.Lovelace) *schema.LovelaceTheme { return &c.Theme },
 		),
 	}
 	return setting.NewTable("lovelace", []setting.Group{Group}, rows,

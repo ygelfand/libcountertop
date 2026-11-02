@@ -27,6 +27,7 @@ func (f *Feature) Rows(saver bool) ([]menu.Row, []func(int)) {
 			pick{"saver_view", gogui.IconPicture},
 		)
 	}
+	picks = append(picks, pick{"theme", gogui.IconPalette})
 	rows := make([]menu.Row, 0, len(picks))
 	taps := make([]func(int), 0, len(picks))
 	for _, p := range picks {

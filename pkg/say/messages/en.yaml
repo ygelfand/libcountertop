@@ -1187,6 +1187,9 @@ lovelace.entity.dashboard: Dashboard
 lovelace.setting.dashboard: Dashboard
 lovelace.entity.view: Dashboard view
 lovelace.setting.view: View
+lovelace.entity.theme: Dashboard theme
+lovelace.setting.theme: Theme
+lovelace.theme.default: Home Assistant default
 lovelace.entity.saver_dashboard: Screensaver dashboard
 lovelace.setting.saver_dashboard: Screensaver dashboard
 lovelace.entity.saver_view: Screensaver view

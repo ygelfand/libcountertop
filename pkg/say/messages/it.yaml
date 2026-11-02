@@ -1187,6 +1187,9 @@ lovelace.entity.dashboard: Dashboard
 lovelace.setting.dashboard: Dashboard
 lovelace.entity.view: Vista della dashboard
 lovelace.setting.view: Vista
+lovelace.entity.theme: Tema della dashboard
+lovelace.setting.theme: Tema
+lovelace.theme.default: Predefinito di Home Assistant
 lovelace.entity.saver_dashboard: Dashboard del salvaschermo
 lovelace.setting.saver_dashboard: Dashboard del salvaschermo
 lovelace.entity.saver_view: Vista del salvaschermo

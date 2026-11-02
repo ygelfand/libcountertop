@@ -37,10 +37,16 @@ type Dashboard struct {
 	Views []DashboardView `json:"views"`
 }
 
+type DashboardTheme struct {
+	Name string `json:"name"`
+	Dark bool   `json:"dark"`
+}
+
 type Dashboards struct {
-	Version    string          `json:"version"`
-	Users      []DashboardUser `json:"users"`
-	Dashboards []Dashboard     `json:"dashboards"`
+	Version    string           `json:"version"`
+	Users      []DashboardUser  `json:"users"`
+	Dashboards []Dashboard      `json:"dashboards"`
+	Themes     []DashboardTheme `json:"themes"`
 }
 
 type DashboardToken struct {

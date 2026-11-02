@@ -14,6 +14,7 @@ require (
 	github.com/bluenviron/gohlslib/v2 v2.4.5
 	github.com/bluenviron/mediacommon/v2 v2.9.5
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/gen2brain/jpegn v0.6.2
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-gui-org/go-glyph v1.26.4
@@ -75,7 +76,6 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dlclark/regexp2/v2 v2.2.2 // indirect
-	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/go-pdf/fpdf v0.9.0 // indirect
