@@ -36,6 +36,7 @@ type Config struct {
 
 	Width, Height int
 	Mounted       geometry.Orientation
+	SurfaceZ      int
 
 	Overlay Overlay
 }

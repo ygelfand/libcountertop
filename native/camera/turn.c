@@ -1,3 +1,6 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include "platform.h"
 #if __ANDROID_API__ >= 26
 #include <fcntl.h>
@@ -128,7 +131,17 @@ turner *turn_open(ANativeWindow *main, int mw, int mh, ANativeWindow *sub, int s
 	ANativeWindow **camera) {
 	turner *t = calloc(1, sizeof *t);
 	t->wake[0] = t->wake[1] = -1;
-	if (pipe2(t->wake, O_NONBLOCK | O_CLOEXEC) != 0) goto fail;
+	const char *profile = getenv("COUNTERTOP_X501F");
+	if (profile && !strcmp(profile, "1")) {
+		// Keep the pipe setup used by the SD-X501F port. Other profiles use pipe2.
+		if (pipe(t->wake) != 0) goto fail;
+		for (int i = 0; i < 2; ++i) {
+			if (fcntl(t->wake[i], F_SETFL, O_NONBLOCK) < 0 ||
+			    fcntl(t->wake[i], F_SETFD, FD_CLOEXEC) < 0) goto fail;
+		}
+	} else if (pipe2(t->wake, O_NONBLOCK | O_CLOEXEC) != 0) {
+		goto fail;
+	}
 	t->dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	if (t->dpy == EGL_NO_DISPLAY || !eglInitialize(t->dpy, NULL, NULL)) goto fail;
 	EGLint want[] = {EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,

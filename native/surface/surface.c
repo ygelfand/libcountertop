@@ -14,10 +14,12 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/system_properties.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 #include <android/log.h>
 #include <android/native_window.h>
@@ -1222,6 +1224,43 @@ static void project_display(void) {
 	tx_projection(tx, &display, 0, rect, rect);
 	sf_close(1);
 }
+#else
+static int x501f(void) {
+	const char *profile = getenv("COUNTERTOP_X501F");
+	return profile && !strcmp(profile, "1");
+}
+
+static int zygote_running(void) {
+	char value[PROP_VALUE_MAX] = {0};
+	return __system_property_get("init.svc.zygote", value) > 0 && !strcmp(value, "running");
+}
+
+// Android Things normally rotates this panel through its window manager.
+// Once zygote is stopped, restore the X501F's landscape projection directly.
+static void project_display(void) {
+	if (!x501f()) return;
+	if (zygote_running()) return;
+	void *display = NULL;
+	sf_display(&display, 0);
+	typedef void (*project_fn)(void *const *, uint32_t, const int32_t *, const int32_t *);
+	project_fn project = (project_fn)dlsym(RTLD_DEFAULT,
+		"_ZN7android21SurfaceComposerClient20setDisplayProjectionERKNS_2spINS_7IBinderEEEjRKNS_4RectES8_");
+	if (!display || !project) return;
+	const int32_t rect[4] = {0, 0, 1280, 800};
+	sf_open();
+	project(&display, 3, rect, rect);
+	sf_close(1);
+}
+
+static void *watch_projection(void *unused) {
+	(void)unused;
+	for (;;) {
+		sleep(1);
+		// A pending Android transaction can overwrite the projection after takeover.
+		project_display();
+	}
+	return NULL;
+}
 #endif
 
 static void wait_stop(void) {
@@ -1246,6 +1285,15 @@ int main(void) {
 	}
 #if __ANDROID_API__ >= 28
 	project_display();
+#else
+	if (x501f()) {
+		last_w = 1280;
+		last_h = 800;
+		project_display();
+		pthread_t projection_thread;
+		if (pthread_create(&projection_thread, NULL, watch_projection, NULL) == 0)
+			pthread_detach(projection_thread);
+	}
 #endif
 	logi("ready on %s", SOCKET_PATH);
 	for (;;) {

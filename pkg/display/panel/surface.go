@@ -167,7 +167,7 @@ func openSurface(cfg Config, wait time.Duration) (*Panel, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &Panel{surf: c, sock: cfg.Socket, askW: cfg.Width, askH: cfg.Height}
+	p := &Panel{surf: c, sock: cfg.Socket, askW: cfg.Width, askH: cfg.Height, surfaceZ: cfg.SurfaceZ}
 	if err := p.attach(c); err != nil {
 		_ = c.Close()
 		return nil, err
@@ -191,7 +191,7 @@ func (p *Panel) attach(c *surface.Client) error {
 	if p.askW > 0 && p.askH > 0 {
 		w, h = p.askW, p.askH
 	}
-	l, err := c.Create(uiLayer, 0, 0, w, h, 0, 0)
+	l, err := c.Create(uiLayer, 0, 0, w, h, p.surfaceZ, 0)
 	if err != nil {
 		return fmt.Errorf("display: the UI layer: %w", err)
 	}

@@ -88,6 +88,7 @@ type Panel struct {
 	layer      *surface.Layer
 	sock       string
 	askW, askH int
+	surfaceZ   int
 	seq        uint32
 }
 
