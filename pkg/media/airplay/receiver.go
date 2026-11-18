@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
+	"github.com/ygelfand/libcountertop/pkg/network/address"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
@@ -25,7 +27,11 @@ import (
 var (
 	errVersion  = errors.New("airplay: helper speaks another protocol version")
 	errNoScreen = errors.New("airplay: screen size not known")
+
+	errAddressChanged = errors.New("airplay: addresses changed")
 )
+
+var addressPoll = 3 * time.Second
 
 type Options struct {
 	Settings  storage.Section[schema.AirPlay]
@@ -133,14 +139,68 @@ func (r *Receiver) run(ctx context.Context) {
 		return
 	}
 	err := service.Keep(ctx, "airplay", func(ctx context.Context) error {
+		var key string
 		for {
-			if err := r.session(ctx); err != nil || ctx.Err() != nil {
+			if key == "" || address.AddressKey(address.Addresses()) != key {
+				ips := address.Settled(ctx, addressPoll)
+				if ctx.Err() != nil {
+					return nil
+				}
+				key = address.AddressKey(ips)
+			}
+			err := r.sessionOn(ctx, key)
+			if ctx.Err() != nil {
+				return nil
+			}
+			if errors.Is(err, errAddressChanged) {
+				slog.Info("addresses changed, restarting airplay", "was", key)
+				key = ""
+				continue
+			}
+			if err != nil {
 				return err
 			}
 		}
 	})
 	if err != nil {
 		slog.Error("airplay stopped", "err", err)
+	}
+}
+
+// The helper's mDNS responder reads the interface addresses once, at start,
+// so it has to be started after the lease lands and again whenever it changes.
+func (r *Receiver) sessionOn(ctx context.Context, key string) error {
+	sctx, cancel := context.WithCancelCause(ctx)
+	watched := make(chan struct{})
+	go func() {
+		defer close(watched)
+		watchAddresses(sctx, key, address.Addresses, cancel)
+	}()
+	err := r.session(sctx)
+	cancel(nil)
+	<-watched
+	if cause := context.Cause(sctx); errors.Is(cause, errAddressChanged) {
+		return cause
+	}
+	return err
+}
+
+func watchAddresses(
+	ctx context.Context,
+	key string,
+	read func() []net.IP,
+	changed context.CancelCauseFunc,
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(addressPoll):
+		}
+		if now := address.AddressKey(read()); now != "" && now != key {
+			changed(errAddressChanged)
+			return
+		}
 	}
 }
 
