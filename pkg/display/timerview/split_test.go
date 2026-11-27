@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -253,5 +254,17 @@ func TestTheKeysAreIcons(t *testing.T) {
 		if got := keyGlyph(c.e, c.op); got != c.want {
 			t.Errorf("keyGlyph(%+v, %s) = %q, want %q", c.e, c.op, got, c.want)
 		}
+	}
+}
+
+func TestTheKeyCirclesStandOutFromTheBackground(t *testing.T) {
+	pal := theme.Theme{Background: theme.Color{R: 0xf5, G: 0xf3, B: 0xef}, Surface: theme.Color{R: 0xff, G: 0xff, B: 0xff}}
+	fill := roundKeyFill(pal)
+	back := gogui.RGB(0xf5, 0xf3, 0xef)
+	if fill.R == back.R && fill.G == back.G && fill.B == back.B {
+		t.Errorf("circle fill %+v is the background colour", fill)
+	}
+	if fill.A != 255 {
+		t.Errorf("circle fill opacity %d, want solid", fill.A)
 	}
 }

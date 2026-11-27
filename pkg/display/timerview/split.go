@@ -8,6 +8,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -256,6 +257,10 @@ func keyGlyph(e timer.Entry, op string) string {
 	return gogui.IconPause
 }
 
+// roundKeyFill is the circle behind a key: the dial's own surface colour, solid, so it
+// shows on the background (widgets.KeyFill is the background at 40 %, which does not).
+func roundKeyFill(pal theme.Theme) gogui.Color { return widgets.Color(pal.Surface) }
+
 // roundKey is an icon in a filled circle, like the music player's keys.
 func (v *View) roundKey(id, glyph string, side float32, do func()) gogui.View {
 	pal := v.UI.Palette()
@@ -270,7 +275,7 @@ func (v *View) roundKey(id, glyph string, side float32, do func()) gogui.View {
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Radius:  gogui.RadiusPx(side / 2),
-		Color:   widgets.KeyFill(pal),
+		Color:   roundKeyFill(pal),
 		Content: []gogui.View{gogui.Label(glyph, st)},
 	}, widgets.Color(pal.Text), func(gogui.EventCtx) { do() })
 }
