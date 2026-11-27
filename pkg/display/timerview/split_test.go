@@ -227,3 +227,31 @@ func TestATapAnywhereOnAFinishedCellStopsTheRing(t *testing.T) {
 		t.Errorf("stopped %d, called HA %d; want 1, 0", s.stopped, a.calls)
 	}
 }
+
+func TestTheXIsLeftAndPauseIsRight(t *testing.T) {
+	left, right := cellKeys(timer.Entry{ID: "t1"})
+	if left != opCancel || right != opPause {
+		t.Errorf("keys %q | %q, want cancel left, pause right", left, right)
+	}
+	left, right = cellKeys(timer.Entry{ID: "t1", Done: true})
+	if left != opCancel || right != "" {
+		t.Errorf("finished keys %q | %q, want only cancel on the left", left, right)
+	}
+}
+
+func TestTheKeysAreIcons(t *testing.T) {
+	cases := []struct {
+		e    timer.Entry
+		op   string
+		want string
+	}{
+		{timer.Entry{}, opCancel, gogui.IconClose},
+		{timer.Entry{}, opPause, gogui.IconPause},
+		{timer.Entry{Paused: true}, opPause, gogui.IconPlay},
+	}
+	for _, c := range cases {
+		if got := keyGlyph(c.e, c.op); got != c.want {
+			t.Errorf("keyGlyph(%+v, %s) = %q, want %q", c.e, c.op, got, c.want)
+		}
+	}
+}

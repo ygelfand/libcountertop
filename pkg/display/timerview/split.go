@@ -187,33 +187,31 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 	id := dialID(i)
 	card := timer.Card{Showing: true, Ringing: e.Done, Name: e.Name, Left: e.Left, Of: e.Of}
 
-	side := min(cell.W, cell.H) * 0.62
-	content := []gogui.View{v.dialAs(w, card, side, id)}
+	side := min(cell.W, cell.H) * 0.58
+	key := max(min(cell.W, cell.H)*0.16, style.Reach()*1.2)
+	left, right := cellKeys(e)
+	dialRow := []gogui.View{
+		v.roundKey(id+"-"+left, keyGlyph(e, left), key, v.press(e, left)),
+		v.dialAs(w, card, side, id),
+	}
+	if right != "" {
+		dialRow = append(dialRow, v.roundKey(id+"-"+right, keyGlyph(e, right), key, v.press(e, right)))
+	} else {
+		dialRow = append(dialRow, gogui.Row(gogui.ContainerCfg{Width: key, Height: key, Sizing: gogui.FixedFixed}))
+	}
+	content := []gogui.View{gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FitFit,
+		VAlign:  gogui.VAlignMiddle,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingLarge,
+		Content: dialRow,
+	})}
 
 	for _, line := range cellLines(e) {
 		st := t.TextStyleTitle
 		st.Color, st.Align = widgets.Color(pal.Muted), gogui.TextAlignCenter
 		content = append(content, gogui.Label(line, st))
 	}
-
-	keyStyle := t.TextStyleTitle
-	tall := style.Reach() * 1.2
-	pauseText := say.T("timer.pause")
-	if e.Paused {
-		pauseText = say.T("timer.resume")
-	}
-	var keys []gogui.View
-	if !e.Done {
-		keys = append(keys, v.splitKey(w, id+"-pause", pauseText, keyStyle, tall, v.press(e, opPause)))
-	}
-	keys = append(keys, v.splitKey(w, id+"-cancel", "×", keyStyle, tall, v.press(e, opCancel)))
-	content = append(content, gogui.Row(gogui.ContainerCfg{
-		Sizing:  gogui.FillFit,
-		HAlign:  gogui.HAlignCenter,
-		Padding: gogui.NoPadding,
-		Spacing: gogui.SpacingLarge,
-		Content: keys,
-	}))
 	if mark != "" {
 		st := t.TextStyleTitle
 		st.Color = widgets.Color(pal.Muted)
@@ -238,15 +236,41 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 	return gogui.Column(cfg)
 }
 
-func (v *View) splitKey(
-	w *gogui.Window,
-	id, text string,
-	st gogui.TextStyle,
-	tall float32,
-	do func(),
-) gogui.View {
-	cfg := stopShape(w, text, st, tall, tall*2.4)
-	cfg.ID = id
-	cfg.Color = widgets.KeyFill(v.UI.Palette())
-	return v.UI.Toolkit.Keyed(cfg, text, st, style.Rest, func(gogui.EventCtx) { do() })
+// cellKeys says which key sits left and right of a cell's dial: × on the left, pause on
+// the right. A finished timer has only the ×.
+func cellKeys(e timer.Entry) (left, right string) {
+	if e.Done {
+		return opCancel, ""
+	}
+	return opCancel, opPause
+}
+
+// keyGlyph is the icon on a key: × to cancel, ‖ to pause, ▶ to resume a paused timer.
+func keyGlyph(e timer.Entry, op string) string {
+	switch {
+	case op == opCancel:
+		return gogui.IconClose
+	case e.Paused:
+		return gogui.IconPlay
+	}
+	return gogui.IconPause
+}
+
+// roundKey is an icon in a filled circle, like the music player's keys.
+func (v *View) roundKey(id, glyph string, side float32, do func()) gogui.View {
+	pal := v.UI.Palette()
+	st := widgets.IconStyle(widgets.Color(pal.Text))
+	st.Size = side * 0.5
+	return v.UI.Presses.Inked(gogui.Column, gogui.ContainerCfg{
+		ID:      id,
+		Width:   side,
+		Height:  side,
+		Sizing:  gogui.FixedFixed,
+		Padding: gogui.NoPadding,
+		HAlign:  gogui.HAlignCenter,
+		VAlign:  gogui.VAlignMiddle,
+		Radius:  gogui.RadiusPx(side / 2),
+		Color:   widgets.KeyFill(pal),
+		Content: []gogui.View{gogui.Label(glyph, st)},
+	}, widgets.Color(pal.Text), func(gogui.EventCtx) { do() })
 }
