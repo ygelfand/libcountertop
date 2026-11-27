@@ -189,8 +189,8 @@ func TestAFinishedCellSaysWhichTimerItIs(t *testing.T) {
 	if len(got) != 2 || got[0] != "eggs" || got[1] != "0:00 · Time's up" {
 		t.Errorf("finished cell reads %q, want [eggs, 0:00 · Time's up]", got)
 	}
-	if got := cellLines(timer.Entry{Name: "eggs", Paused: true}); len(got) != 1 || got[0] != "Paused" {
-		t.Errorf("paused cell reads %q, want [Paused]", got)
+	if got := cellLines(timer.Entry{Name: "eggs", Paused: true}); len(got) != 0 {
+		t.Errorf("paused cell reads %q under the dial, want nothing: Paused goes inside the dial", got)
 	}
 	if got := cellLines(timer.Entry{Name: "eggs"}); len(got) != 0 {
 		t.Errorf("running cell reads %q, want nothing under the dial", got)
@@ -284,5 +284,14 @@ func TestTheDialAndKeysFitInEveryCell(t *testing.T) {
 				t.Errorf("%d timers: key %.0f px is too small to tap", n, key)
 			}
 		}
+	}
+}
+
+func TestPausedIsWrittenInsideTheDial(t *testing.T) {
+	if got := dialNote(timer.Entry{Name: "eggs", Paused: true}); got != "Paused" {
+		t.Errorf("paused dial note %q, want Paused", got)
+	}
+	if got := dialNote(timer.Entry{Name: "eggs"}); got != "" {
+		t.Errorf("running dial note %q, want none", got)
 	}
 }

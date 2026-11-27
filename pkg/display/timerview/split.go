@@ -119,10 +119,17 @@ func cellLines(e timer.Entry) []string {
 	switch {
 	case e.Done:
 		return []string{e.Name, timer.Remaining(0) + " · " + say.T("timer.up")}
-	case e.Paused:
-		return []string{say.T("timer.paused")}
 	}
 	return nil
+}
+
+// dialNote is written inside the dial, under the name, so the dial does not move when a
+// timer is paused.
+func dialNote(e timer.Entry) string {
+	if e.Paused && !e.Done {
+		return say.T("timer.paused")
+	}
+	return ""
 }
 
 func cellID(i int) string { return fmt.Sprintf("timer-split-%d-cell", i) }
@@ -191,7 +198,7 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 	left, right := cellKeys(e)
 	dialRow := []gogui.View{
 		v.roundKey(id+"-"+left, keyGlyph(e, left), key, v.press(e, left)),
-		v.dialAs(w, card, side, id),
+		v.dialAs(w, card, side, id, dialNote(e)),
 	}
 	if right != "" {
 		dialRow = append(dialRow, v.roundKey(id+"-"+right, keyGlyph(e, right), key, v.press(e, right)))
