@@ -176,6 +176,8 @@ type Options struct {
 	Stage     Stage
 	Badge     func(id, name string, size float32) gogui.View
 	Timers    *timer.Timers
+	// TimerAct calls a Home Assistant action with a timer_id (the Split timer keys).
+	TimerAct  func(action, timerID string) error
 	Poster    *poster.Poster
 	Drawer    *drawer.Rail
 	Tabs      *dashboard.Tabs
@@ -263,7 +265,7 @@ func New(o Options) *App {
 		a.rings = ringsview.New(ringsview.Options{UI: o.UI, Home: o.Home, Clock: a.ringsClock})
 	}
 	a.alerts = alertview.View{UI: o.UI, Messages: o.Messages, Again: a.again}
-	a.timers = timerview.View{UI: o.UI, Timers: o.Timers, Again: a.again}
+	a.timers = timerview.View{UI: o.UI, Timers: o.Timers, Again: a.again, Act: o.TimerAct}
 	a.alarms = alarmview.View{
 		UI:      o.UI,
 		Alarms:  o.Alarms,

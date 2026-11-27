@@ -2711,6 +2711,10 @@ thermostat:
   temperature: Temperatur
   waiting: Warte auf Home Assistant
 timer:
+  pause: "Pause"
+  paused: "Pausiert"
+  resume: "Weiter"
+  up: "Zeit ist um"
   stop: Stopp
 timerstyle:
   split: Geteilt

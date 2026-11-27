@@ -35,6 +35,11 @@ type View struct {
 	UI     *widgets.UI
 	Timers Timers
 	Again  func(w *gogui.Window, after time.Duration)
+
+	// Act calls a Home Assistant action with a timer_id, for the Split style's keys.
+	Act func(action, timerID string) error
+	// Domain names the integration whose pause/resume/cancel actions Act calls.
+	Domain func() string
 }
 
 type Scene struct {
@@ -44,7 +49,12 @@ type Scene struct {
 	ClearRight      float32
 }
 
-func Covers(c timer.Card, s schema.TimerStyle) bool { return c.Showing && s == schema.TimerFull }
+func Covers(c timer.Card, s schema.TimerStyle) bool {
+	if s == schema.TimerSplit {
+		return len(shownEntries(c)) > 0
+	}
+	return c.Showing && s == schema.TimerFull
+}
 
 func (v *View) Build(w *gogui.Window, c timer.Card, s schema.TimerStyle, scene Scene) gogui.View {
 	switch s {
@@ -58,6 +68,8 @@ func (v *View) Build(w *gogui.Window, c timer.Card, s schema.TimerStyle, scene S
 		return v.face(w, c, scene.Clock)
 	case schema.TimerCorner:
 		return v.corner(w, c, scene)
+	case schema.TimerSplit:
+		return v.split(w, c)
 	}
 	return v.bar(w, c)
 }
@@ -211,6 +223,11 @@ func (v *View) dialStyle(w *gogui.Window, c timer.Card) gogui.View {
 }
 
 func (v *View) dial(w *gogui.Window, c timer.Card, side float32) gogui.View {
+	return v.dialAs(w, c, side, "timer")
+}
+
+// dialAs draws a dial whose element ids start with id, so several can share a screen.
+func (v *View) dialAs(w *gogui.Window, c timer.Card, side float32, id string) gogui.View {
 	pal := v.UI.Palette()
 	tint := v.tint(w, c, pal.Surface)
 	wide := side * 0.07
@@ -240,7 +257,7 @@ func (v *View) dial(w *gogui.Window, c timer.Card, side float32) gogui.View {
 	fill := widgets.Color(tint)
 	track := widgets.Color(tint.Blend(pal.Surface, 0.8))
 	ring := gogui.DrawCanvas(gogui.DrawCanvasCfg{
-		ID:      "timer-dial",
+		ID:      id + "-dial",
 		Width:   side,
 		Height:  side,
 		Version: uint64(time.Now().UnixNano()),
@@ -262,7 +279,7 @@ func (v *View) dial(w *gogui.Window, c timer.Card, side float32) gogui.View {
 		},
 	})
 	disc := v.UI.Toolkit.Panel(gogui.ContainerCfg{
-		ID:      "timer",
+		ID:      id,
 		Width:   side,
 		Height:  side,
 		Sizing:  gogui.FixedFixed,

@@ -2713,6 +2713,10 @@ thermostat:
   temperature: Nhiệt độ
   waiting: Đang chờ Home Assistant
 timer:
+  pause: "Tạm dừng"
+  paused: "Đã tạm dừng"
+  resume: "Tiếp tục"
+  up: "Hết giờ"
   stop: Dừng
 timerstyle:
   split: Chia màn hình
