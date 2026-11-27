@@ -35,6 +35,14 @@ type View struct {
 	UI     *widgets.UI
 	Timers Timers
 	Again  func(w *gogui.Window, after time.Duration)
+
+	// Act calls a Home Assistant action with a timer_id, for the Split style's keys.
+	Act func(action, timerID string) error
+	// Domain names the integration whose pause/resume/cancel actions Act calls.
+	Domain func() string
+
+	// spawn runs a key's Home Assistant call off the screen's thread (safe.Go when nil).
+	spawn func(what string, f func())
 }
 
 type Scene struct {
@@ -44,7 +52,12 @@ type Scene struct {
 	ClearRight      float32
 }
 
-func Covers(c timer.Card, s schema.TimerStyle) bool { return c.Showing && s == schema.TimerFull }
+func Covers(c timer.Card, s schema.TimerStyle) bool {
+	if s == schema.TimerSplit {
+		return len(shownEntries(c)) > 0
+	}
+	return c.Showing && s == schema.TimerFull
+}
 
 func (v *View) Build(w *gogui.Window, c timer.Card, s schema.TimerStyle, scene Scene) gogui.View {
 	switch s {
@@ -58,6 +71,8 @@ func (v *View) Build(w *gogui.Window, c timer.Card, s schema.TimerStyle, scene S
 		return v.face(w, c, scene.Clock)
 	case schema.TimerCorner:
 		return v.corner(w, c, scene)
+	case schema.TimerSplit:
+		return v.split(w, c)
 	}
 	return v.bar(w, c)
 }
@@ -211,6 +226,12 @@ func (v *View) dialStyle(w *gogui.Window, c timer.Card) gogui.View {
 }
 
 func (v *View) dial(w *gogui.Window, c timer.Card, side float32) gogui.View {
+	return v.dialAs(w, c, side, "timer", "")
+}
+
+// dialAs draws a dial whose element ids start with id, so several can share a screen.
+// note, when set, is a third line under the name (the Split style writes "Paused" there).
+func (v *View) dialAs(w *gogui.Window, c timer.Card, side float32, id, note string) gogui.View {
 	pal := v.UI.Palette()
 	tint := v.tint(w, c, pal.Surface)
 	wide := side * 0.07
@@ -237,10 +258,15 @@ func (v *View) dial(w *gogui.Window, c timer.Card, side float32) gogui.View {
 		small.Size = clockview.Fitted(w, under, small, side*0.5, side*0.08)
 	}
 
+	noteStyle := clockview.Lettering(glyph.TypefaceBold, 0, pal.Muted)
+	if note != "" {
+		noteStyle.Size = clockview.Fitted(w, note, noteStyle, side*0.5, side*0.07)
+	}
+
 	fill := widgets.Color(tint)
 	track := widgets.Color(tint.Blend(pal.Surface, 0.8))
 	ring := gogui.DrawCanvas(gogui.DrawCanvasCfg{
-		ID:      "timer-dial",
+		ID:      id + "-dial",
 		Width:   side,
 		Height:  side,
 		Version: uint64(time.Now().UnixNano()),
@@ -249,20 +275,27 @@ func (v *View) dial(w *gogui.Window, c timer.Card, side float32) gogui.View {
 			drawRing(dc, cx, cy, radius, wide, share, fill, track)
 
 			tall := dc.FontHeight(big)
-			block, gap := tall, float32(0)
+			block, gap := tall, side*0.02
 			if under != "" {
-				gap = side * 0.02
 				block += gap + dc.FontHeight(small)
+			}
+			if note != "" {
+				block += gap + dc.FontHeight(noteStyle)
 			}
 			top := cy - block/2
 			dc.Text(cx-dc.TextWidth(label, big)/2, top, label, big)
+			y := top + tall
 			if under != "" {
-				dc.Text(cx-dc.TextWidth(under, small)/2, top+tall+gap, under, small)
+				dc.Text(cx-dc.TextWidth(under, small)/2, y+gap, under, small)
+				y += gap + dc.FontHeight(small)
+			}
+			if note != "" {
+				dc.Text(cx-dc.TextWidth(note, noteStyle)/2, y+gap, note, noteStyle)
 			}
 		},
 	})
 	disc := v.UI.Toolkit.Panel(gogui.ContainerCfg{
-		ID:      "timer",
+		ID:      id,
 		Width:   side,
 		Height:  side,
 		Sizing:  gogui.FixedFixed,

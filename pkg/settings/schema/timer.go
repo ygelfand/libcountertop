@@ -11,6 +11,8 @@ const (
 	TimerFull   TimerStyle = "full"
 	TimerFace   TimerStyle = "face"
 	TimerCorner TimerStyle = "corner"
+	// TimerSplit shows every timer at once: 1 full, 2 side by side, 3-4 in a 2x2 grid.
+	TimerSplit TimerStyle = "split"
 )
 
 const DefaultTimerStyle = TimerBar
@@ -29,10 +31,12 @@ func (s TimerStyle) Label() string {
 		return say.T("timerstyle.face")
 	case TimerCorner:
 		return say.T("timerstyle.corner")
+	case TimerSplit:
+		return say.T("timerstyle.split")
 	}
 	return string(s)
 }
 
 func TimerStyles() []TimerStyle {
-	return []TimerStyle{TimerBar, TimerBanner, TimerDial, TimerFull, TimerFace, TimerCorner}
+	return []TimerStyle{TimerBar, TimerBanner, TimerDial, TimerFull, TimerFace, TimerCorner, TimerSplit}
 }

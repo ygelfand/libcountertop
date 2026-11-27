@@ -2713,8 +2713,13 @@ thermostat:
   temperature: Temperatura
   waiting: In attesa di Home Assistant
 timer:
+  pause: "Pausa"
+  paused: "In pausa"
+  resume: "Riprendi"
+  up: "Tempo scaduto"
   stop: Ferma
 timerstyle:
+  split: Diviso
   banner: Banner
   bar: Barra
   corner: Angolo

@@ -47,11 +47,14 @@ type Timers struct {
 	mu    sync.Mutex
 	held  map[string]*timer
 	local map[string]*time.Timer
-	stop  context.CancelFunc
-	said  string
+	// done holds finished timers until the ring stops, so the Split style can show them.
+	done map[string]*timer
+	stop context.CancelFunc
+	said string
 }
 
 type timer struct {
+	first  time.Time
 	name   string
 	total  time.Duration
 	left   time.Duration
@@ -79,6 +82,7 @@ func New(opts Options) *Timers {
 		},
 		woke: make(chan struct{}, 1),
 		held: map[string]*timer{},
+		done: map[string]*timer{},
 	}
 }
 
@@ -196,6 +200,7 @@ func (t *Timers) Forget() {
 	t.mu.Lock()
 	n := len(t.held)
 	t.held = map[string]*timer{}
+	t.done = map[string]*timer{}
 	t.mu.Unlock()
 
 	if n > 0 {
@@ -225,7 +230,12 @@ func (t *Timers) Stop() bool {
 
 func (t *Timers) set(e esphome.TimerEvent) {
 	t.mu.Lock()
+	first := time.Now()
+	if old, ok := t.held[e.TimerID]; ok {
+		first = old.first
+	}
 	t.held[e.TimerID] = &timer{
+		first:  first,
 		name:   e.Name,
 		total:  time.Duration(e.TotalSeconds) * time.Second,
 		left:   time.Duration(e.SecondsLeft) * time.Second,
@@ -250,7 +260,12 @@ func (t *Timers) finished(e esphome.TimerEvent) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	done := &timer{first: time.Now(), name: e.Name, total: time.Duration(e.TotalSeconds) * time.Second}
+	if old, ok := t.held[e.TimerID]; ok {
+		done.first, done.name, done.total = old.first, old.name, old.total
+	}
 	delete(t.held, e.TimerID)
+	t.done[e.TimerID] = done
 	t.start(t.opts)
 }
 
@@ -275,6 +290,7 @@ func (t *Timers) ring(ctx context.Context, sound Options) {
 	defer func() {
 		t.mu.Lock()
 		t.stop = nil
+		t.done = map[string]*timer{}
 		t.mu.Unlock()
 		t.show()
 	}()
@@ -319,7 +335,39 @@ func (t *Timers) now() Card {
 	}
 
 	card.Showing = card.Showing || card.Ringing
+	card.All = t.all(now)
 	return card
+}
+
+// all lists held and finished timers oldest first.
+func (t *Timers) all(now time.Time) []Entry {
+	type item struct {
+		id   string
+		c    *timer
+		done bool
+	}
+	items := make([]item, 0, len(t.held)+len(t.done))
+	for id, c := range t.held {
+		items = append(items, item{id, c, false})
+	}
+	for id, c := range t.done {
+		items = append(items, item{id, c, true})
+	}
+	slices.SortFunc(items, func(a, b item) int {
+		if c := a.c.first.Compare(b.c.first); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.id, b.id)
+	})
+	out := make([]Entry, 0, len(items))
+	for _, it := range items {
+		e := Entry{ID: it.id, Name: cmp.Or(it.c.name, "Timer"), Of: it.c.total, Done: it.done}
+		if !it.done {
+			e.Left, e.Paused = it.c.remaining(now), !it.c.active
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 func (t *Timers) show() {

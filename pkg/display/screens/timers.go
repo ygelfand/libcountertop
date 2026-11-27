@@ -10,7 +10,7 @@ import (
 
 func (a *App) timer(w *gogui.Window) gogui.View {
 	c := a.o.Timers.Now()
-	if !c.Showing {
+	if !c.Showing && !timerview.Covers(c, a.o.Settings().Screen.Timer) {
 		return nil
 	}
 	return a.timers.Build(w, c, a.o.Settings().Screen.Timer, a.timerScene(w))

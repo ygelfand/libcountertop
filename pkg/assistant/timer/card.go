@@ -2,6 +2,7 @@ package timer
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -13,13 +14,32 @@ type Card struct {
 
 	Left time.Duration
 	Of   time.Duration
+
+	// All lists every timer the display knows, oldest first: running, paused, and finished
+	// ones that are still ringing. The fields above still describe only the soonest.
+	All []Entry
+}
+
+// Entry is one timer as the Split style draws it.
+type Entry struct {
+	ID     string
+	Name   string
+	Left   time.Duration
+	Of     time.Duration
+	Paused bool
+	Done   bool
 }
 
 func (c Card) key() string {
-	if !c.Showing {
+	if !c.Showing && len(c.All) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("%v|%s|%s", c.Ringing, c.Name, Remaining(c.Left))
+	var b strings.Builder
+	fmt.Fprintf(&b, "%v|%s|%s", c.Ringing, c.Name, Remaining(c.Left))
+	for _, e := range c.All {
+		fmt.Fprintf(&b, "|%s,%s,%v,%v,%s", e.ID, e.Name, e.Paused, e.Done, Remaining(e.Left))
+	}
+	return b.String()
 }
 
 func (c Card) Share() float64 {

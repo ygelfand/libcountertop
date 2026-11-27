@@ -2726,6 +2726,10 @@ thermostat:
   temperature: Temperature
   waiting: Waiting for Home Assistant
 timer:
+  pause: "Pause"
+  paused: "Paused"
+  resume: "Resume"
+  up: "Time's up"
   stop: Stop
 timerstyle:
   banner: Banner
@@ -2734,6 +2738,7 @@ timerstyle:
   dial: Dial
   face: Clock face
   full: Full screen
+  split: Split
 todo:
   add: Add an item
   app: Shopping list
