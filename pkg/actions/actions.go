@@ -33,6 +33,8 @@ type Action struct {
 	Speech   string
 	Triggers []Trigger
 	Run      func(esphome.Call) (string, error)
+	Answer   func(esphome.Call) any
+	Protocol int
 }
 
 type Registry struct {
@@ -63,6 +65,9 @@ func (r *Registry) Actions() []*esphome.Action {
 			Args:        a.Args,
 			Answers:     true,
 			Run: func(c esphome.Call) (any, error) {
+				if a.Answer != nil {
+					return map[string]any{"answer": a.Answer(c)}, nil
+				}
 				reply, err := a.Run(c)
 				if err != nil {
 					slog.Warn("action failed", "action", a.Name, "err", err)
@@ -113,9 +118,13 @@ func (r *Registry) Names() []string {
 func (r *Registry) Declaration(
 	voiced func(name string) bool,
 	switched func(name string) string,
+	speaks func(protocol int) bool,
 ) map[string]string {
 	d := declared{Version: Version, Actions: []declaredAction{}}
 	for _, a := range r.all() {
+		if a.Protocol != 0 && (speaks == nil || !speaks(a.Protocol)) {
+			continue
+		}
 		var triggers []declaredTrigger
 		if voiced(a.Name) {
 			for _, t := range a.Triggers {

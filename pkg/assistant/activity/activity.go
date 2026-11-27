@@ -2,6 +2,8 @@ package activity
 
 import (
 	"strconv"
+	"sync"
+	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
@@ -10,6 +12,8 @@ import (
 
 type Log struct {
 	opts  Options
+	mu    sync.Mutex
+	now   *Turn
 	word  *esphome.TextSensor
 	heard *esphome.TextSensor
 	reply *esphome.TextSensor
@@ -48,6 +52,27 @@ func (l *Log) Name() string { return "activity" }
 
 func (l *Log) Entities() []esphome.Entity {
 	return []esphome.Entity{l.word, l.heard, l.reply}
+}
+
+func (l *Log) Speaker() Speaker {
+	l.mu.Lock()
+	t := l.now
+	l.mu.Unlock()
+	return t.who()
+}
+
+func (l *Log) SpeakerWithin(wait time.Duration) Speaker {
+	l.mu.Lock()
+	t := l.now
+	l.mu.Unlock()
+	if s := t.who(); s.Match != Pending {
+		return s
+	}
+	select {
+	case <-t.settled:
+	case <-time.After(wait):
+	}
+	return t.who()
 }
 
 func (l *Log) Woke(phrase string) {

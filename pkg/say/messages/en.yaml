@@ -90,6 +90,33 @@ actions:
       bare: hang up
       call: hang up [the] (call|phone)
       end: (end|decline|reject) [the] call
+  personal:
+    _: Personal requests
+    reply:
+      add_to_list:
+        done: Added {{.Item}} to your list.
+        no_list: '{{.Name}}, there''s no list set up for you.'
+        not_caught: Sorry, I didn't catch what to add.
+      calendar:
+        empty_today: Nothing on your calendar today.
+        empty_tomorrow: Nothing on your calendar tomorrow.
+        none: '{{.Name}}, there''s no calendar set up for you.'
+        today: 'You have {{.Count}} thing{{if ne .Count 1}}s{{end}} today: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} at {{$e.Time}}{{else}} all day{{end}}{{end}}{{if .More}}, and {{.More}} more{{end}}.'
+        tomorrow: 'You have {{.Count}} thing{{if ne .Count 1}}s{{end}} tomorrow: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} at {{$e.Time}}{{else}} all day{{end}}{{end}}{{if .More}}, and {{.More}} more{{end}}.'
+      failed: Sorry, that didn't work.
+      no_notify: '{{.Name}}, your phone can''t take notifications.'
+      no_phone: '{{.Name}}, there''s no phone set up for you.'
+      remind:
+        not_caught: Sorry, I didn't catch when.
+        set: 'I''ll send a reminder to your phone in {{if .Hours}}{{.Hours}} hour{{if ne .Hours 1}}s{{end}}{{else}}{{.Minutes}} minute{{if ne .Minutes 1}}s{{end}}{{end}}.'
+      unlinked: '{{.Name}}, your voice isn''t linked to a person yet.'
+      unrecognized: Sorry, I couldn't recognize your voice.
+    sentence:
+      add_to_list: add {item} to my list
+      calendar: ((what's|what is) on my calendar [today]|what do I have today)
+      calendar_tomorrow: ((what's|what is) on my calendar|what do I have) tomorrow
+      remind_hours: remind me to {task} in {hours} hour[s]
+      remind_minutes: remind me to {task} in {minutes} minute[s]
   recipes:
     _: Cook from recipes
     amount: You need {{.Amount}}
@@ -122,19 +149,15 @@ actions:
     which: Which recipe?
   youtube_tv:
     _: Watch YouTube TV
-    airing: '{{.Channel}} is showing {{.Title}}'
     channel: Say a channel or a show
     device: There's no device called {{.Device}}
     here:
       _: Playing {{.Show}} on {{.Channel}}
       channel: Playing {{.Channel}}
-    nothing: Nothing is listed on {{.Channel}} right now
     nowhere: Choose a default TV in the TV app
     sentence:
       watch: (watch|put on) {channel}
       watch_on: (watch|put on) {channel} on [the] {device}
-      what_is_on: what is on {channel}
-      whats_on: what's on {channel}
     unknown: I looked for {{.Channel}} on YouTube TV, but it either isn't available or can't be played right now
     watching:
       _: Playing {{.Show}} on {{.Channel}} on {{.Device}}
@@ -2908,12 +2931,15 @@ voice:
       call_hangup:
         _: Hang up a call
         help: Lets Home Assistant Assist sentences like "hang up" end or decline a call
+      personal:
+        _: Personal requests
+        help: Lets Home Assistant Assist sentences like "what's on my calendar" or "add milk to my list" act for the person whose voice matched
       recipes:
         _: Cook from recipes
         help: Lets Home Assistant Assist sentences find recipes, start cooking, and step through the recipe on this device
       youtube_tv:
         _: Watch YouTube TV
-        help: Lets Home Assistant Assist sentences put on a YouTube TV channel or say what's on
+        help: Lets Home Assistant Assist sentences put on a YouTube TV channel
     actions:
       _: All actions
       help: Offers this device's spoken sentences to Home Assistant Assist; off withdraws all of them

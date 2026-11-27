@@ -856,6 +856,8 @@ func (c *Conversation) startAudio(
 		told := func(name, person string, score float64, err error) {
 			if err == nil {
 				t.Spoke(name, person, score)
+			} else {
+				t.Missed()
 			}
 			if g != nil {
 				c.post(event{kind: evVoice, at: g.heard, text: name})

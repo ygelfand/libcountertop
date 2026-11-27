@@ -90,6 +90,33 @@ actions:
       bare: auflegen
       call: (beende den Anruf|leg den Anruf auf)
       end: (lehne|weise) [den] Anruf ab
+  personal:
+    _: Persönliche Anfragen
+    reply:
+      add_to_list:
+        done: '{{.Item}} steht jetzt auf deiner Liste.'
+        no_list: '{{.Name}}, für dich ist keine Liste eingerichtet.'
+        not_caught: Entschuldigung, ich habe nicht verstanden, was ich hinzufügen soll.
+      calendar:
+        empty_today: Heute steht nichts in deinem Kalender.
+        empty_tomorrow: Morgen steht nichts in deinem Kalender.
+        none: '{{.Name}}, für dich ist kein Kalender eingerichtet.'
+        today: 'Du hast heute {{.Count}} Termin{{if ne .Count 1}}e{{end}}: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} um {{$e.Time}}{{else}} ganztägig{{end}}{{end}}{{if .More}} und {{.More}} weitere{{end}}.'
+        tomorrow: 'Du hast morgen {{.Count}} Termin{{if ne .Count 1}}e{{end}}: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} um {{$e.Time}}{{else}} ganztägig{{end}}{{end}}{{if .More}} und {{.More}} weitere{{end}}.'
+      failed: Entschuldigung, das hat nicht geklappt.
+      no_notify: '{{.Name}}, dein Handy kann keine Benachrichtigungen empfangen.'
+      no_phone: '{{.Name}}, für dich ist kein Handy eingerichtet.'
+      remind:
+        not_caught: Entschuldigung, ich habe nicht verstanden, wann.
+        set: 'Ich schicke dir in {{if .Hours}}{{.Hours}} Stunde{{if ne .Hours 1}}n{{end}}{{else}}{{.Minutes}} Minute{{if ne .Minutes 1}}n{{end}}{{end}} eine Erinnerung aufs Handy.'
+      unlinked: '{{.Name}}, deine Stimme ist noch mit keiner Person verknüpft.'
+      unrecognized: Entschuldigung, ich habe deine Stimme nicht erkannt.
+    sentence:
+      add_to_list: (setze|füge) {item} auf meine Liste [hinzu]
+      calendar: (was steht [heute] in meinem Kalender|was habe ich heute)
+      calendar_tomorrow: (was steht morgen in meinem Kalender|was habe ich morgen)
+      remind_hours: erinnere mich in {hours} Stunde[n] (an|daran) {task}
+      remind_minutes: erinnere mich in {minutes} Minute[n] (an|daran) {task}
   recipes:
     _: Nach Rezept kochen
     amount: Du brauchst {{.Amount}}
@@ -122,19 +149,15 @@ actions:
     which: Welches Rezept?
   youtube_tv:
     _: YouTube TV schauen
-    airing: Auf {{.Channel}} läuft {{.Title}}
     channel: Nenne einen Sender oder eine Sendung
     device: Es gibt kein Gerät namens {{.Device}}
     here:
       _: '{{.Show}} auf {{.Channel}} wird abgespielt'
       channel: '{{.Channel}} wird abgespielt'
-    nothing: Auf {{.Channel}} ist gerade nichts eingetragen
     nowhere: Wähle in der TV-App einen Standardfernseher
     sentence:
       watch: (schaue|zeige|spiele) {channel}
       watch_on: (schaue|zeige|spiele) {channel} auf [dem] {device}
-      what_is_on: was kommt auf {channel}
-      whats_on: was läuft auf {channel}
     unknown: Ich habe {{.Channel}} auf YouTube TV gesucht, aber es ist nicht verfügbar oder kann gerade nicht abgespielt werden
     watching:
       _: '{{.Show}} auf {{.Channel}} wird auf {{.Device}} abgespielt'
@@ -2890,12 +2913,15 @@ voice:
       call_hangup:
         _: Anruf beenden
         help: Lässt Sätze von Home Assistant Assist wie „auflegen“ einen Anruf beenden oder ablehnen
+      personal:
+        _: Persönliche Anfragen
+        help: Lässt Sätze von Home Assistant Assist wie „was steht in meinem Kalender“ oder „setze Milch auf meine Liste“ für die Person handeln, deren Stimme erkannt wurde
       recipes:
         _: Nach Rezept kochen
         help: Lässt Sätze von Home Assistant Assist Rezepte finden, das Kochen starten und auf diesem Gerät durch die Schritte gehen
       youtube_tv:
         _: YouTube TV schauen
-        help: Lässt Sätze von Home Assistant Assist einen YouTube-TV-Sender einschalten oder sagen, was läuft
+        help: Lässt Sätze von Home Assistant Assist einen YouTube-TV-Sender einschalten
     actions:
       _: Alle Aktionen
       help: Bietet die gesprochenen Sätze dieses Geräts Home Assistant Assist an; aus zieht sie alle zurück

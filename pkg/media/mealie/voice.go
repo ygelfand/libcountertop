@@ -20,6 +20,8 @@ import (
 const (
 	ActionName  = "recipes"
 	CookCommand = "cook"
+
+	voiceWait = 3 * time.Second
 )
 
 func (k *Kitchen) VoiceAction() actions.Action {
@@ -80,7 +82,7 @@ func (k *Kitchen) voice(c esphome.Call) (string, error) {
 	if said == "" {
 		return say.Speak("actions.recipes.which"), nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), askTime)
+	ctx, cancel := context.WithTimeout(context.Background(), voiceWait)
 	defer cancel()
 	best, found, err := k.Find(ctx, said)
 	switch {

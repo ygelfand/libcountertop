@@ -90,6 +90,33 @@ actions:
       bare: cúp máy
       call: (cúp|tắt) [cuộc] (gọi|điện thoại)
       end: (kết thúc|từ chối) cuộc gọi
+  personal:
+    _: Yêu cầu cá nhân
+    reply:
+      add_to_list:
+        done: Đã thêm {{.Item}} vào danh sách của bạn.
+        no_list: '{{.Name}}, bạn chưa thiết lập danh sách.'
+        not_caught: Xin lỗi, tôi không nghe rõ cần thêm gì.
+      calendar:
+        empty_today: Hôm nay lịch của bạn trống.
+        empty_tomorrow: Ngày mai lịch của bạn trống.
+        none: '{{.Name}}, bạn chưa thiết lập lịch.'
+        today: 'Hôm nay bạn có {{.Count}} việc: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} lúc {{$e.Time}}{{else}} cả ngày{{end}}{{end}}{{if .More}} và {{.More}} việc khác{{end}}.'
+        tomorrow: 'Ngày mai bạn có {{.Count}} việc: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} lúc {{$e.Time}}{{else}} cả ngày{{end}}{{end}}{{if .More}} và {{.More}} việc khác{{end}}.'
+      failed: Xin lỗi, không thực hiện được.
+      no_notify: '{{.Name}}, điện thoại của bạn không nhận được thông báo.'
+      no_phone: '{{.Name}}, bạn chưa thiết lập điện thoại.'
+      remind:
+        not_caught: Xin lỗi, tôi không nghe rõ khi nào.
+        set: 'Tôi sẽ gửi lời nhắc đến điện thoại của bạn sau {{if .Hours}}{{.Hours}} giờ{{else}}{{.Minutes}} phút{{end}}.'
+      unlinked: '{{.Name}}, giọng của bạn chưa được liên kết với người nào.'
+      unrecognized: Xin lỗi, tôi không nhận ra giọng của bạn.
+    sentence:
+      add_to_list: thêm {item} vào danh sách của tôi
+      calendar: (lịch [hôm nay] của tôi có gì|hôm nay tôi có gì)
+      calendar_tomorrow: (lịch ngày mai của tôi có gì|ngày mai tôi có gì)
+      remind_hours: nhắc tôi {task} sau {hours} giờ
+      remind_minutes: nhắc tôi {task} sau {minutes} phút
   recipes:
     _: Nấu theo công thức
     amount: Bạn cần {{.Amount}}
@@ -122,19 +149,15 @@ actions:
     which: Công thức nào?
   youtube_tv:
     _: Xem YouTube TV
-    airing: '{{.Channel}} đang chiếu {{.Title}}'
     channel: Đọc tên kênh hoặc chương trình
     device: Không có thiết bị nào tên {{.Device}}
     here:
       _: Đang phát {{.Show}} trên {{.Channel}}
       channel: Đang phát {{.Channel}}
-    nothing: Hiện không có gì trên {{.Channel}}
     nowhere: Chọn TV mặc định trong ứng dụng TV
     sentence:
       watch: (xem|mở) {channel}
       watch_on: (xem|mở) {channel} trên {device}
-      what_is_on: trên {channel} đang có gì
-      whats_on: '{channel} đang chiếu gì'
     unknown: Tôi đã tìm {{.Channel}} trên YouTube TV, nhưng kênh không khả dụng hoặc không thể phát lúc này
     watching:
       _: Đang phát {{.Show}} trên {{.Channel}} trên {{.Device}}
@@ -2893,12 +2916,15 @@ voice:
       call_hangup:
         _: Gác máy
         help: Cho phép câu lệnh Home Assistant Assist như "hang up" kết thúc hoặc từ chối cuộc gọi
+      personal:
+        _: Yêu cầu cá nhân
+        help: Cho phép câu lệnh Home Assistant Assist như "lịch của tôi có gì" hoặc "thêm sữa vào danh sách của tôi" thực hiện cho người được nhận diện giọng nói
       recipes:
         _: Nấu theo công thức
         help: Cho phép các câu của Home Assistant Assist tìm công thức, bắt đầu nấu và chuyển qua các bước trên thiết bị này
       youtube_tv:
         _: Xem YouTube TV
-        help: Cho phép câu lệnh Home Assistant Assist mở kênh YouTube TV hoặc cho biết đang chiếu gì
+        help: Cho phép câu lệnh Home Assistant Assist mở kênh YouTube TV
     actions:
       _: Tất cả hành động
       help: Cung cấp các câu lệnh của thiết bị này cho Home Assistant Assist; tắt sẽ rút lại tất cả

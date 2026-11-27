@@ -32,7 +32,7 @@ func (g *Guide) VoiceAction() actions.Action {
 			{
 				Name:        "operation",
 				Type:        esphome.ArgString,
-				Description: "watch or whats_on.",
+				Description: "watch.",
 				Example:     "watch",
 			},
 			{Name: "channel", Type: esphome.ArgString, Example: "ESPN"},
@@ -45,8 +45,6 @@ func (g *Guide) VoiceAction() actions.Action {
 		Triggers: []actions.Trigger{
 			trigger("watch_on", "watch"),
 			trigger("watch", "watch"),
-			trigger("whats_on", "whats_on"),
-			trigger("what_is_on", "whats_on"),
 		},
 		Run: g.voice,
 	}
@@ -73,12 +71,7 @@ func (g *Guide) voice(c esphome.Call) (string, error) {
 		return say.SpeakF("actions.youtube_tv.unknown", map[string]any{"Channel": said}), nil
 	}
 
-	switch c.String("operation") {
-	case "whats_on":
-		return whatsOn(channel, now), nil
-	default:
-		return g.watch(channel, tvs, named, now), nil
-	}
+	return g.watch(channel, tvs, named, now), nil
 }
 
 func (g *Guide) watch(channel Channel, tvs []TV, named string, now time.Time) string {
@@ -133,17 +126,6 @@ func (g *Guide) target(tvs []TV, named string) (TV, string) {
 		return TV{Entity: entity}, ""
 	}
 	return TV{}, say.Speak("actions.youtube_tv.nowhere")
-}
-
-func whatsOn(c Channel, now time.Time) string {
-	a, ok := c.At(now)
-	if !ok || a.Title == "" {
-		return say.SpeakF("actions.youtube_tv.nothing", map[string]any{"Channel": c.Name})
-	}
-	return say.SpeakF(
-		"actions.youtube_tv.airing",
-		map[string]any{"Channel": c.Name, "Title": a.Title},
-	)
 }
 
 func label(tv TV) string {

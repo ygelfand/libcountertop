@@ -43,6 +43,7 @@ type Turn struct {
 	person   string
 	score    float64
 	scored   bool
+	settled  chan struct{}
 	awaiting bool
 	how      Outcome
 	sent     bool
@@ -54,7 +55,47 @@ type Turn struct {
 }
 
 func (l *Log) Begin(slot int, word string) *Turn {
-	return &Turn{id: newID(), slot: slot, word: word, opts: l.opts}
+	t := &Turn{id: newID(), slot: slot, word: word, opts: l.opts, settled: make(chan struct{})}
+	l.mu.Lock()
+	l.now = t
+	l.mu.Unlock()
+	return t
+}
+
+type Match string
+
+const (
+	NoTurn  Match = "none"
+	Pending Match = "pending"
+	Known   Match = "known"
+	Unknown Match = "unknown"
+)
+
+type Speaker struct {
+	Turn   string  `json:"turn,omitempty"`
+	Match  Match   `json:"match"`
+	Name   string  `json:"name,omitempty"`
+	Person string  `json:"person,omitempty"`
+	Score  float64 `json:"score,omitempty"`
+}
+
+func (t *Turn) who() Speaker {
+	if t == nil {
+		return Speaker{Match: NoTurn}
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	switch {
+	case !t.ended.IsZero():
+		return Speaker{Match: NoTurn}
+	case t.scored && t.speaker != "":
+		return Speaker{Turn: t.id, Match: Known, Name: t.speaker, Person: t.person, Score: t.score}
+	case t.scored:
+		return Speaker{Turn: t.id, Match: Unknown, Score: t.score}
+	case t.awaiting && !t.isSettled():
+		return Speaker{Turn: t.id, Match: Pending}
+	}
+	return Speaker{Turn: t.id, Match: Unknown}
 }
 
 func (t *Turn) Listening() {
@@ -107,7 +148,7 @@ func (t *Turn) Ends(how Outcome) {
 		return
 	}
 	t.ended, t.how = time.Now(), how
-	waits := t.awaiting && !t.scored
+	waits := t.awaiting && !t.isSettled()
 	t.mu.Unlock()
 
 	if waits {
@@ -136,10 +177,39 @@ func (t *Turn) Spoke(name, person string, score float64) {
 		return
 	}
 	t.speaker, t.person, t.score, t.scored = name, person, score, true
+	t.settle()
 	over := !t.ended.IsZero()
 	t.mu.Unlock()
 	if over {
 		t.send()
+	}
+}
+
+func (t *Turn) Missed() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.settle()
+	over := !t.ended.IsZero()
+	t.mu.Unlock()
+	if over {
+		t.send()
+	}
+}
+
+func (t *Turn) settle() {
+	if !t.isSettled() {
+		close(t.settled)
+	}
+}
+
+func (t *Turn) isSettled() bool {
+	select {
+	case <-t.settled:
+		return true
+	default:
+		return false
 	}
 }
 

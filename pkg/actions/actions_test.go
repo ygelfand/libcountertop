@@ -29,7 +29,10 @@ func TestTheDeclarationCarriesEveryActionAndItsTriggers(t *testing.T) {
 
 	var got declared
 	switched := func(name string) string { return "Switch " + name }
-	if err := json.Unmarshal([]byte(r.Declaration(all, switched)["actions"]), &got); err != nil {
+	if err := json.Unmarshal(
+		[]byte(r.Declaration(all, switched, nil)["actions"]),
+		&got,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if got.Version != Version || len(got.Actions) != 2 {
@@ -60,7 +63,7 @@ func TestASpeechArgIsDeclaredAsSpeech(t *testing.T) {
 		Speech: "message",
 	})
 	var got declared
-	if err := json.Unmarshal([]byte(r.Declaration(all, nil)["actions"]), &got); err != nil {
+	if err := json.Unmarshal([]byte(r.Declaration(all, nil, nil)["actions"]), &got); err != nil {
 		t.Fatal(err)
 	}
 	if arg := got.Actions[0].Args[0]; arg.Type != speechType {
@@ -109,7 +112,7 @@ func TestASilencedActionDeclaresNoTriggers(t *testing.T) {
 	r.Add(Action{Name: "call", Triggers: []Trigger{{Key: "actions.call.sentence.call"}}})
 	r.Add(Action{Name: "broadcast", Triggers: []Trigger{{Key: "actions.broadcast.sentence.ask"}}})
 	var got declared
-	raw := r.Declaration(func(name string) bool { return name != "call" }, nil)["actions"]
+	raw := r.Declaration(func(name string) bool { return name != "call" }, nil, nil)["actions"]
 	if err := json.Unmarshal([]byte(raw), &got); err != nil {
 		t.Fatal(err)
 	}
@@ -118,6 +121,40 @@ func TestASilencedActionDeclaresNoTriggers(t *testing.T) {
 	}
 	if len(got.Actions[0].Triggers) != 0 || len(got.Actions[1].Triggers) != 1 {
 		t.Errorf("triggers declared %+v, want none for call and one for broadcast", got.Actions)
+	}
+}
+
+func TestAnActionIsDeclaredOnlyToAnIntegrationThatSpeaksItsProtocol(t *testing.T) {
+	var r Registry
+	r.Add(Action{Name: "alarm"})
+	r.Add(Action{Name: "personal", Protocol: 7})
+	names := func(speaks func(int) bool) []string {
+		var got declared
+		if err := json.Unmarshal(
+			[]byte(r.Declaration(all, nil, speaks)["actions"]),
+			&got,
+		); err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, a := range got.Actions {
+			out = append(out, a.Name)
+		}
+		return out
+	}
+	if got := names(func(p int) bool { return p <= 6 }); !slices.Equal(got, []string{"alarm"}) {
+		t.Errorf("to an older integration: %v", got)
+	}
+	if got := names(
+		func(p int) bool { return p <= 7 },
+	); !slices.Equal(
+		got,
+		[]string{"alarm", "personal"},
+	) {
+		t.Errorf("to a newer integration: %v", got)
+	}
+	if got := names(nil); !slices.Equal(got, []string{"alarm"}) {
+		t.Errorf("with no integration: %v", got)
 	}
 }
 

@@ -182,19 +182,3 @@ func TestShowsAiringNowFindTheirChannel(t *testing.T) {
 		t.Errorf("a show that ended still found %q", got.Name)
 	}
 }
-
-func TestWhatsOnSaysTheCurrentAiring(t *testing.T) {
-	now := time.Date(2026, 11, 8, 20, 0, 0, 0, time.UTC)
-	c := Channel{
-		Name:     "ESPN",
-		Title:    "SportsCenter",
-		StartsAt: now.Add(-time.Hour).Format(time.RFC3339),
-		EndsAt:   now.Add(time.Hour).Format(time.RFC3339),
-	}
-	if got := whatsOn(c, now); !strings.Contains(got, "SportsCenter") {
-		t.Errorf("airing said %q", got)
-	}
-	if got := whatsOn(c, now.Add(2*time.Hour)); strings.Contains(got, "SportsCenter") {
-		t.Errorf("after it ended said %q", got)
-	}
-}

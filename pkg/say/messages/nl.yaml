@@ -90,6 +90,33 @@ actions:
       bare: ophangen
       call: (hang [de] (oproep|telefoon) op|beëindig [de] oproep)
       end: (weiger|negeer) [de] oproep
+  personal:
+    _: Persoonlijke verzoeken
+    reply:
+      add_to_list:
+        done: '{{.Item}} staat nu op je lijst.'
+        no_list: '{{.Name}}, er is geen lijst voor je ingesteld.'
+        not_caught: Sorry, ik verstond niet wat ik moet toevoegen.
+      calendar:
+        empty_today: Er staat vandaag niets in je agenda.
+        empty_tomorrow: Er staat morgen niets in je agenda.
+        none: '{{.Name}}, er is geen agenda voor je ingesteld.'
+        today: 'Je hebt vandaag {{.Count}} afspra{{if eq .Count 1}}ak{{else}}ken{{end}}: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} om {{$e.Time}}{{else}} de hele dag{{end}}{{end}}{{if .More}} en nog {{.More}}{{end}}.'
+        tomorrow: 'Je hebt morgen {{.Count}} afspra{{if eq .Count 1}}ak{{else}}ken{{end}}: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} om {{$e.Time}}{{else}} de hele dag{{end}}{{end}}{{if .More}} en nog {{.More}}{{end}}.'
+      failed: Sorry, dat is niet gelukt.
+      no_notify: '{{.Name}}, je telefoon kan geen meldingen ontvangen.'
+      no_phone: '{{.Name}}, er is geen telefoon voor je ingesteld.'
+      remind:
+        not_caught: Sorry, ik verstond niet wanneer.
+        set: 'Ik stuur je over {{if .Hours}}{{.Hours}} uur{{else}}{{.Minutes}} minu{{if eq .Minutes 1}}ut{{else}}ten{{end}}{{end}} een herinnering op je telefoon.'
+      unlinked: '{{.Name}}, je stem is nog niet aan een persoon gekoppeld.'
+      unrecognized: Sorry, ik herkende je stem niet.
+    sentence:
+      add_to_list: zet {item} op mijn lijst
+      calendar: (wat staat er [vandaag] in mijn agenda|wat heb ik vandaag)
+      calendar_tomorrow: (wat staat er morgen in mijn agenda|wat heb ik morgen)
+      remind_hours: herinner me (aan|om) {task} over {hours} uur
+      remind_minutes: herinner me (aan|om) {task} over {minutes} minu(ut|ten)
   recipes:
     _: Koken met recepten
     amount: Je hebt {{.Amount}} nodig
@@ -122,19 +149,15 @@ actions:
     which: Welk recept?
   youtube_tv:
     _: YouTube TV kijken
-    airing: Op {{.Channel}} is {{.Title}}
     channel: Noem een zender of programma
     device: Er is geen apparaat met de naam {{.Device}}
     here:
       _: '{{.Show}} op {{.Channel}} wordt afgespeeld'
       channel: '{{.Channel}} wordt afgespeeld'
-    nothing: Er staat nu niets op {{.Channel}}
     nowhere: Kies een standaard-tv in de tv-app
     sentence:
       watch: (kijk naar|kijk) {channel}
       watch_on: (kijk naar|kijk) {channel} op [de] {device}
-      what_is_on: wat komt er op {channel}
-      whats_on: wat is er op {channel}
     unknown: Ik heb {{.Channel}} gezocht op YouTube TV, maar het is niet beschikbaar of kan nu niet worden afgespeeld
     watching:
       _: '{{.Show}} op {{.Channel}} wordt afgespeeld op {{.Device}}'
@@ -2890,12 +2913,15 @@ voice:
       call_hangup:
         _: Een oproep beëindigen
         help: Laat zinnen in Home Assistant Assist zoals "ophangen" een oproep beëindigen of weigeren
+      personal:
+        _: Persoonlijke verzoeken
+        help: Laat zinnen in Home Assistant Assist zoals "wat staat er in mijn agenda" of "zet melk op mijn lijst" handelen voor de persoon wiens stem herkend is
       recipes:
         _: Koken met recepten
         help: Laat zinnen in Home Assistant Assist recepten zoeken, beginnen met koken en door de stappen gaan op dit apparaat
       youtube_tv:
         _: YouTube TV kijken
-        help: Laat zinnen in Home Assistant Assist een YouTube TV-zender aanzetten of zeggen wat er op is
+        help: Laat zinnen in Home Assistant Assist een YouTube TV-zender aanzetten
     actions:
       _: Alle acties
       help: Biedt de gesproken zinnen van dit apparaat aan Home Assistant Assist aan; uit trekt ze allemaal in

@@ -90,6 +90,33 @@ actions:
       bare: riattacca
       call: (chiudi|termina) [la] (chiamata|telefonata)
       end: (rifiuta|ignora) [la] chiamata
+  personal:
+    _: Richieste personali
+    reply:
+      add_to_list:
+        done: Ho aggiunto {{.Item}} alla tua lista.
+        no_list: '{{.Name}}, non hai una lista configurata.'
+        not_caught: Scusa, non ho capito cosa aggiungere.
+      calendar:
+        empty_today: Oggi non hai niente in calendario.
+        empty_tomorrow: Domani non hai niente in calendario.
+        none: '{{.Name}}, non hai un calendario configurato.'
+        today: 'Oggi hai {{.Count}} impegn{{if eq .Count 1}}o{{else}}i{{end}}: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} alle {{$e.Time}}{{else}} tutto il giorno{{end}}{{end}}{{if .More}} e altri {{.More}}{{end}}.'
+        tomorrow: 'Domani hai {{.Count}} impegn{{if eq .Count 1}}o{{else}}i{{end}}: {{range $i, $e := .Events}}{{if $i}}, {{end}}{{$e.Summary}}{{if $e.Time}} alle {{$e.Time}}{{else}} tutto il giorno{{end}}{{end}}{{if .More}} e altri {{.More}}{{end}}.'
+      failed: Scusa, non ha funzionato.
+      no_notify: '{{.Name}}, il tuo telefono non può ricevere notifiche.'
+      no_phone: '{{.Name}}, non hai un telefono configurato.'
+      remind:
+        not_caught: Scusa, non ho capito quando.
+        set: 'Ti invierò un promemoria sul telefono tra {{if .Hours}}{{.Hours}} or{{if eq .Hours 1}}a{{else}}e{{end}}{{else}}{{.Minutes}} minut{{if eq .Minutes 1}}o{{else}}i{{end}}{{end}}.'
+      unlinked: '{{.Name}}, la tua voce non è ancora collegata a una persona.'
+      unrecognized: Scusa, non ho riconosciuto la tua voce.
+    sentence:
+      add_to_list: aggiungi {item} alla mia lista
+      calendar: (cosa c'è [oggi] nel mio calendario|cosa ho [da fare] oggi)
+      calendar_tomorrow: (cosa c'è domani nel mio calendario|cosa ho [da fare] domani)
+      remind_hours: ricordami di {task} tra {hours} (ora|ore)
+      remind_minutes: ricordami di {task} tra {minutes} minut(o|i)
   recipes:
     _: Cucinare dalle ricette
     amount: Ti serve {{.Amount}}
@@ -122,19 +149,15 @@ actions:
     which: Quale ricetta?
   youtube_tv:
     _: Guarda YouTube TV
-    airing: Su {{.Channel}} c'è {{.Title}}
     channel: Di' un canale o un programma
     device: Non c'è nessun dispositivo chiamato {{.Device}}
     here:
       _: Riproduco {{.Show}} su {{.Channel}}
       channel: Riproduco {{.Channel}}
-    nothing: Al momento non c'è niente in programma su {{.Channel}}
     nowhere: Scegli una TV predefinita nell'app TV
     sentence:
       watch: (guarda|sintonizza) {channel}
       watch_on: (guarda|sintonizza) {channel} (sulla|sul|su) {device}
-      what_is_on: che cosa c'è su {channel}
-      whats_on: cosa c'è su {channel}
     unknown: Ho cercato {{.Channel}} su YouTube TV, ma non è disponibile o al momento non si può riprodurre
     watching:
       _: Riproduco {{.Show}} su {{.Channel}} su {{.Device}}
@@ -2894,12 +2917,15 @@ voice:
       call_hangup:
         _: Chiudi una chiamata
         help: Consente alle frasi di Home Assistant Assist come "riaggancia" di chiudere o rifiutare una chiamata
+      personal:
+        _: Richieste personali
+        help: Consente alle frasi di Home Assistant Assist come "cosa c'è nel mio calendario" o "aggiungi latte alla mia lista" di agire per la persona riconosciuta dalla voce
       recipes:
         _: Cucinare dalle ricette
         help: Permette alle frasi di Home Assistant Assist di trovare ricette, iniziare a cucinare e scorrere i passaggi su questo dispositivo
       youtube_tv:
         _: Guarda YouTube TV
-        help: Consente alle frasi di Home Assistant Assist di mettere un canale YouTube TV o dire cosa c'è in onda
+        help: Consente alle frasi di Home Assistant Assist di mettere un canale YouTube TV
     actions:
       _: Tutte le azioni
       help: Offre a Home Assistant Assist le frasi di questo dispositivo; spento le ritira tutte
