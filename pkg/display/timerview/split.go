@@ -7,7 +7,6 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
-	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
@@ -188,8 +187,7 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 	id := dialID(i)
 	card := timer.Card{Showing: true, Ringing: e.Done, Name: e.Name, Left: e.Left, Of: e.Of}
 
-	side := min(cell.W, cell.H) * 0.58
-	key := max(min(cell.W, cell.H)*0.16, style.Reach()*1.2)
+	side, key := cellSizes(cell)
 	left, right := cellKeys(e)
 	dialRow := []gogui.View{
 		v.roundKey(id+"-"+left, keyGlyph(e, left), key, v.press(e, left)),
@@ -235,6 +233,15 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 		return v.UI.Presses.Pressable(gogui.Column, cfg, func(gogui.EventCtx) { tap() })
 	}
 	return gogui.Column(cfg)
+}
+
+// cellSizes fits the dial and the two keys beside it inside a cell, with room for the
+// gaps between them: the dial gets at most 46 % of the width and 58 % of the height.
+func cellSizes(cell Cell) (dial, key float32) {
+	short := min(cell.W, cell.H)
+	key = max(short*0.13, 72)
+	dial = min(cell.H*0.58, cell.W*0.46)
+	return dial, key
 }
 
 // cellKeys says which key sits left and right of a cell's dial: × on the left, pause on

@@ -268,3 +268,21 @@ func TestTheKeyCirclesStandOutFromTheBackground(t *testing.T) {
 		t.Errorf("circle fill opacity %d, want solid", fill.A)
 	}
 }
+
+func TestTheDialAndKeysFitInEveryCell(t *testing.T) {
+	const gaps = 4 * 48 // two spacings and two paddings, generously
+	for n := 1; n <= 4; n++ {
+		for _, cell := range splitCells(n, 1920, 1200) {
+			dial, key := cellSizes(cell)
+			if wide := dial + 2*key + gaps; wide > cell.W {
+				t.Errorf("%d timers: dial %.0f + keys 2x%.0f + gaps = %.0f, wider than the cell %.0f", n, dial, key, wide, cell.W)
+			}
+			if dial > cell.H*0.7 {
+				t.Errorf("%d timers: dial %.0f too tall for the cell %.0f", n, dial, cell.H)
+			}
+			if key < 64 {
+				t.Errorf("%d timers: key %.0f px is too small to tap", n, key)
+			}
+		}
+	}
+}
