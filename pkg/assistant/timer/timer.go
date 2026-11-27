@@ -361,7 +361,7 @@ func (t *Timers) all(now time.Time) []Entry {
 	})
 	out := make([]Entry, 0, len(items))
 	for _, it := range items {
-		e := Entry{ID: it.id, Name: cmp.Or(it.c.name, ""), Of: it.c.total, Done: it.done}
+		e := Entry{ID: it.id, Name: cmp.Or(it.c.name, "Timer"), Of: it.c.total, Done: it.done}
 		if !it.done {
 			e.Left, e.Paused = it.c.remaining(now), !it.c.active
 		}

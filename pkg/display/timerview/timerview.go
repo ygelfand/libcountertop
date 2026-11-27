@@ -40,6 +40,9 @@ type View struct {
 	Act func(action, timerID string) error
 	// Domain names the integration whose pause/resume/cancel actions Act calls.
 	Domain func() string
+
+	// spawn runs a key's Home Assistant call off the screen's thread (safe.Go when nil).
+	spawn func(what string, f func())
 }
 
 type Scene struct {

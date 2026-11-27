@@ -9,6 +9,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -86,11 +87,46 @@ func (v *View) press(e timer.Entry, op string) func() {
 			slog.Warn("timer key has no way to reach Home Assistant", "action", action)
 			return
 		}
-		if err := v.Act(action, e.ID); err != nil {
-			slog.Warn("timer key failed", "action", action, "timer", e.ID, "err", err)
-		}
+		act := v.Act
+		// Off the screen's thread: a slow Home Assistant must not freeze the display.
+		v.goSpawn("timer key", func() {
+			if err := act(action, e.ID); err != nil {
+				slog.Warn("timer key failed", "action", action, "timer", e.ID, "err", err)
+			}
+		})
 	}
 }
+
+func (v *View) goSpawn(what string, f func()) {
+	if v.spawn != nil {
+		v.spawn(what, f)
+		return
+	}
+	safe.Go(what, f)
+}
+
+// cellTap stops the ring when a finished cell is tapped anywhere; other cells do nothing.
+func (v *View) cellTap(e timer.Entry) func() {
+	if !e.Done {
+		return nil
+	}
+	return func() { v.Timers.Stop() }
+}
+
+// cellLines is the text under a cell's dial. A finished dial shows a bell, so the cell
+// names the timer itself.
+func cellLines(e timer.Entry) []string {
+	switch {
+	case e.Done:
+		return []string{e.Name, timer.Remaining(0) + " · " + say.T("timer.up")}
+	case e.Paused:
+		return []string{say.T("timer.paused")}
+	}
+	return nil
+}
+
+func cellID(i int) string { return fmt.Sprintf("timer-split-%d-cell", i) }
+func dialID(i int) string { return fmt.Sprintf("timer-split-%d", i) }
 
 func (v *View) split(w *gogui.Window, c timer.Card) gogui.View {
 	vw, vh := w.WindowSize()
@@ -115,42 +151,49 @@ func (v *View) split(w *gogui.Window, c timer.Card) gogui.View {
 	default:
 		rows = []gogui.View{splitRow(views[:2]), splitRow(views[2:])}
 	}
-	return gogui.Column(widgets.Blocking(gogui.ContainerCfg{
-		ID:      "timer-split",
-		Width:   fw,
-		Height:  fh,
-		Sizing:  gogui.FixedFixed,
-		Color:   widgets.Color(v.UI.Palette().Background),
-		Radius:  gogui.NoRadius,
-		Padding: gogui.NoPadding,
-		Content: rows,
-	}))
+	return gogui.Column(widgets.Blocking(splitScreenCfg(rows, fw, fh, widgets.Color(v.UI.Palette().Background))))
 }
 
-func splitRow(views []gogui.View) gogui.View {
-	return gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: views})
+// splitScreenCfg and splitRowCfg set no spacing: an unset spacing is the theme's gap, which
+// would push the right and bottom cells past the screen edge.
+func splitScreenCfg(rows []gogui.View, w, h float32, back gogui.Color) gogui.ContainerCfg {
+	return gogui.ContainerCfg{
+		ID:      "timer-split",
+		Width:   w,
+		Height:  h,
+		Sizing:  gogui.FixedFixed,
+		Color:   back,
+		Radius:  gogui.NoRadius,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.NoSpacing,
+		Content: rows,
+	}
 }
+
+func splitRowCfg(views []gogui.View) gogui.ContainerCfg {
+	return gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.NoSpacing,
+		Content: views,
+	}
+}
+
+func splitRow(views []gogui.View) gogui.View { return gogui.Row(splitRowCfg(views)) }
 
 func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark string) gogui.View {
 	t := gogui.CurrentTheme()
 	pal := v.UI.Palette()
-	id := fmt.Sprintf("timer-split-%d", i)
+	id := dialID(i)
 	card := timer.Card{Showing: true, Ringing: e.Done, Name: e.Name, Left: e.Left, Of: e.Of}
 
 	side := min(cell.W, cell.H) * 0.62
 	content := []gogui.View{v.dialAs(w, card, side, id)}
 
-	status := ""
-	switch {
-	case e.Done:
-		status = say.T("timer.up")
-	case e.Paused:
-		status = say.T("timer.paused")
-	}
-	if status != "" {
+	for _, line := range cellLines(e) {
 		st := t.TextStyleTitle
 		st.Color, st.Align = widgets.Color(pal.Muted), gogui.TextAlignCenter
-		content = append(content, gogui.Label(status, st))
+		content = append(content, gogui.Label(line, st))
 	}
 
 	keyStyle := t.TextStyleTitle
@@ -177,8 +220,8 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 		content = append(content, gogui.Label(mark, st))
 	}
 
-	return gogui.Column(gogui.ContainerCfg{
-		ID:      id,
+	cfg := gogui.ContainerCfg{
+		ID:      cellID(i),
 		Width:   cell.W,
 		Height:  cell.H,
 		Sizing:  gogui.FixedFixed,
@@ -188,7 +231,11 @@ func (v *View) splitCell(w *gogui.Window, i int, e timer.Entry, cell Cell, mark 
 		Spacing: gogui.SpacingMedium,
 		Clip:    true,
 		Content: content,
-	})
+	}
+	if tap := v.cellTap(e); tap != nil {
+		return v.UI.Presses.Pressable(gogui.Column, cfg, func(gogui.EventCtx) { tap() })
+	}
+	return gogui.Column(cfg)
 }
 
 func (v *View) splitKey(

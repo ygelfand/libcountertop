@@ -2,6 +2,7 @@ package timerview
 
 import (
 	"errors"
+	gogui "github.com/go-gui-org/go-gui/gui"
 	"testing"
 	"time"
 
@@ -60,6 +61,7 @@ type acted struct {
 func viewFor(s *stopper, a *acted) *View {
 	return &View{
 		Timers: s,
+		spawn:  func(_ string, f func()) { f() },
 		Act: func(action, id string) error {
 			a.action, a.id = action, id
 			a.calls++
@@ -157,5 +159,71 @@ func TestShownEntriesAddARingWhenForgottenCellsLeftOnlyTheRing(t *testing.T) {
 	got = shownEntries(timer.Card{All: []timer.Entry{{ID: "a"}}})
 	if len(got) != 1 || got[0].ID != "a" {
 		t.Errorf("got %+v, want the listed timer", got)
+	}
+}
+
+func TestAKeyNeverWaitsForHomeAssistant(t *testing.T) {
+	var s stopper
+	called := make(chan struct{})
+	v := &View{Timers: &s, Act: func(string, string) error {
+		time.Sleep(300 * time.Millisecond)
+		close(called)
+		return nil
+	}}
+
+	start := time.Now()
+	v.press(timer.Entry{ID: "t1"}, opPause)()
+	if took := time.Since(start); took > 100*time.Millisecond {
+		t.Errorf("the key held the screen for %s waiting for Home Assistant", took)
+	}
+	select {
+	case <-called:
+	case <-time.After(2 * time.Second):
+		t.Error("Home Assistant was never called")
+	}
+}
+
+func TestAFinishedCellSaysWhichTimerItIs(t *testing.T) {
+	got := cellLines(timer.Entry{Name: "eggs", Done: true})
+	if len(got) != 2 || got[0] != "eggs" || got[1] != "0:00 · Time's up" {
+		t.Errorf("finished cell reads %q, want [eggs, 0:00 · Time's up]", got)
+	}
+	if got := cellLines(timer.Entry{Name: "eggs", Paused: true}); len(got) != 1 || got[0] != "Paused" {
+		t.Errorf("paused cell reads %q, want [Paused]", got)
+	}
+	if got := cellLines(timer.Entry{Name: "eggs"}); len(got) != 0 {
+		t.Errorf("running cell reads %q, want nothing under the dial", got)
+	}
+}
+
+func TestTheGridHasNoGapsThatPushCellsOffScreen(t *testing.T) {
+	if got := splitRowCfg(nil).Spacing; got != gogui.NoSpacing {
+		t.Errorf("row spacing %v, want none", got)
+	}
+	if got := splitScreenCfg(nil, 1920, 1200, gogui.Color{}).Spacing; got != gogui.NoSpacing {
+		t.Errorf("screen spacing %v, want none", got)
+	}
+}
+
+func TestACellAndItsDialHaveDifferentIDs(t *testing.T) {
+	if cellID(0) == dialID(0) || cellID(0) == cellID(1) || dialID(0) == dialID(1) {
+		t.Errorf("ids clash: cell %q/%q dial %q/%q", cellID(0), cellID(1), dialID(0), dialID(1))
+	}
+}
+
+func TestATapAnywhereOnAFinishedCellStopsTheRing(t *testing.T) {
+	var s stopper
+	var a acted
+	v := viewFor(&s, &a)
+	if v.cellTap(timer.Entry{ID: "t1"}) != nil {
+		t.Error("a running cell stops something when tapped")
+	}
+	tap := v.cellTap(timer.Entry{ID: "t1", Done: true})
+	if tap == nil {
+		t.Fatal("a finished cell does nothing when tapped")
+	}
+	tap()
+	if s.stopped != 1 || a.calls != 0 {
+		t.Errorf("stopped %d, called HA %d; want 1, 0", s.stopped, a.calls)
 	}
 }

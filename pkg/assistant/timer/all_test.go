@@ -162,3 +162,13 @@ func waitQuiet(t *testing.T, ts *Timers) {
 }
 
 func sleepTick() { time.Sleep(5 * time.Millisecond) }
+
+func TestAnUnnamedTimerIsCalledTimer(t *testing.T) {
+	ts := New(Options{})
+	e := started("t1", 60)
+	e.Name = ""
+	ts.Event(e)
+	if all := ts.Now().All; len(all) != 1 || all[0].Name != "Timer" {
+		t.Errorf("got %+v, want it named Timer", all)
+	}
+}
