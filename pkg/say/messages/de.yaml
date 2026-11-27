@@ -2713,6 +2713,7 @@ thermostat:
 timer:
   stop: Stopp
 timerstyle:
+  split: Geteilt
   banner: Banner
   bar: Leiste
   corner: Ecke
